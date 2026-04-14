@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>STMC Operations - Owner</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'styles.css' %}" />
+</head>
+<body data-page="owner" class="page-shell">
+  <header class="header">
+    <div class="header-left">
+      <strong>SUMMERTOWN METALS</strong>
+      <span class="header-muted" id="hR"></span>
+    </div>
+    <div class="header-right">
+      <span id="hN" class="header-muted"></span>
+      <span id="hA" class="header-badge"></span>
+      <span class="logout-link">Logout</span>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <button class="active" data-target="own-dashboard">Dashboard</button>
+    <button data-target="own-projects">All projects</button>
+    <button data-target="own-payments">Payments</button>
+  </nav>
+
+  <main class="wrap">
+    <section id="own-dashboard" class="page active">
+      <div id="own-kpis" class="kpis cols-4"></div>
+
+      <h2 class="section-title">Notifications</h2>
+      <div id="own-notifications"></div>
+    </section>
+
+    <section id="own-projects" class="page">
+      <h2 class="section-title">All projects</h2>
+      <article class="card">
+        <table class="table">
+          <thead><tr><th>Project</th><th>PM</th><th>Contract</th><th>Margin</th></tr></thead>
+          <tbody id="own-projects-body"></tbody>
+        </table>
+      </article>
+    </section>
+
+    <section id="own-payments" class="page">
+      <h2 class="section-title">Payment tracking</h2>
+      <article id="own-payments-card" class="card"></article>
+    </section>
+  </main>
+
+  <script>
+    window.STMC_ROUTES = {
+      login: "{% url 'login' %}",
+      sales: "{% url 'sales' %}",
+      pm: "{% url 'manager' %}",
+      exec: "{% url 'owner' %}"
+    };
+    window.STMC_DATA_URL = "{% static 'data.json' %}";
+  </script>
+  <script src="{% static 'app.js' %}" defer></script>
+</body>
+</html>

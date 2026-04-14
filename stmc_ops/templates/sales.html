@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>STMC Operations - Sales</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'styles.css' %}" />
+</head>
+<body data-page="sales" class="page-shell">
+  <header class="header">
+    <div class="header-left">
+      <strong>SUMMERTOWN METALS</strong>
+      <span class="header-muted" id="hR"></span>
+    </div>
+    <div class="header-right">
+      <span id="hN" class="header-muted"></span>
+      <span id="hA" class="header-badge"></span>
+      <span class="logout-link">Logout</span>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <button class="active" data-target="sales-contract">New contract</button>
+    <button data-target="sales-projects">My projects</button>
+    <button data-target="sales-models">Models</button>
+    <button data-target="sales-rates">Rate card</button>
+  </nav>
+
+  <main class="wrap">
+    <section id="sales-contract" class="page active">
+      <div id="sales-wizard"></div>
+    </section>
+
+    <section id="sales-projects" class="page">
+      <h2 class="section-title">My projects</h2>
+      <div id="sales-projects-list" class="sales-projects-list"></div>
+    </section>
+
+    <section id="sales-models" class="page">
+      <h2 class="section-title">Models</h2>
+      <article class="card">
+        <table class="table">
+          <thead><tr><th>Model</th><th>SF</th><th>Turnkey / SF</th><th>Total</th></tr></thead>
+          <tbody id="sales-models-body"></tbody>
+        </table>
+      </article>
+    </section>
+
+    <section id="sales-rates" class="page">
+      <h2 class="section-title">Rate card</h2>
+      <article class="card">
+        <table class="table">
+          <thead><tr><th>Trade</th><th>Unit</th><th>Rate</th></tr></thead>
+          <tbody id="sales-rates-body"></tbody>
+        </table>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    window.STMC_ROUTES = {
+      login: "{% url 'login' %}",
+      sales: "{% url 'sales' %}",
+      pm: "{% url 'manager' %}",
+      exec: "{% url 'owner' %}"
+    };
+    window.STMC_DATA_URL = "{% static 'data.json' %}";
+  </script>
+  <script src="{% static 'app.js' %}" defer></script>
+</body>
+</html>
