@@ -337,6 +337,93 @@ select {
   font-size: 16px;
 }
 
+.sales-rates-content {
+  max-width: 640px;
+}
+
+.sales-models-content {
+  max-width: 640px;
+}
+
+.sales-models-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sales-models-badge {
+  font-size: 10px;
+  background: rgba(163, 26, 26, 0.16);
+  color: var(--brand);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.sales-models-meta {
+  font-size: 11px;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+}
+
+.sales-model-row {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.sales-model-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.sales-model-main h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sales-model-main p {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.sales-model-value {
+  text-align: right;
+}
+
+.sales-model-value strong {
+  display: block;
+  font-size: 13px;
+}
+
+.sales-model-value span {
+  font-size: 9px;
+  color: var(--text-soft);
+}
+
+.sales-rates-shell {
+  width: 100%;
+}
+
+.rates-meta {
+  font-size: 10px;
+  color: var(--text-soft);
+  margin-bottom: 8px;
+}
+
+.rate-row .rd {
+  min-width: 42px;
+  text-align: right;
+}
+
+.rate-row .rv {
+  min-width: 70px;
+}
+
 @media (min-width: 900px) {
   .sales-project-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));

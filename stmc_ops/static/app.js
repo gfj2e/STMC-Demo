@@ -910,8 +910,147 @@
       .join("");
   }
 
+  function formatRateMoney(value) {
+    return "$" + parseNumber(value).toFixed(2);
+  }
+
+  function normalizeRateCategory(value) {
+    var category = String(value || "").toLowerCase();
+    if (category === "exterior" || category === "e") {
+      return "exterior";
+    }
+    if (category === "interior" || category === "i") {
+      return "interior";
+    }
+    return "";
+  }
+
+  function renderRateCardRows(rows) {
+    return rows
+      .map(function(item) {
+        return "<div class=\"rw rate-row\">" +
+          "<span class=\"rl\">" + escapeHtml(item.label) + "</span>" +
+          "<span class=\"rd mono\">" + escapeHtml(item.unit) + "</span>" +
+          "<span class=\"rv\">" + formatRateMoney(item.rate) + "</span>" +
+          "</div>";
+      })
+      .join("");
+  }
+
+  function getSalesCatalogModels(salesData) {
+    var wizardModels = (salesData.wizard && salesData.wizard.models) || [];
+    if (wizardModels.length) {
+      return wizardModels;
+    }
+
+    return (salesData.models || []).map(function(item) {
+      var livingSf = parseNumber(item.sf);
+      var turnkeyRate = parseNumber(item.turnkeyPerSf);
+      var total = parseNumber(item.total);
+      return {
+        id: String(item.model || "").toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        name: item.model,
+        livingSf: livingSf,
+        materialTotal: Math.round(total * 0.24),
+        laborBudget: Math.round(total * 0.11),
+        concreteBudget: Math.round(total * 0.1),
+        turnkeyRate: turnkeyRate
+      };
+    });
+  }
+
+  function renderSalesModelCatalog(salesData, region) {
+    var models = getSalesCatalogModels(salesData).slice().sort(function(a, b) {
+      return parseNumber(a.livingSf) - parseNumber(b.livingSf);
+    });
+
+    if (!models.length) {
+      return "<article class=\"card\"><div class=\"notice\">No models configured.</div></article>";
+    }
+
+    var regionName = region && region.name ? region.name : "Default region";
+
+    var rows = models.map(function(model) {
+      var livingSf = parseNumber(model.livingSf);
+      var turnkeyRate = parseNumber(model.turnkeyRate) + parseNumber(region && region.turnkeyPremium);
+      var total =
+        parseNumber(model.materialTotal) +
+        parseNumber(model.laborBudget) +
+        parseNumber(model.concreteBudget) +
+        (livingSf * turnkeyRate);
+      var perSf = livingSf > 0 ? Math.round(total / livingSf) : 0;
+
+      return "<article class=\"card sales-model-row\">" +
+        "<div class=\"sales-model-main\">" +
+        "<div><h3>" + escapeHtml(model.name || "Model") + "</h3><p>" + formatCount(livingSf) + " SF</p></div>" +
+        "<div class=\"sales-model-value\"><strong class=\"mono\">" + formatMoney(total) + "</strong><span>$" + perSf + "/SF</span></div>" +
+        "</div>" +
+        "</article>";
+    }).join("");
+
+    return "<section class=\"sales-models-shell\">" +
+      "<div class=\"sales-models-title\">Models <span class=\"sales-models-badge\">" + models.length + "</span></div>" +
+      "<div class=\"sales-models-meta\">" + escapeHtml(regionName) + "</div>" +
+      rows +
+      "</section>";
+  }
+
+  function renderSalesRateCard(salesData, region) {
+    var wizardRates = (salesData.wizard && salesData.wizard.rateCard) || [];
+    var rates = wizardRates.length
+      ? wizardRates.map(function(item) {
+        return {
+          label: item.label || item.l || item.trade,
+          unit: item.unit || item.u,
+          rate: item.rate !== undefined ? item.rate : item.r,
+          category: normalizeRateCategory(item.category || item.c)
+        };
+      })
+      : (salesData.rates || []).map(function(item) {
+        return {
+          label: item.trade || item.label || item.l,
+          unit: item.unit || item.u,
+          rate: item.rate !== undefined ? item.rate : item.r,
+          category: normalizeRateCategory(item.category || item.c) || "exterior"
+        };
+      });
+
+    var cleanRates = rates.filter(function(item) {
+      return item.label && item.unit && item.rate !== undefined;
+    });
+
+    var exteriorRates = cleanRates.filter(function(item) {
+      return item.category === "exterior";
+    });
+    var interiorRates = cleanRates.filter(function(item) {
+      return item.category === "interior";
+    });
+
+    if (!exteriorRates.length && !interiorRates.length && cleanRates.length) {
+      exteriorRates = cleanRates;
+    }
+
+    if (!interiorRates.length && !exteriorRates.length) {
+      return "<article class=\"card\"><div class=\"notice\">No rates configured.</div></article>";
+    }
+
+    var version = salesData.rateCardVersion || "2026-02";
+    var subtitle = (region && region.name ? region.name : "Default region") + " &middot; " + version;
+
+    return "<section class=\"sales-rates-shell\">" +
+      "<div class=\"rates-meta\">" + escapeHtml(subtitle) + "</div>" +
+      (exteriorRates.length
+        ? "<div class=\"sh\">Exterior rates</div><div class=\"sb\">" + renderRateCardRows(exteriorRates) + "</div>"
+        : "") +
+      (interiorRates.length
+        ? "<div class=\"shd\">Interior rates</div><div class=\"sb\">" + renderRateCardRows(interiorRates) + "</div>"
+        : "") +
+      "</section>";
+  }
+
   function renderSales() {
     var salesData = demoData.sales || {};
+    var region = getRegionForSession();
 
     renderSalesWizard(salesData);
 
@@ -922,29 +1061,12 @@
         : "<article class=\"card\"><div class=\"notice\">No active projects.</div></article>";
     }
 
-    if ($("sales-models-body")) {
-      $("sales-models-body").innerHTML = (salesData.models || [])
-        .map(function(item) {
-          return "<tr>" +
-            "<td>" + escapeHtml(item.model) + "</td>" +
-            "<td class=\"mono\">" + escapeHtml(item.sf) + "</td>" +
-            "<td class=\"mono\">" + escapeHtml(item.turnkeyPerSf) + "</td>" +
-            "<td class=\"mono\">" + escapeHtml(item.total) + "</td>" +
-            "</tr>";
-        })
-        .join("");
+    if ($("sales-models-content")) {
+      $("sales-models-content").innerHTML = renderSalesModelCatalog(salesData, region);
     }
 
-    if ($("sales-rates-body")) {
-      $("sales-rates-body").innerHTML = (salesData.rates || [])
-        .map(function(item) {
-          return "<tr>" +
-            "<td>" + escapeHtml(item.trade) + "</td>" +
-            "<td>" + escapeHtml(item.unit) + "</td>" +
-            "<td class=\"mono\">" + escapeHtml(item.rate) + "</td>" +
-            "</tr>";
-        })
-        .join("");
+    if ($("sales-rates-content")) {
+      $("sales-rates-content").innerHTML = renderSalesRateCard(salesData, region);
     }
   }
 

@@ -39,23 +39,12 @@
     </section>
 
     <section id="sales-models" class="page">
-      <h2 class="section-title">Models</h2>
-      <article class="card">
-        <table class="table">
-          <thead><tr><th>Model</th><th>SF</th><th>Turnkey / SF</th><th>Total</th></tr></thead>
-          <tbody id="sales-models-body"></tbody>
-        </table>
-      </article>
+      <div id="sales-models-content" class="sales-models-content"></div>
     </section>
 
     <section id="sales-rates" class="page">
       <h2 class="section-title">Rate card</h2>
-      <article class="card">
-        <table class="table">
-          <thead><tr><th>Trade</th><th>Unit</th><th>Rate</th></tr></thead>
-          <tbody id="sales-rates-body"></tbody>
-        </table>
-      </article>
+      <div id="sales-rates-content" class="sales-rates-content"></div>
     </section>
   </main>
 
@@ -66,8 +55,8 @@
       pm: "{% url 'manager' %}",
       exec: "{% url 'owner' %}"
     };
-    window.STMC_DATA_URL = "{% static 'data.json' %}";
+    window.STMC_DATA_URL = "{% static 'data.json' %}?v=20260414-models";
   </script>
-  <script src="{% static 'app.js' %}" defer></script>
+  <script src="{% static 'app.js' %}?v=20260414-models" defer></script>
 </body>
 </html>

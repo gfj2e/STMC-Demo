@@ -51,8 +51,90 @@
     }
   ],
   "sales": {
+    "rateCardVersion": "2026-02",
     "wizard": {
       "models": [
+        {
+          "id": "brookside",
+          "name": "Brookside",
+          "livingSf": 1200,
+          "materialTotal": 36950,
+          "laborBudget": 20528,
+          "concreteBudget": 11712,
+          "turnkeyRate": 87.5
+        },
+        {
+          "id": "bluewater",
+          "name": "Bluewater",
+          "livingSf": 1232,
+          "materialTotal": 43775,
+          "laborBudget": 19600,
+          "concreteBudget": 10528,
+          "turnkeyRate": 87.5
+        },
+        {
+          "id": "timber_crest",
+          "name": "Timber Crest",
+          "livingSf": 1284,
+          "materialTotal": 63325,
+          "laborBudget": 28700,
+          "concreteBudget": 13440,
+          "turnkeyRate": 87.5
+        },
+        {
+          "id": "willow_creek",
+          "name": "Willow Creek",
+          "livingSf": 1428,
+          "materialTotal": 52130,
+          "laborBudget": 25200,
+          "concreteBudget": 15200,
+          "turnkeyRate": 87.5
+        },
+        {
+          "id": "buffalo_run",
+          "name": "Buffalo Run",
+          "livingSf": 1464,
+          "materialTotal": 81750,
+          "laborBudget": 32000,
+          "concreteBudget": 17912,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "east_fork_deluxe",
+          "name": "East Fork Deluxe",
+          "livingSf": 1560,
+          "materialTotal": 75550,
+          "laborBudget": 33200,
+          "concreteBudget": 20500,
+          "turnkeyRate": 87.5
+        },
+        {
+          "id": "the_berkley",
+          "name": "The Berkley",
+          "livingSf": 1560,
+          "materialTotal": 72000,
+          "laborBudget": 49500,
+          "concreteBudget": 19200,
+          "turnkeyRate": 95
+        },
+        {
+          "id": "piney_creek",
+          "name": "Piney Creek",
+          "livingSf": 1672,
+          "materialTotal": 79550,
+          "laborBudget": 33260,
+          "concreteBudget": 23000,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "huntley",
+          "name": "Huntley",
+          "livingSf": 1680,
+          "materialTotal": 59500,
+          "laborBudget": 27000,
+          "concreteBudget": 17024,
+          "turnkeyRate": 90
+        },
         {
           "id": "huntley_2_0",
           "name": "Huntley 2.0",
@@ -60,6 +142,15 @@
           "materialTotal": 63075,
           "laborBudget": 30724,
           "concreteBudget": 18816,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "johnson",
+          "name": "Johnson",
+          "livingSf": 1710,
+          "materialTotal": 74000,
+          "laborBudget": 44500,
+          "concreteBudget": 23000,
           "turnkeyRate": 90
         },
         {
@@ -72,12 +163,228 @@
           "turnkeyRate": 90
         },
         {
+          "id": "arrowhead_lodge",
+          "name": "Arrowhead Lodge",
+          "livingSf": 1827,
+          "materialTotal": 156100,
+          "laborBudget": 63500,
+          "concreteBudget": 32056,
+          "turnkeyRate": 110
+        },
+        {
+          "id": "riverview_cottage",
+          "name": "Riverview Cottage",
+          "livingSf": 1863,
+          "materialTotal": 71100,
+          "laborBudget": 31500,
+          "concreteBudget": 14664,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "woodside_special",
+          "name": "Woodside Special",
+          "livingSf": 1920,
+          "materialTotal": 92000,
+          "laborBudget": 44000,
+          "concreteBudget": 23000,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "creekside_special",
+          "name": "Creekside Special",
+          "livingSf": 1920,
+          "materialTotal": 87050,
+          "laborBudget": 41380,
+          "concreteBudget": 25920,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "northview_lodge",
+          "name": "Northview Lodge",
+          "livingSf": 1920,
+          "materialTotal": 87350,
+          "laborBudget": 37500,
+          "concreteBudget": 23040,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "cottonwood_bend",
+          "name": "Cottonwood Bend",
+          "livingSf": 1962,
+          "materialTotal": 110500,
+          "laborBudget": 44500,
+          "concreteBudget": 26700,
+          "turnkeyRate": 95
+        },
+        {
+          "id": "whispering_pines",
+          "name": "Whispering Pines",
+          "livingSf": 2000,
+          "materialTotal": 79000,
+          "laborBudget": 44800,
+          "concreteBudget": 28480,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "martin_lodge",
+          "name": "Martin Lodge",
+          "livingSf": 2016,
+          "materialTotal": 94050,
+          "laborBudget": 49500,
+          "concreteBudget": 31400,
+          "turnkeyRate": 105
+        },
+        {
           "id": "mini_pettus",
           "name": "Mini Pettus",
           "livingSf": 2046,
           "materialTotal": 100750,
           "laborBudget": 48700,
           "concreteBudget": 29104,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "meadows_end",
+          "name": "Meadows End",
+          "livingSf": 2203,
+          "materialTotal": 99750,
+          "laborBudget": 46120,
+          "concreteBudget": 28160,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "southern_monitor",
+          "name": "Southern Monitor",
+          "livingSf": 2230,
+          "materialTotal": 103150,
+          "laborBudget": 38800,
+          "concreteBudget": 22400,
+          "turnkeyRate": 95
+        },
+        {
+          "id": "robertson_deluxe",
+          "name": "Robertson Deluxe",
+          "livingSf": 2250,
+          "materialTotal": 113750,
+          "laborBudget": 49500,
+          "concreteBudget": 28560,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "robertson",
+          "name": "Robertson",
+          "livingSf": 2250,
+          "materialTotal": 97996,
+          "laborBudget": 46300,
+          "concreteBudget": 28560,
+          "turnkeyRate": 90
+        },
+        {
+          "id": "rocky_top",
+          "name": "Rocky Top",
+          "livingSf": 2328,
+          "materialTotal": 137000,
+          "laborBudget": 55060,
+          "concreteBudget": 30144,
+          "turnkeyRate": 98
+        },
+        {
+          "id": "thompson",
+          "name": "Thompson",
+          "livingSf": 2400,
+          "materialTotal": 109000,
+          "laborBudget": 50800,
+          "concreteBudget": 31500,
+          "turnkeyRate": 95
+        },
+        {
+          "id": "fox_run",
+          "name": "Fox Run",
+          "livingSf": 2400,
+          "materialTotal": 203500,
+          "laborBudget": 83000,
+          "concreteBudget": 51000,
+          "turnkeyRate": 115
+        },
+        {
+          "id": "ridgecrest",
+          "name": "Ridgecrest",
+          "livingSf": 2540,
+          "materialTotal": 138150,
+          "laborBudget": 69200,
+          "concreteBudget": 32600,
+          "turnkeyRate": 94
+        },
+        {
+          "id": "pettus",
+          "name": "Pettus",
+          "livingSf": 2688,
+          "materialTotal": 124500,
+          "laborBudget": 59847,
+          "concreteBudget": 38208,
+          "turnkeyRate": 92
+        },
+        {
+          "id": "daugherty",
+          "name": "Daugherty",
+          "livingSf": 2694,
+          "materialTotal": 184250,
+          "laborBudget": 83500,
+          "concreteBudget": 46288,
+          "turnkeyRate": 102
+        },
+        {
+          "id": "maple_grove",
+          "name": "Maple Grove",
+          "livingSf": 3012,
+          "materialTotal": 126800,
+          "laborBudget": 69500,
+          "concreteBudget": 31000,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "franks_barndominium",
+          "name": "Franks Barndominium",
+          "livingSf": 3016,
+          "materialTotal": 149000,
+          "laborBudget": 77500,
+          "concreteBudget": 35500,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "cedar_ridge",
+          "name": "Cedar Ridge",
+          "livingSf": 3261,
+          "materialTotal": 193500,
+          "laborBudget": 87000,
+          "concreteBudget": 44000,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "the_hadley",
+          "name": "The Hadley",
+          "livingSf": 3429,
+          "materialTotal": 158500,
+          "laborBudget": 61500,
+          "concreteBudget": 39464,
+          "turnkeyRate": 100
+        },
+        {
+          "id": "westview_manor",
+          "name": "Westview Manor",
+          "livingSf": 3610,
+          "materialTotal": 193750,
+          "laborBudget": 82000,
+          "concreteBudget": 33000,
+          "turnkeyRate": 98
+        },
+        {
+          "id": "summer_breeze",
+          "name": "Summer Breeze",
+          "livingSf": 3658,
+          "materialTotal": 151750,
+          "laborBudget": 78500,
+          "concreteBudget": 38000,
           "turnkeyRate": 100
         }
       ],
