@@ -4,11 +4,12 @@
   {% load static %}
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>STMC Operations - Manager</title>
+  <title>STMC Operations – Manager</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'styles.css' %}" />
 </head>
 <body data-page="manager" class="page-shell">
+
   <header class="header">
     <div class="header-left">
       <strong>SUMMERTOWN METALS</strong>
@@ -17,7 +18,7 @@
     <div class="header-right">
       <span id="hN" class="header-muted"></span>
       <span id="hA" class="header-badge"></span>
-      <span class="logout-link">Logout</span>
+      <span class="logout-link" role="button" tabindex="0">Logout</span>
     </div>
   </header>
 
@@ -28,43 +29,31 @@
   </nav>
 
   <main class="wrap">
-    <section id="mgr-builds" class="page active">
-      <div id="mgr-build-kpis" class="kpis cols-3"></div>
 
-      <article class="card">
-        <h2 class="section-title">Current pipeline</h2>
-        <table class="table">
-          <thead><tr><th>Build</th><th>Model</th><th>Phase</th><th>Contract</th></tr></thead>
-          <tbody id="mgr-pipeline-body"></tbody>
-        </table>
-      </article>
+    <section id="mgr-builds" class="page active">
+      {% include "manager/my_builds.html" %}
     </section>
 
     <section id="mgr-budgets" class="page">
-      <h2 class="section-title">Budget tracking</h2>
-      <div id="mgr-budgets-list"></div>
+      {% include "manager/budgets.html" %}
     </section>
 
     <section id="mgr-draws" class="page">
-      <h2 class="section-title">Draw tracking</h2>
-      <article class="card">
-        <table class="table">
-          <thead><tr><th>Build</th><th>Current draw</th><th>Status</th><th>Amount</th></tr></thead>
-          <tbody id="mgr-draws-body"></tbody>
-        </table>
-      </article>
+      {% include "manager/draws.html" %}
     </section>
+
   </main>
 
   <script>
     window.STMC_ROUTES = {
       login: "{% url 'login' %}",
       sales: "{% url 'sales' %}",
-      pm: "{% url 'manager' %}",
-      exec: "{% url 'owner' %}"
+      pm:    "{% url 'manager' %}",
+      exec:  "{% url 'owner' %}"
     };
     window.STMC_DATA_URL = "{% static 'data.json' %}";
   </script>
-  <script src="{% static 'app.js' %}" defer></script>
+  <script src="{% static 'script.js' %}"  defer></script>
+  <script src="{% static 'manager.js' %}" defer></script>
 </body>
 </html>

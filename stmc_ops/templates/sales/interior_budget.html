@@ -1,0 +1,37 @@
+{% comment %}Sales wizard – Step 4: Interior Budget{% endcomment %}
+<div class="wizard-step" id="step-interior" style="display:none">
+
+  <div class="stl">Interior budget</div>
+
+  <div class="blk">
+    <div class="blk-t">Turnkey INT contract</div>
+    <div class="rw">
+      <span class="rl">Turnkey adder</span>
+      <span class="rd" id="int-sf-detail">— SF × $—</span>
+      <span class="rv" id="int-contract">—</span>
+    </div>
+  </div>
+
+  <div class="shd">PM trade budget
+    <span id="int-true-cost">—</span>
+  </div>
+  <div class="sb" id="int-groups-body">
+    <!-- trade group rows populated by sales.js -->
+  </div>
+
+  <div class="kpis cols-3">
+    <article class="kpi">
+      <div class="kpi-label">INT contract</div>
+      <div class="kpi-value mono" id="int-kpi-contract" style="font-size:15px">—</div>
+    </article>
+    <article class="kpi">
+      <div class="kpi-label">True cost</div>
+      <div class="kpi-value mono" id="int-kpi-truecost" style="font-size:15px">—</div>
+    </article>
+    <article class="kpi">
+      <div class="kpi-label">Margin</div>
+      <div class="kpi-value mono" id="int-kpi-margin" style="font-size:15px">—</div>
+    </article>
+  </div>
+
+</div>

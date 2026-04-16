@@ -6,16 +6,16 @@ def index(request):
 
 
 def login_view(request):
-    return render(request, "login.html")
+    return render(request, "login/index.html")
 
 
 def sales_view(request):
-    return render(request, "sales.html")
+    return render(request, "sales/index.html")
 
 
 def manager_view(request):
-    return render(request, "manager.html")
+    return render(request, "manager/index.html")
 
 
 def owner_view(request):
-    return render(request, "owner.html")
+    return render(request, "owner/index.html")

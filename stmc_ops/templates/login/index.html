@@ -4,11 +4,12 @@
   {% load static %}
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>STMC Operations - Login</title>
+  <title>STMC Operations – Login</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'styles.css' %}" />
 </head>
 <body data-page="login">
+
   <main class="login-wrap">
     <section class="login-card">
       <h1 class="brand-title">SUMMERTOWN METALS</h1>
@@ -17,14 +18,14 @@
       <div class="field">
         <label for="lU">Sign in as</label>
         <select id="lU" name="user">
-          <option value="" disabled selected>Loading users...</option>
+          <option value="" disabled selected>Loading users…</option>
         </select>
       </div>
 
       <div class="field">
         <label for="lR">Region</label>
         <select id="lR" name="region">
-          <option value="" disabled selected>Loading regions...</option>
+          <option value="" disabled selected>Loading regions…</option>
         </select>
       </div>
 
@@ -36,11 +37,12 @@
     window.STMC_ROUTES = {
       login: "{% url 'login' %}",
       sales: "{% url 'sales' %}",
-      pm: "{% url 'manager' %}",
-      exec: "{% url 'owner' %}"
+      pm:    "{% url 'manager' %}",
+      exec:  "{% url 'owner' %}"
     };
     window.STMC_DATA_URL = "{% static 'data.json' %}";
   </script>
-  <script src="{% static 'app.js' %}" defer></script>
+  <script src="{% static 'script.js' %}" defer></script>
+  <script src="{% static 'sales.js' %}"  defer></script>
 </body>
 </html>

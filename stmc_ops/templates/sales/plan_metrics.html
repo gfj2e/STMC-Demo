@@ -1,0 +1,98 @@
+{% comment %}Sales wizard – Step 1: Plan Metrics{% endcomment %}
+<div class="wizard-step" id="step-metrics" style="display:none">
+  <h2 class="wizard-title">Plan metrics</h2>
+
+  <article class="card metrics-grid">
+
+    <div class="metric-row">
+      <span class="metric-label">Living SF</span>
+      <input class="metric-input" id="m-livingSF" data-metric="livingSF" type="number" min="0" />
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Garage SF</span>
+      <input class="metric-input" id="m-garageSF" data-metric="garageSF" type="number" min="0" />
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Porch SF</span>
+      <input class="metric-input" id="m-porchSF" data-metric="porchSF" type="number" min="0" />
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row computed">
+      <span class="metric-label">Slab SF <em>(auto)</em></span>
+      <span class="metric-value" id="m-slabSF">—</span>
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Roof Schedule SF</span>
+      <input class="metric-input" id="m-roofSF" data-metric="roofSF" type="number" min="0" />
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Exterior Wall SF</span>
+      <input class="metric-input" id="m-extWallSF" data-metric="extWallSF" type="number" min="0" />
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Soffit LF</span>
+      <input class="metric-input" id="m-soffitLF" data-metric="soffitLF" type="number" min="0" />
+      <span class="metric-unit">LF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Beam Wrap LF</span>
+      <input class="metric-input" id="m-beamLF" data-metric="beamLF" type="number" min="0" />
+      <span class="metric-unit">LF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Windows</span>
+      <input class="metric-input" id="m-windows" data-metric="windows" type="number" min="0" />
+      <span class="metric-unit">ea</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Exterior Doors</span>
+      <input class="metric-input" id="m-extDoors" data-metric="extDoors" type="number" min="0" />
+      <span class="metric-unit">ea</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Cabinet LF</span>
+      <input class="metric-input" id="m-cabLF" data-metric="cabLF" type="number" min="0" />
+      <span class="metric-unit">LF</span>
+    </div>
+
+    <div class="metric-row computed">
+      <span class="metric-label">Counter SF <em>(auto)</em></span>
+      <span class="metric-value" id="m-counterSF">—</span>
+      <span class="metric-unit">SF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Interior Doors</span>
+      <input class="metric-input" id="m-intDoors" data-metric="intDoors" type="number" min="0" />
+      <span class="metric-unit">ea</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Plumbing Fixtures</span>
+      <input class="metric-input" id="m-fixtures" data-metric="fixtures" type="number" min="0" />
+      <span class="metric-unit">ea</span>
+    </div>
+
+    <div class="metric-row computed">
+      <span class="metric-label">HVAC Tons <em>(auto)</em></span>
+      <span class="metric-value" id="m-hvacTons">—</span>
+      <span class="metric-unit">ton</span>
+    </div>
+
+  </article>
+</div>

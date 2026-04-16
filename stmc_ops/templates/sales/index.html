@@ -4,11 +4,12 @@
   {% load static %}
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>STMC Operations - Sales</title>
+  <title>STMC Operations – Sales</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'styles.css' %}" />
 </head>
 <body data-page="sales" class="page-shell">
+
   <header class="header">
     <div class="header-left">
       <strong>SUMMERTOWN METALS</strong>
@@ -17,7 +18,7 @@
     <div class="header-right">
       <span id="hN" class="header-muted"></span>
       <span id="hA" class="header-badge"></span>
-      <span class="logout-link">Logout</span>
+      <span class="logout-link" role="button" tabindex="0">Logout</span>
     </div>
   </header>
 
@@ -29,34 +30,35 @@
   </nav>
 
   <main class="wrap">
+
     <section id="sales-contract" class="page active">
-      <div id="sales-wizard"></div>
+      {% include "sales/new_contract.html" %}
     </section>
 
     <section id="sales-projects" class="page">
-      <h2 class="section-title">My projects</h2>
-      <div id="sales-projects-list" class="sales-projects-list"></div>
+      {% include "sales/my_projects.html" %}
     </section>
 
     <section id="sales-models" class="page">
-      <div id="sales-models-content" class="sales-models-content"></div>
+      {% include "sales/models.html" %}
     </section>
 
     <section id="sales-rates" class="page">
-      <h2 class="section-title">Rate card</h2>
-      <div id="sales-rates-content" class="sales-rates-content"></div>
+      {% include "sales/rate_card.html" %}
     </section>
+
   </main>
 
   <script>
     window.STMC_ROUTES = {
       login: "{% url 'login' %}",
       sales: "{% url 'sales' %}",
-      pm: "{% url 'manager' %}",
-      exec: "{% url 'owner' %}"
+      pm:    "{% url 'manager' %}",
+      exec:  "{% url 'owner' %}"
     };
-    window.STMC_DATA_URL = "{% static 'data.json' %}?v=20260414-models";
+    window.STMC_DATA_URL = "{% static 'data.json' %}";
   </script>
-  <script src="{% static 'app.js' %}?v=20260414-models" defer></script>
+  <script src="{% static 'script.js' %}" defer></script>
+  <script src="{% static 'sales.js' %}"  defer></script>
 </body>
 </html>

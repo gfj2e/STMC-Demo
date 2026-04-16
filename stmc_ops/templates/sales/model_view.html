@@ -1,0 +1,32 @@
+{% comment %}Sales wizard – Step 0: Select Model{% endcomment %}
+<div class="wizard-step" id="step-model">
+  <h2 class="wizard-title">Select model</h2>
+
+  <article class="card">
+    <div class="field">
+      <label for="sw-model-select">Model</label>
+      <select id="sw-model-select">
+        <option value="" disabled selected>Loading models…</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="sw-customer">Customer</label>
+      <input id="sw-customer" type="text" placeholder="Customer name" autocomplete="off" />
+    </div>
+  </article>
+
+  <div class="kpis cols-3" id="model-kpis" style="display:none">
+    <article class="kpi">
+      <div class="kpi-label">Living SF</div>
+      <div class="kpi-value mono" id="kpi-living-sf">—</div>
+    </article>
+    <article class="kpi">
+      <div class="kpi-label">Turnkey / SF</div>
+      <div class="kpi-value mono" id="kpi-turnkey-sf">—</div>
+    </article>
+    <article class="kpi">
+      <div class="kpi-label">Region</div>
+      <div class="kpi-value" id="kpi-region">—</div>
+    </article>
+  </div>
+</div>
