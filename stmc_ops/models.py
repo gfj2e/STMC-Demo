@@ -1,712 +1,677 @@
-import uuid
+"""
+STMC Turnkey Estimator — Django Database Schema
+================================================
+Derived from STMC_TURNKEY_WIZARD_BUILD_SPEC.md (2,324 lines)
+Covers all 9 wizard steps, 39 models, rate cards, upgrade routing, and budget tracking.
+
+Design principles:
+- All monetary fields use DecimalField (max_digits=12, decimal_places=2)
+- Model presets are seeded from PM, MD, RD, P10, MODELS, CRAFTSMAN, INT_CONTRACT, BASE_COSTS
+- Job state is stored per-project, not in browser memory
+- Backend-only profitability fields are on the Job model (never exposed to PM UI)
+- Upgrade routing uses a ForeignKey to BudgetTrade for precise budget allocation
+"""
 
 from django.db import models
-from django.db.models import Q
+from django.core.validators import MinValueValidator
+import json
 
 
-class UserRole(models.TextChoices):
-	EXECUTIVE = "executive", "Executive"
-	DIVISION_MANAGER = "division_manager", "Division Manager"
-	SALES = "sales", "Sales"
-	CONTRACTS = "contracts", "Contracts"
-	PROJECT_MANAGER = "project_manager", "Project Manager"
-
-
-class RegionCode(models.TextChoices):
-	SUMMERTOWN = "summertown", "Summertown"
-	EAST_TN = "east_tn", "East Tennessee"
-	HOPKINSVILLE = "hopkinsville", "Hopkinsville"
+# ═══════════════════════════════════════════════════════════════
+# REFERENCE DATA — Seeded once, rarely changes
+# ═══════════════════════════════════════════════════════════════
 
+class Branch(models.Model):
+    """Branch locations that affect concrete zone, miles tier, and default rates."""
+    key = models.CharField(max_length=30, unique=True)  # e.g. "summertown"
+    label = models.CharField(max_length=100)             # e.g. "Summertown Main"
+    conc_rate = models.DecimalField(max_digits=6, decimal_places=2, default=8)
+    default_miles = models.IntegerField(default=0)       # 0=under100, 1=over100
+    zone = models.IntegerField(default=1)                # 1, 2, or 3
 
-class ContractStatus(models.TextChoices):
-	DRAFT = "draft", "Draft"
-	REVIEW = "review", "Review"
-	SENT = "sent", "Sent"
-	SIGNED = "signed", "Signed"
-	ACTIVE = "active", "Active"
-	COMPLETE = "complete", "Complete"
-	CANCELLED = "cancelled", "Cancelled"
-
-
-class DrawCalcMethod(models.TextChoices):
-	FIXED_AMOUNT = "fixed_amount", "Fixed Amount"
-	PERCENTAGE = "percentage", "Percentage"
-
-
-class DrawStatus(models.TextChoices):
-	PENDING = "pending", "Pending"
-	PHASE_COMPLETE = "phase_complete", "Phase Complete"
-	INVOICED = "invoiced", "Invoiced"
-	PAID = "paid", "Paid"
-	OVERDUE = "overdue", "Overdue"
-
-
-class ChangeOrderStatus(models.TextChoices):
-	DRAFT = "draft", "Draft"
-	PENDING_APPROVAL = "pending_approval", "Pending Approval"
-	APPROVED = "approved", "Approved"
-	SENT = "sent", "Sent"
-	SIGNED = "signed", "Signed"
-	REJECTED = "rejected", "Rejected"
-
-
-class MetricSource(models.TextChoices):
-	PLAN_SCHEDULE = "plan_schedule", "Plan Schedule"
-	COMPUTED = "computed", "Computed"
-	MANUAL = "manual", "Manual"
-
-
-class EditScope(models.TextChoices):
-	BASE = "base", "Base"
-	UPGRADE = "upgrade", "Upgrade"
-
-
-class Region(models.Model):
-	id = models.CharField(max_length=32, primary_key=True, choices=RegionCode.choices)
-	name = models.TextField()
-	description = models.TextField(blank=True, null=True)
-	labor_mileage_multiplier = models.DecimalField(max_digits=5, decimal_places=4, default=1.0000)
-	concrete_rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=8.00)
-	turnkey_sf_premium = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-	interior_regional_adder = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "regions"
-
-	def __str__(self):
-		return self.name
-
-
-class OpsUser(models.Model):
-	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-	email = models.EmailField(unique=True)
-	password_hash = models.TextField()
-	first_name = models.TextField()
-	last_name = models.TextField()
-	role = models.CharField(max_length=32, choices=UserRole.choices)
-	region = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True, blank=True, related_name="users")
-	is_active = models.BooleanField(default=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "users"
-		indexes = [
-			models.Index(fields=["role"], name="idx_users_role"),
-			models.Index(fields=["region"], name="idx_users_region"),
-		]
-
-	def __str__(self):
-		return f"{self.first_name} {self.last_name}".strip()
-
-
-class ModelCatalog(models.Model):
-	name = models.TextField(unique=True)
-	name_normalized = models.TextField(unique=True)
-	square_footage = models.IntegerField()
-	mft_percentage = models.DecimalField(max_digits=5, decimal_places=4)
-	is_active = models.BooleanField(default=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "models"
-
-	def __str__(self):
-		return self.name
-
-
-class MetricDefinition(models.Model):
-	field_key = models.TextField(unique=True)
-	label = models.TextField()
-	unit = models.TextField(default="SF")
-	source = models.CharField(max_length=32, choices=MetricSource.choices)
-	compute_formula = models.TextField(blank=True, null=True)
-	depends_on = models.JSONField(blank=True, null=True)
-	category = models.TextField(default="general")
-	display_order = models.IntegerField(default=0)
-	is_overridable = models.BooleanField(default=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "metric_definitions"
-
-	def __str__(self):
-		return self.field_key
-
-
-class ModelDefaultMetric(models.Model):
-	model = models.ForeignKey(ModelCatalog, on_delete=models.CASCADE, related_name="default_metrics")
-	metric = models.ForeignKey(
-		MetricDefinition,
-		to_field="field_key",
-		db_column="metric_key",
-		on_delete=models.CASCADE,
-		related_name="model_defaults",
-	)
-	default_value = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
-
-	class Meta:
-		db_table = "model_default_metrics"
-		constraints = [
-			models.UniqueConstraint(fields=["model", "metric"], name="model_default_metrics_model_metric_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["model"], name="idx_model_metrics_model"),
-		]
-
-
-class RateCardVersion(models.Model):
-	region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="rate_card_versions")
-	version_label = models.TextField()
-	effective_date = models.DateField()
-	is_current = models.BooleanField(default=True)
-	notes = models.TextField(blank=True, null=True)
-	created_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_rate_card_versions")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "rate_card_versions"
-		constraints = [
-			models.UniqueConstraint(fields=["region", "version_label"], name="rate_card_versions_region_label_uniq"),
-			models.UniqueConstraint(
-				fields=["region"],
-				condition=Q(is_current=True),
-				name="rate_card_versions_one_current_per_region",
-			),
-		]
-		indexes = [
-			models.Index(fields=["region"], name="idx_rate_versions_region"),
-			models.Index(fields=["region", "is_current"], name="idx_rate_versions_current"),
-		]
-
-
-class RateCardItem(models.Model):
-	version = models.ForeignKey(RateCardVersion, on_delete=models.CASCADE, related_name="items")
-	rate_key = models.TextField()
-	label = models.TextField()
-	rate = models.DecimalField(max_digits=12, decimal_places=4)
-	unit = models.TextField()
-	driver = models.TextField()
-	category = models.TextField()
-	trade_group = models.TextField()
-	display_order = models.IntegerField(default=0)
-
-	class Meta:
-		db_table = "rate_card_items"
-		constraints = [
-			models.UniqueConstraint(fields=["version", "rate_key"], name="rate_card_items_version_key_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["version"], name="idx_rate_items_version"),
-		]
-
-
-class ModelRegionalPricing(models.Model):
-	model = models.ForeignKey(ModelCatalog, on_delete=models.CASCADE, related_name="regional_pricing")
-	region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="model_pricing")
-	material_price = models.DecimalField(max_digits=12, decimal_places=2)
-	exterior_labor_rate = models.DecimalField(max_digits=12, decimal_places=2)
-	concrete_price = models.DecimalField(max_digits=12, decimal_places=2)
-	shell_price = models.DecimalField(max_digits=12, decimal_places=2)
-	turnkey_per_sf = models.DecimalField(max_digits=8, decimal_places=2)
-	turnkey_adder = models.DecimalField(max_digits=12, decimal_places=2)
-	turnkey_total = models.DecimalField(max_digits=12, decimal_places=2)
-	quote_id = models.TextField(blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "model_regional_pricing"
-		constraints = [
-			models.UniqueConstraint(fields=["model", "region"], name="model_regional_pricing_model_region_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["model"], name="idx_model_pricing_model"),
-			models.Index(fields=["region"], name="idx_model_pricing_region"),
-		]
-
-
-class Customer(models.Model):
-	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-	first_name = models.TextField()
-	last_name = models.TextField()
-	email = models.EmailField(blank=True, null=True)
-	phone = models.TextField(blank=True, null=True)
-	address_line1 = models.TextField(blank=True, null=True)
-	address_line2 = models.TextField(blank=True, null=True)
-	city = models.TextField(blank=True, null=True)
-	state = models.TextField(blank=True, null=True)
-	zip = models.TextField(blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "customers"
-
-	def __str__(self):
-		return f"{self.first_name} {self.last_name}".strip()
-
-
-class Project(models.Model):
-	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-	project_name = models.TextField()
-	model = models.ForeignKey(ModelCatalog, on_delete=models.CASCADE, related_name="projects")
-	customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="projects")
-	region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="projects")
-	sales_rep = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="sales_projects")
-	pm = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="managed_projects")
-	rate_card_version = models.ForeignKey(RateCardVersion, on_delete=models.SET_NULL, null=True, blank=True, related_name="projects")
-	status = models.CharField(max_length=32, choices=ContractStatus.choices, default=ContractStatus.DRAFT)
-	site_address = models.TextField(blank=True, null=True)
-	site_city = models.TextField(blank=True, null=True)
-	site_state = models.TextField(blank=True, null=True)
-	site_zip = models.TextField(blank=True, null=True)
-	has_detached_structure = models.BooleanField(default=False)
-	detached_structure_notes = models.TextField(blank=True, null=True)
-	total_contract_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	total_true_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	total_collected = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	bank_name = models.TextField(blank=True, null=True)
-	contract_date = models.DateField(blank=True, null=True)
-	est_start_date = models.DateField(blank=True, null=True)
-	est_completion_date = models.DateField(blank=True, null=True)
-	actual_completion_date = models.DateField(blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "projects"
-		indexes = [
-			models.Index(fields=["status"], name="idx_projects_status"),
-			models.Index(fields=["region"], name="idx_projects_region"),
-			models.Index(fields=["sales_rep"], name="idx_projects_sales"),
-			models.Index(fields=["pm"], name="idx_projects_pm"),
-			models.Index(fields=["model"], name="idx_projects_model"),
-		]
-
-
-class ProjectMetric(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="metrics")
-	metric = models.ForeignKey(
-		MetricDefinition,
-		to_field="field_key",
-		db_column="metric_key",
-		on_delete=models.CASCADE,
-		related_name="project_metrics",
-	)
-	value = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
-	is_overridden = models.BooleanField(default=False)
-	overridden_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="overridden_metrics")
-	overridden_at = models.DateTimeField(blank=True, null=True)
-
-	class Meta:
-		db_table = "project_metrics"
-		constraints = [
-			models.UniqueConstraint(fields=["project", "metric"], name="project_metrics_project_metric_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["project"], name="idx_proj_metrics_project"),
-		]
-
-
-class ProjectMetricAudit(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="metric_audit")
-	metric_key = models.TextField()
-	old_value = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
-	new_value = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
-	changed_by = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="metric_changes")
-	reason = models.TextField(blank=True, null=True)
-	changed_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_metric_audit"
-		indexes = [
-			models.Index(fields=["project"], name="idx_metric_audit_project"),
-		]
-
-
-class P10Order(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="p10_orders")
-	order_number = models.TextField()
-	order_date = models.DateField()
-	customer_number = models.TextField(blank=True, null=True)
-	subtotal = models.DecimalField(max_digits=12, decimal_places=2)
-	freight = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	sales_tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	other_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	amount_prepaid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	balance = models.DecimalField(max_digits=12, decimal_places=2)
-	pdf_storage_key = models.TextField(blank=True, null=True)
-	notes = models.TextField(blank=True, null=True)
-	entered_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="entered_p10_orders")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "p10_orders"
-		indexes = [
-			models.Index(fields=["project"], name="idx_p10_project"),
-		]
-
-
-class ProjectExteriorPricing(models.Model):
-	project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="exterior_pricing")
-	base_sf = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	base_rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	base_shell_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	total_customer_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_exterior_pricing"
-
-
-class ProjectExteriorUpgrade(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="exterior_upgrades")
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	unit = models.TextField(blank=True, null=True)
-	rate = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	edit_scope = models.CharField(max_length=16, choices=EditScope.choices, default=EditScope.UPGRADE)
-	added_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="added_exterior_upgrades")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_exterior_upgrades"
-		indexes = [
-			models.Index(fields=["project"], name="idx_ext_upgrades_project"),
-		]
-
-
-class ProjectContractorBudget(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="contractor_budget")
-	rate_key = models.TextField()
-	label = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	unit = models.TextField(blank=True, null=True)
-	rate = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	trade_group = models.TextField()
-	is_override = models.BooleanField(default=False)
-	display_order = models.IntegerField(default=0)
-
-	class Meta:
-		db_table = "project_contractor_budget"
-		constraints = [
-			models.UniqueConstraint(fields=["project", "rate_key"], name="project_contractor_budget_project_key_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["project"], name="idx_contractor_budget_project"),
-		]
-
-
-class ProjectConcrete(models.Model):
-	project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="concrete")
-	total_concrete_cost = models.DecimalField(max_digits=12, decimal_places=2)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_concrete"
-
-
-class ProjectConcreteLine(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="concrete_lines")
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	unit = models.TextField(blank=True, null=True)
-	rate = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	notes = models.TextField(blank=True, null=True)
-
-	class Meta:
-		db_table = "project_concrete_lines"
-		indexes = [
-			models.Index(fields=["project"], name="idx_concrete_lines_project"),
-		]
-
-
-class ProjectInteriorContract(models.Model):
-	project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="interior_contract")
-	base_turnkey_amount = models.DecimalField(max_digits=12, decimal_places=2)
-	regional_adder = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	adjusted_turnkey_amount = models.DecimalField(max_digits=12, decimal_places=2)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_interior_contract"
-
-
-class ProjectCabinetContract(models.Model):
-	project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="cabinet_contract")
-	base_cabinet_amount = models.DecimalField(max_digits=12, decimal_places=2)
-	total_cabinet_upgrades = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	total_countertop = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	total_cabinet_contract = models.DecimalField(max_digits=12, decimal_places=2)
-	cabinet_pct_of_interior = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_cabinet_contract"
-
-
-class ProjectCabinetUpgrade(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="cabinet_upgrades")
-	category = models.TextField()
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	unit = models.TextField(blank=True, null=True)
-	rate = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	edit_scope = models.CharField(max_length=16, choices=EditScope.choices, default=EditScope.UPGRADE)
-	added_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="added_cabinet_upgrades")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_cabinet_upgrades"
-		indexes = [
-			models.Index(fields=["project"], name="idx_cab_upgrades_project"),
-		]
-
-
-class ProjectCountertopLine(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="countertop_lines")
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	quantity_sf = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	total = models.DecimalField(max_digits=12, decimal_places=2)
-	edit_scope = models.CharField(max_length=16, choices=EditScope.choices, default=EditScope.UPGRADE)
-	added_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="added_countertop_lines")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_countertop_lines"
-		indexes = [
-			models.Index(fields=["project"], name="idx_countertop_project"),
-		]
-
-
-class ProjectInteriorUpgrade(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="interior_upgrades")
-	category = models.TextField()
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
-	customer_price = models.DecimalField(max_digits=12, decimal_places=2)
-	true_cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	edit_scope = models.CharField(max_length=16, choices=EditScope.choices, default=EditScope.UPGRADE)
-	added_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="added_interior_upgrades")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_interior_upgrades"
-		indexes = [
-			models.Index(fields=["project"], name="idx_int_upgrades_project"),
-		]
-
-
-class ProjectContract(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="contracts")
-	contract_number = models.TextField(blank=True, null=True)
-	contract_date = models.DateField(blank=True, null=True)
-	p10_material_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	concrete_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	exterior_labor_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	interior_turnkey_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	cabinet_contract_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	all_upgrades_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	total_contract_amount = models.DecimalField(max_digits=12, decimal_places=2)
-	bank_name = models.TextField(blank=True, null=True)
-	deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=2500)
-	docusign_envelope_id = models.TextField(blank=True, null=True)
-	docusign_status = models.TextField(blank=True, null=True)
-	docusign_sent_at = models.DateTimeField(blank=True, null=True)
-	docusign_signed_at = models.DateTimeField(blank=True, null=True)
-	specification_notes = models.TextField(blank=True, null=True)
-	contract_pdf_key = models.TextField(blank=True, null=True)
-	version = models.IntegerField(default=1)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_contracts"
-		indexes = [
-			models.Index(fields=["project"], name="idx_contracts_project"),
-		]
-
-
-class ProjectDraw(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="draws")
-	contract = models.ForeignKey(ProjectContract, on_delete=models.SET_NULL, null=True, blank=True, related_name="draws")
-	draw_number = models.IntegerField()
-	draw_label = models.TextField()
-	draw_description = models.TextField(blank=True, null=True)
-	calc_method = models.CharField(max_length=24, choices=DrawCalcMethod.choices)
-	percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-	source_component = models.TextField(blank=True, null=True)
-	amount = models.DecimalField(max_digits=12, decimal_places=2)
-	is_detached_portion = models.BooleanField(default=False)
-	detached_description = models.TextField(blank=True, null=True)
-	detached_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	status = models.CharField(max_length=24, choices=DrawStatus.choices, default=DrawStatus.PENDING)
-	phase_completed_at = models.DateTimeField(blank=True, null=True)
-	phase_completed_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="completed_draw_phases")
-	qb_invoice_id = models.TextField(blank=True, null=True)
-	qb_invoice_number = models.TextField(blank=True, null=True)
-	date_invoiced = models.DateField(blank=True, null=True)
-	date_due = models.DateField(blank=True, null=True)
-	date_paid = models.DateField(blank=True, null=True)
-	payment_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-	display_order = models.IntegerField(default=0)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_draws"
-		constraints = [
-			models.UniqueConstraint(
-				fields=["project", "draw_number", "is_detached_portion"],
-				name="project_draws_project_number_detached_uniq",
-			),
-		]
-		indexes = [
-			models.Index(fields=["project"], name="idx_draws_project"),
-			models.Index(fields=["status"], name="idx_draws_status"),
-		]
-
-
-class ChangeOrder(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="change_orders")
-	contract = models.ForeignKey(ProjectContract, on_delete=models.SET_NULL, null=True, blank=True, related_name="change_orders")
-	co_number = models.IntegerField()
-	title = models.TextField()
-	description = models.TextField(blank=True, null=True)
-	amount_change = models.DecimalField(max_digits=12, decimal_places=2)
-	new_contract_total = models.DecimalField(max_digits=12, decimal_places=2)
-	status = models.CharField(max_length=24, choices=ChangeOrderStatus.choices, default=ChangeOrderStatus.DRAFT)
-	docusign_envelope_id = models.TextField(blank=True, null=True)
-	docusign_signed_at = models.DateTimeField(blank=True, null=True)
-	requested_by = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="requested_change_orders")
-	approved_by = models.ForeignKey(OpsUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_change_orders")
-	approved_at = models.DateTimeField(blank=True, null=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "change_orders"
-		constraints = [
-			models.UniqueConstraint(fields=["project", "co_number"], name="change_orders_project_number_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["project"], name="idx_change_orders_project"),
-			models.Index(fields=["status"], name="idx_change_orders_status"),
-		]
-
-
-class ChangeOrderItem(models.Model):
-	change_order = models.ForeignKey(ChangeOrder, on_delete=models.CASCADE, related_name="items")
-	line_order = models.IntegerField(default=0)
-	description = models.TextField()
-	category = models.TextField()
-	quantity = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-	unit = models.TextField(blank=True, null=True)
-	rate = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
-	amount = models.DecimalField(max_digits=12, decimal_places=2)
-	notes = models.TextField(blank=True, null=True)
-
-	class Meta:
-		db_table = "change_order_items"
-		indexes = [
-			models.Index(fields=["change_order"], name="idx_co_items_co"),
-		]
-
-
-class ProjectBudgetLine(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="budget_lines")
-	trade_group = models.TextField()
-	trade_label = models.TextField()
-	budget_amount = models.DecimalField(max_digits=12, decimal_places=2)
-	upgrade_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	total_budget = models.DecimalField(max_digits=12, decimal_places=2)
-	actual_spent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-	remaining = models.DecimalField(max_digits=12, decimal_places=2)
-	display_order = models.IntegerField(default=0)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		db_table = "project_budget_lines"
-		constraints = [
-			models.UniqueConstraint(fields=["project", "trade_group"], name="project_budget_lines_project_trade_uniq"),
-		]
-		indexes = [
-			models.Index(fields=["project"], name="idx_budget_lines_project"),
-		]
-
-
-class ProjectBudgetActual(models.Model):
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="budget_actuals")
-	budget_line = models.ForeignKey(ProjectBudgetLine, on_delete=models.CASCADE, related_name="actuals")
-	amount = models.DecimalField(max_digits=12, decimal_places=2)
-	description = models.TextField(blank=True, null=True)
-	invoice_reference = models.TextField(blank=True, null=True)
-	date_entered = models.DateField(auto_now_add=True)
-	entered_by = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="entered_actuals")
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "project_budget_actuals"
-		indexes = [
-			models.Index(fields=["project"], name="idx_actuals_project"),
-			models.Index(fields=["budget_line"], name="idx_actuals_budget_line"),
-		]
-
-
-class ContractEditLog(models.Model):
-	id = models.BigAutoField(primary_key=True)
-	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="edit_logs")
-	table_name = models.TextField()
-	record_id = models.IntegerField(blank=True, null=True)
-	action = models.TextField()
-	field_name = models.TextField(blank=True, null=True)
-	old_value = models.TextField(blank=True, null=True)
-	new_value = models.TextField(blank=True, null=True)
-	edit_scope = models.CharField(max_length=16, choices=EditScope.choices)
-	contract_status = models.CharField(max_length=32, choices=ContractStatus.choices)
-	edited_by = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="contract_edits")
-	user_role = models.CharField(max_length=32, choices=UserRole.choices)
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "contract_edit_log"
-		indexes = [
-			models.Index(fields=["project"], name="idx_edit_log_project"),
-			models.Index(fields=["created_at"], name="idx_edit_log_time"),
-		]
-
-
-class Notification(models.Model):
-	id = models.BigAutoField(primary_key=True)
-	recipient = models.ForeignKey(OpsUser, on_delete=models.CASCADE, related_name="notifications")
-	project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications")
-	type = models.TextField()
-	title = models.TextField()
-	message = models.TextField()
-	is_read = models.BooleanField(default=False)
-	created_at = models.DateTimeField(auto_now_add=True)
-
-	class Meta:
-		db_table = "notifications"
-		indexes = [
-			models.Index(fields=["recipient", "is_read"], name="idx_notifications_recipient"),
-			models.Index(fields=["created_at"], name="idx_notifications_time"),
-		]
+    class Meta:
+        verbose_name_plural = "Branches"
+
+    def __str__(self):
+        return self.label
+
+
+class FloorPlanModel(models.Model):
+    """
+    A barndominium floor plan model (e.g. HUNTLEY 2.0, THE PETTUS).
+    Contains all preset data from PM, MD, RD, P10, MODELS, CRAFTSMAN, INT_CONTRACT, BASE_COSTS.
+    """
+    name = models.CharField(max_length=60, unique=True)  # ALL CAPS: "CAJUN", "HUNTLEY 2.0"
+
+    # From PM — Exterior Plan Metrics
+    stories = models.DecimalField(max_digits=3, decimal_places=1, default=1)  # 1, 1.5, or 2
+    ext_wall_sf = models.IntegerField(default=0)
+    dbl_doors = models.IntegerField(default=0)
+    sgl_doors = models.IntegerField(default=0)
+    dbl_windows = models.IntegerField(default=0)
+    sgl_windows = models.IntegerField(default=0)
+
+    # From P10 — Material price
+    p10_material = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # From MODELS — Cabinet/island data
+    cabinetry_lf_display = models.CharField(max_length=20, blank=True)  # "44' - 0\""
+    cabinetry_lf_num = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    island_depth = models.IntegerField(default=3)
+    island_width = models.IntegerField(default=8)
+    island_label = models.CharField(max_length=20, blank=True)  # "4' x 8'"
+    pdf_pages = models.IntegerField(default=2)
+    is_custom = models.BooleanField(default=False)
+
+    # From INT_CONTRACT — Turnkey interior contract price
+    int_contract = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # From BASE_COSTS — Cabinet base + INT contract
+    cabinet_top_line = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # model LF × $330
+
+    # PDF file reference
+    pdf_filename = models.CharField(max_length=100, blank=True)  # e.g. "CAJUN.pdf"
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class SlabAreaPreset(models.Model):
+    """Default slab schedule rows per model (from MD)."""
+    model = models.ForeignKey(FloorPlanModel, on_delete=models.CASCADE, related_name='slab_presets')
+    area_name = models.CharField(max_length=40)  # "1st Floor Living Area", "Garage Area", etc.
+    sqft = models.IntegerField(default=0)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+
+class RoofAreaPreset(models.Model):
+    """Default roof schedule rows per model (from RD)."""
+    model = models.ForeignKey(FloorPlanModel, on_delete=models.CASCADE, related_name='roof_presets')
+    area_name = models.CharField(max_length=40)  # "Main House", "Front Porch", etc.
+    sqft = models.IntegerField(default=0)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+
+class CraftsmanPreset(models.Model):
+    """Per-model craftsman door style paint/stain pricing by area (from CRAFTSMAN)."""
+    model = models.ForeignKey(FloorPlanModel, on_delete=models.CASCADE, related_name='craftsman_presets')
+    area = models.CharField(max_length=20)  # kitchen, island, laundry, baths, other
+    paint_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stain_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ['model', 'area']
+
+
+class PlanMetric(models.Model):
+    """Per-model interior plan metrics (from PLAN_METRICS)."""
+    model = models.ForeignKey(FloorPlanModel, on_delete=models.CASCADE, related_name='plan_metrics')
+    key = models.CharField(max_length=40)    # "Total Living SF", "Bath Count", etc.
+    value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ['model', 'key']
+
+
+# ═══════════════════════════════════════════════════════════════
+# RATE CARDS — Seeded, adjustable per branch/override
+# ═══════════════════════════════════════════════════════════════
+
+class ExteriorRateCard(models.Model):
+    """
+    Exterior pricing rates (from P object).
+    Stores sales rates (customer-facing) and contractor rates (under/over 100mi).
+    """
+    key = models.CharField(max_length=30, unique=True)  # e.g. "sales_base", "ctr_fSlab_u"
+    category = models.CharField(max_length=20)           # "sales", "contractor", "concrete"
+    label = models.CharField(max_length=100)
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=10)               # "SF", "LF", "ea", "flat"
+    miles_tier = models.CharField(max_length=10, blank=True)  # "u", "o", or "" for flat
+
+    def __str__(self):
+        return f"{self.label}: ${self.rate}/{self.unit}"
+
+
+class InteriorRateCard(models.Model):
+    """
+    Interior rate card (from INT_RC).
+    Each row is one rate line that drives a budget trade.
+    """
+    key = models.CharField(max_length=30, unique=True)  # e.g. "cabinets", "floorMat", "electrical"
+    label = models.CharField(max_length=100)
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=10)               # "/LF", "/SF", "/bath", "/fix", "/ton", "flat"
+    driver = models.CharField(max_length=30)             # "cabLF", "livingSF", "bathCount", "flat", etc.
+
+    def __str__(self):
+        return f"{self.label}: ${self.rate}{self.unit}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# BUDGET TRADE STRUCTURE
+# ═══════════════════════════════════════════════════════════════
+
+class BudgetTrade(models.Model):
+    """
+    Budget trade groups for both interior and exterior.
+    16 interior + 7 exterior = 23 total trades.
+    """
+    SCOPE_CHOICES = [('interior', 'Interior'), ('exterior', 'Exterior')]
+
+    key = models.CharField(max_length=30, unique=True)   # "cabinets", "flooring", "framing", etc.
+    name = models.CharField(max_length=40)               # Display name
+    scope = models.CharField(max_length=10, choices=SCOPE_CHOICES)
+    sort_order = models.IntegerField(default=0)
+    has_base_cost = models.BooleanField(default=True)    # False for upgrade-only trades (fireplaces, tile, etc.)
+
+    class Meta:
+        ordering = ['scope', 'sort_order']
+
+    def __str__(self):
+        return f"[{self.scope}] {self.name}"
+
+
+class BudgetTradeRate(models.Model):
+    """Maps rate card entries to budget trades (which rates roll into which trade)."""
+    trade = models.ForeignKey(BudgetTrade, on_delete=models.CASCADE, related_name='rate_mappings')
+    rate_card = models.ForeignKey(InteriorRateCard, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ['trade', 'rate_card']
+
+
+# ═══════════════════════════════════════════════════════════════
+# UPGRADE ITEMS — Seeded catalog of all available upgrades
+# ═══════════════════════════════════════════════════════════════
+
+class UpgradeCategory(models.Model):
+    """
+    Top-level upgrade category / pill tab.
+    Maps to Steps 6-7 UI structure.
+    """
+    STEP_CHOICES = [
+        ('cabinets', 'Step 6 - Cabinets'),
+        ('countertops', 'Step 6 - Countertops'),
+        ('docusign', 'Step 7 - Docusign Upgrades'),
+        ('electrical', 'Step 7 - Electrical'),
+        ('plumbing', 'Step 7 - Plumbing'),
+        ('trim', 'Step 7 - Interior Trim & Flooring'),
+        ('custom', 'Step 7 - Custom'),
+    ]
+
+    key = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=60)
+    step = models.CharField(max_length=20, choices=STEP_CHOICES)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+        verbose_name_plural = "Upgrade Categories"
+
+    def __str__(self):
+        return self.name
+
+
+class UpgradeSection(models.Model):
+    """Section within an upgrade category (e.g. "Kitchen Upgrades", "Outlets & Technology")."""
+    category = models.ForeignKey(UpgradeCategory, on_delete=models.CASCADE, related_name='sections')
+    name = models.CharField(max_length=60)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f"{self.category.name} > {self.name}"
+
+
+class UpgradeItem(models.Model):
+    """
+    Individual upgrade line item (e.g. "Can Lights ($250 each)").
+    Includes budget routing and special calculation rules.
+    """
+    INPUT_TYPE_CHOICES = [
+        ('toggle', 'Checkbox (flat cost)'),
+        ('qty', 'Quantity stepper'),
+        ('sf', 'Square footage input'),
+        ('lf', 'Linear footage input'),
+        ('radio', 'Radio buttons (informational)'),
+    ]
+
+    section = models.ForeignKey(UpgradeSection, on_delete=models.CASCADE, related_name='items')
+    item_id = models.CharField(max_length=40, unique=True)  # e.g. "canLight", "selFarmSink"
+    label = models.CharField(max_length=200)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    input_type = models.CharField(max_length=10, choices=INPUT_TYPE_CHOICES)
+    unit = models.CharField(max_length=10, default='each')  # "each", "SF", "LF"
+
+    # Budget routing
+    budget_trade = models.ForeignKey(BudgetTrade, on_delete=models.SET_NULL, null=True, blank=True,
+                                     help_text="Which trade this upgrade's true cost routes to")
+    true_cost_multiplier = models.DecimalField(max_digits=4, decimal_places=2, default=0.80,
+                                                help_text="Usually 0.80 (20% margin). Set to 1.0 for pass-through.")
+
+    # Special calculation flags
+    has_base_addon = models.BooleanField(default=False)  # e.g. HVAC upgrade with $1,039 gas line
+    base_addon_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    adds_fixture_points = models.DecimalField(max_digits=4, decimal_places=1, default=0,
+                                               help_text="Plumbing fixture points added (e.g. 1.0 for sink stub, 0.5 for ice line)")
+    is_split_budget = models.BooleanField(default=False,
+                                           help_text="True for tankless WH: 50% to materials, +1 fixture point")
+    has_note_box = models.BooleanField(default=False,
+                                        help_text="Shows text input when qty > 0 (cabinet inserts)")
+
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f"{self.label} (${self.price})"
+
+
+# ═══════════════════════════════════════════════════════════════
+# APPLIANCE & ISLAND CONFIGURATION OPTIONS
+# ═══════════════════════════════════════════════════════════════
+
+class ApplianceConfig(models.Model):
+    """Appliance configuration options (from APPLIANCE_COSTS/LABELS)."""
+    key = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=100)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return self.label
+
+
+class IslandAddon(models.Model):
+    """Island add-on options (from ISLAND_ADDON_LABELS)."""
+    key = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=100)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=500)
+
+    def __str__(self):
+        return self.label
+
+
+# ═══════════════════════════════════════════════════════════════
+# JOB / PROJECT — One per customer build
+# ═══════════════════════════════════════════════════════════════
+
+class Job(models.Model):
+    """
+    A single barndominium project. Contains all state for one customer build.
+    This is the central entity — everything else references back here.
+    """
+    MODE_CHOICES = [('shell', 'Shell Only'), ('turnkey', 'Turnkey Interior')]
+
+    # Step 1 — Customer & Model
+    customer_name = models.CharField(max_length=200, blank=True)
+    customer_addr = models.CharField(max_length=300, blank=True)
+    sales_rep = models.CharField(max_length=100, blank=True)
+    order_number = models.CharField(max_length=50, blank=True)
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True)
+    floor_plan = models.ForeignKey(FloorPlanModel, on_delete=models.SET_NULL, null=True, blank=True)
+    job_mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='shell')
+    miles_over_100 = models.BooleanField(default=False)
+    p10_material = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+                                        help_text="Auto-filled from model P10 but editable")
+
+    # Step 2 — Foundation
+    foundation_type = models.CharField(max_length=10, default='concrete')  # "concrete" or "crawl"
+    basement_framing = models.BooleanField(default=False)
+    crawl_sf = models.IntegerField(default=0)
+    stories = models.DecimalField(max_digits=3, decimal_places=1, default=1)
+
+    # Step 3 — Exterior options
+    wall_type = models.CharField(max_length=30, default='Metal')
+    wall_tuff_sf = models.IntegerField(default=0)
+    wainscot_enabled = models.BooleanField(default=False)
+    wall_rock_sf = models.IntegerField(default=0)
+    wall_stone_sf = models.IntegerField(default=0)
+    stone_upgrade = models.BooleanField(default=False)
+    sheathing = models.BooleanField(default=False)
+    gauge_26 = models.BooleanField(default=False)
+    awning_qty = models.IntegerField(default=0)
+    cupola_qty = models.IntegerField(default=0)
+    chimney_qty = models.IntegerField(default=0)
+    punch_amount = models.DecimalField(max_digits=10, decimal_places=2, default=2500)
+    windows_above_12 = models.BooleanField(default=False)
+    sgl_windows = models.IntegerField(default=0)
+    dbl_windows = models.IntegerField(default=0)
+    s2s_windows = models.IntegerField(default=0)
+    s2d_windows = models.IntegerField(default=0)
+    sgl_doors = models.IntegerField(default=0)
+    dbl_doors = models.IntegerField(default=0)
+    detached_shop = models.BooleanField(default=False)
+    deck_shown = models.BooleanField(default=False)
+
+    # Step 4 — Concrete
+    conc_sqft = models.IntegerField(default=0)
+    conc_type = models.CharField(max_length=20, blank=True)  # "4fiber", "6fiber", "4mono", "6mono"
+    conc_zone = models.IntegerField(default=1)
+    conc_line_pump = models.BooleanField(default=False)
+    conc_boom_pump = models.BooleanField(default=False)
+    conc_wire = models.BooleanField(default=False)
+    conc_rebar = models.BooleanField(default=False)
+    conc_foam_lf = models.IntegerField(default=0)
+
+    # Step 5 — Interior Selections
+    bedrooms = models.IntegerField(default=3)
+    full_baths = models.IntegerField(default=2)
+    half_baths = models.IntegerField(default=0)
+    plumbing_fixtures = models.IntegerField(default=8)
+    closet_qty = models.IntegerField(default=3)
+    interior_doors = models.IntegerField(default=15)
+    laundry_sink = models.BooleanField(default=False)
+    modified_cab_lf = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    modified_island_depth = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    modified_island_width = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    island_addon = models.CharField(max_length=30, blank=True)  # "", "microwave", "sink", "sink_microwave"
+    appliance_config = models.CharField(max_length=40, default='standard_range_mw')
+
+    # Computed metrics (editable on Budget page)
+    counter_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    flooring_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    trim_lf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    drywall_sf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    dw_sheets = models.IntegerField(default=0)
+    paint_sf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    hvac_tons = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    insulation_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+
+    # Step 6 — Cabinet discount
+    cabinet_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # Step 6 — Countertop notes
+    countertop_notes = models.TextField(blank=True)
+
+    # Step 7 Pill 1 — Gas type
+    gas_type = models.CharField(max_length=10, blank=True)  # "natural", "propane", ""
+
+    # ── BACKEND-ONLY PROFITABILITY (never shown in UI) ──
+    int_true_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    adjusted_int_contract = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    int_margin_pct = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    int_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    ext_labor_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    ext_labor_profit_pct = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    margin_div = models.DecimalField(max_digits=6, decimal_places=4, default=1)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.customer_name} — {self.floor_plan or 'No Model'} ({self.job_mode})"
+
+
+# ═══════════════════════════════════════════════════════════════
+# JOB CHILD TABLES — Per-job editable schedules
+# ═══════════════════════════════════════════════════════════════
+
+class JobSlabRow(models.Model):
+    """Editable slab schedule row for a job (from Step 2)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='slab_rows')
+    area_name = models.CharField(max_length=40)
+    sqft = models.IntegerField(default=0)
+    tg_ceiling = models.BooleanField(default=False)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+
+class JobRoofRow(models.Model):
+    """Editable roof schedule row for a job (from Step 3)."""
+    ROOF_TYPE_CHOICES = [('metal', 'Metal'), ('ss', 'Standing Seam'), ('shingles', 'Shingles')]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='roof_rows')
+    area_name = models.CharField(max_length=40)
+    roof_type = models.CharField(max_length=10, choices=ROOF_TYPE_CHOICES, default='metal')
+    steep = models.BooleanField(default=False)  # True = 8/12 or greater
+    sqft = models.IntegerField(default=0)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+
+class JobCustomCharge(models.Model):
+    """Custom charges on Steps 3 and 4 (exterior + concrete)."""
+    CHARGE_TYPE_CHOICES = [('exterior', 'Exterior'), ('concrete', 'Concrete')]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='custom_charges')
+    charge_type = models.CharField(max_length=10, choices=CHARGE_TYPE_CHOICES)
+    description = models.CharField(max_length=200, blank=True)
+    rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit = models.CharField(max_length=5, default='SF')  # "SF", "LF", "ea"
+    qty = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def cost(self):
+        return self.rate * self.qty
+
+
+class JobContractorOverride(models.Model):
+    """PM overrides on the contractor calculator (Step 9 Part A)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='contractor_overrides')
+    item_key = models.CharField(max_length=30)  # Matches buildCtrItems() key
+    override_qty = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        unique_together = ['job', 'item_key']
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 6 — Cabinet & Countertop Selections
+# ═══════════════════════════════════════════════════════════════
+
+class JobCraftsmanSelection(models.Model):
+    """Craftsman door style selection per area (Step 6, Section 2 Part A)."""
+    FINISH_CHOICES = [('', 'None'), ('paint', 'Craftsman Paint'), ('stain', 'Craftsman Stain')]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='craftsman_selections')
+    area = models.CharField(max_length=20)  # kitchen, island, laundry, baths, other
+    finish = models.CharField(max_length=10, choices=FINISH_CHOICES, blank=True)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ['job', 'area']
+
+
+class JobCustomCraftsmanRow(models.Model):
+    """Custom craftsman area rows (Step 6, Section 2 Part B)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='custom_craftsman_rows')
+    area = models.CharField(max_length=100, blank=True)
+    finish = models.CharField(max_length=10)  # "paint" ($35/LF) or "stain" ($45/LF)
+    lf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+
+    @property
+    def cost(self):
+        rate = 35 if self.finish == 'paint' else 45
+        return round(float(self.lf) * rate)
+
+
+class JobCabinetUpgrade(models.Model):
+    """Cabinet upgrade selections (Step 6, Sections 3-7)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='cabinet_upgrades')
+    item = models.ForeignKey(UpgradeItem, on_delete=models.CASCADE)
+    qty = models.IntegerField(default=0)
+    checked = models.BooleanField(default=False)  # For toggle types
+    lf_value = models.DecimalField(max_digits=8, decimal_places=2, default=0)  # For LF types
+    note = models.TextField(blank=True)  # For insert note boxes
+
+    @property
+    def cost(self):
+        if self.item.input_type == 'toggle':
+            return float(self.item.price) if self.checked else 0
+        elif self.item.input_type == 'qty':
+            return self.qty * float(self.item.price)
+        elif self.item.input_type == 'lf':
+            return round(float(self.lf_value) * float(self.item.price))
+        return 0
+
+
+class JobCabinetCustomLine(models.Model):
+    """Custom cabinet line items (Step 6, Section 7 free-form)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='cabinet_custom_lines')
+    description = models.CharField(max_length=200, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    area = models.CharField(max_length=100, blank=True)
+
+
+class JobCountertopArea(models.Model):
+    """Countertop upgrade area rows (Step 6 Sub-Tab B, Section 2)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='countertop_areas')
+    area = models.CharField(max_length=100, blank=True)
+    rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    sqft = models.IntegerField(default=0)
+
+    @property
+    def cost(self):
+        return round(float(self.rate_per_sf) * self.sqft)
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 7 — Selections (Pills 1-4)
+# ═══════════════════════════════════════════════════════════════
+
+class JobUpgradeSelection(models.Model):
+    """
+    A single upgrade selection on a job (Steps 7 Pills 1-4).
+    Covers toggle, qty, sf, and lf input types.
+    """
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='upgrade_selections')
+    item = models.ForeignKey(UpgradeItem, on_delete=models.CASCADE)
+    qty = models.IntegerField(default=0)
+    checked = models.BooleanField(default=False)
+    sf_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    lf_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def customer_cost(self):
+        if self.item.input_type == 'toggle':
+            return float(self.item.price) if self.checked else 0
+        elif self.item.input_type == 'qty':
+            base = self.qty * float(self.item.price)
+            if self.item.has_base_addon and self.qty > 0:
+                base += float(self.item.base_addon_amount)
+            return base
+        elif self.item.input_type == 'sf':
+            return round(float(self.sf_value) * float(self.item.price))
+        elif self.item.input_type == 'lf':
+            return round(float(self.lf_value) * float(self.item.price))
+        return 0
+
+    @property
+    def budget_true_cost(self):
+        if self.item.is_split_budget:
+            # Tankless WH: 50% to materials (fixture point handled separately)
+            return round(self.customer_cost * 0.50)
+        return round(self.customer_cost * float(self.item.true_cost_multiplier))
+
+    class Meta:
+        unique_together = ['job', 'item']
+
+
+class JobSelectionCustomLine(models.Model):
+    """Custom line items within Docusign, Electrical, Plumbing, or Trim pills."""
+    PILL_CHOICES = [
+        ('docusign', 'Docusign'), ('electrical', 'Electrical'),
+        ('plumbing', 'Plumbing'), ('trim', 'Interior Trim'),
+    ]
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='selection_custom_lines')
+    pill = models.CharField(max_length=20, choices=PILL_CHOICES)
+    description = models.CharField(max_length=200, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    budget_trade = models.ForeignKey(BudgetTrade, on_delete=models.SET_NULL, null=True, blank=True)
+
+
+class JobConcreteFinishLine(models.Model):
+    """Concrete floor finish custom lines (Pill 4, Section 5)."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='concrete_finish_lines')
+    description = models.CharField(max_length=200, blank=True)
+    rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    sqft = models.IntegerField(default=0)
+
+    @property
+    def cost(self):
+        return round(float(self.rate_per_sf) * self.sqft)
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 7 PILL 5 — Custom Upgrades & Credits
+# ═══════════════════════════════════════════════════════════════
+
+class JobCustomUpgrade(models.Model):
+    """Custom upgrade from Pill 5 Part A."""
+    PRICING_CHOICES = [('flat', 'Flat Rate'), ('per_unit', 'Per SF/LF')]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='custom_upgrades')
+    trade = models.ForeignKey(BudgetTrade, on_delete=models.CASCADE,
+                               help_text="Which budget trade this routes to")
+    pricing_type = models.CharField(max_length=10, choices=PRICING_CHOICES)
+    description = models.CharField(max_length=200, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # For flat rate
+    rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)    # For per-unit
+    unit = models.CharField(max_length=5, default='SF')                       # "SF" or "LF"
+    qty = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def customer_cost(self):
+        if self.pricing_type == 'flat':
+            return float(self.amount)
+        return round(float(self.rate) * float(self.qty))
+
+    @property
+    def budget_true_cost(self):
+        return round(self.customer_cost * 0.80)
+
+
+class JobCredit(models.Model):
+    """Credit from Pill 5 Part B — subtracts from INT contract and budget trade."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='credits')
+    trade = models.ForeignKey(BudgetTrade, on_delete=models.CASCADE,
+                               help_text="Which budget trade gets reduced")
+    description = models.CharField(max_length=200, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                  help_text="Full credit amount (NOT × 0.80 — entire expense eliminated)")
+
+
+# ═══════════════════════════════════════════════════════════════
+# BUDGET SNAPSHOT — Computed on save, stored for reporting
+# ═══════════════════════════════════════════════════════════════
+
+class JobBudgetLine(models.Model):
+    """
+    Computed budget line per trade for a job.
+    Recalculated whenever the job is saved.
+    """
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='budget_lines')
+    trade = models.ForeignKey(BudgetTrade, on_delete=models.CASCADE)
+    base_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    upgrade_adder = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    credit_reduction = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_budgeted = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Backend-only (not shown in PM UI)
+    customer_price_allocation = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    margin_pct = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ['job', 'trade']
