@@ -1,68 +1,300 @@
 {% comment %}Sales wizard – Step 1: Plan Metrics{% endcomment %}
 <div class="wizard-step" id="step-metrics" style="display:none">
-  <h2 class="wizard-title">Plan metrics</h2>
 
-  <article class="card metrics-grid">
-
-    <div class="metric-row">
-      <span class="metric-label">Living SF</span>
-      <input class="metric-input" id="m-livingSF" data-metric="livingSF" type="number" min="0" />
-      <span class="metric-unit">SF</span>
+  <!-- ── Foundation Type ─────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">Foundation Type</div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0">
+    <div class="pill-row">
+      <span class="pill-label">Foundation</span>
+      <label><input type="radio" name="pm-ft" id="pm-ft-concrete" value="concrete" checked> Concrete Slab</label>
+      <label><input type="radio" name="pm-ft" id="pm-ft-crawl"    value="crawl"> Crawlspace / Basement</label>
     </div>
-
-    <div class="metric-row">
-      <span class="metric-label">Garage SF</span>
-      <input class="metric-input" id="m-garageSF" data-metric="garageSF" type="number" min="0" />
-      <span class="metric-unit">SF</span>
+    <div id="pm-crawl-extra" style="display:none">
+      <div class="pill-row">
+        <span class="pill-label">Basement Framing</span>
+        <label><input type="radio" name="pm-bf" id="pm-bf-no"  value="0" checked> No</label>
+        <label><input type="radio" name="pm-bf" id="pm-bf-yes" value="1"> Yes</label>
+      </div>
+      <div class="upg-row">
+        <span class="upg-label">Crawlspace / Basement SF
+          <span class="upg-sub">Defaults to living SF — editable</span>
+        </span>
+        <input class="upg-sf" id="pm-crawl-sf" type="number" min="0" />
+        <span class="upg-unit">SF</span>
+      </div>
     </div>
+  </article>
 
-    <div class="metric-row">
-      <span class="metric-label">Porch SF</span>
-      <input class="metric-input" id="m-porchSF" data-metric="porchSF" type="number" min="0" />
-      <span class="metric-unit">SF</span>
+  <!-- ── Stories ──────────────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">Stories</div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0">
+    <div class="inline-row">
+      <label>Number of Stories</label>
+      <select id="pm-stories" style="width:120px">
+        <option value="1">1 Story</option>
+        <option value="1.5">1.5 Stories</option>
+        <option value="2">2 Stories</option>
+      </select>
     </div>
+  </article>
 
-    <div class="metric-row computed">
-      <span class="metric-label">Slab SF <em>(auto)</em></span>
-      <span class="metric-value" id="m-slabSF">—</span>
-      <span class="metric-unit">SF</span>
+  <!-- ── Slab SQFT Schedule ───────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">
+    Slab SQFT Schedule
+    <span class="psh-count" id="pm-slab-total">0 SF</span>
+  </div>
+  <div class="sqft-summary" id="pm-slab-summary">
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-living">0</div><div class="sqft-lbl">Living SQFT</div></div>
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-garage">0</div><div class="sqft-lbl">Garage / Carport</div></div>
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-porch">0</div><div class="sqft-lbl">Porch SQFT</div></div>
+  </div>
+  <article class="card" style="border-radius:0;margin-bottom:0;border-top:none">
+    <div class="sched-hdr">
+      <span>Area</span><span style="text-align:right">SF</span><span style="text-align:center">T&amp;G Ceiling</span><span></span>
     </div>
+    <div id="pm-slab-body"><!-- JS renders rows --></div>
+  </article>
+  <button class="plans-add-btn" id="pm-slab-add" type="button">+ Add Area</button>
 
-    <div class="metric-row">
-      <span class="metric-label">Roof Schedule SF</span>
-      <input class="metric-input" id="m-roofSF" data-metric="roofSF" type="number" min="0" />
-      <span class="metric-unit">SF</span>
+  <!-- ── Roof Schedule ────────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">
+    Roof Schedule
+    <span class="psh-count" id="pm-roof-total">0 SF</span>
+  </div>
+  <div class="sqft-summary" id="pm-roof-summary"><!-- JS renders summary boxes --></div>
+  <article class="card" style="border-radius:0;margin-bottom:0;border-top:none">
+    <div class="pill-row">
+      <label><input type="checkbox" id="pm-sheath"> Add Sheathing (OSB)</label>
+      <label><input type="checkbox" id="pm-g26"> 26 Gauge Roof</label>
     </div>
+    <div class="plans-info-banner"><strong>⚠ All areas default to Standard Metal at 7/12 or under.</strong> Set the roof type and pitch tier per area from the plans.</div>
+    <div class="roof-sched-hdr">
+      <span>Area</span><span>Roof Type</span><span>Pitch Tier</span><span style="text-align:right">SF</span><span></span>
+    </div>
+    <div id="pm-roof-body"><!-- JS renders rows --></div>
+  </article>
+  <button class="plans-add-btn" id="pm-roof-add" type="button">+ Add Roof Area</button>
 
-    <div class="metric-row">
-      <span class="metric-label">Exterior Wall SF</span>
-      <input class="metric-input" id="m-extWallSF" data-metric="extWallSF" type="number" min="0" />
-      <span class="metric-unit">SF</span>
+  <!-- ── Exterior Wall Area ───────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">
+    Exterior Wall Area
+    <span class="psh-count" id="pm-wall-total">0 SF</span>
+  </div>
+  <div class="sqft-summary" id="pm-wall-summary" style="grid-template-columns:1fr">
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-tuff">0</div><div class="sqft-lbl">Tuff Rib SF</div></div>
+  </div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0;border-top:none">
+    <div style="padding:8px 14px;border-bottom:1px solid var(--border-soft);font-size:10px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.5px">Wall Type</div>
+    <div class="pill-row" style="flex-wrap:wrap;gap:8px 14px">
+      <label><input type="radio" name="pm-wt" value="Metal"            checked> Standard Metal (Tuff Rib)</label>
+      <label><input type="radio" name="pm-wt" value="Board and Batten"> Board &amp; Batten</label>
+      <label><input type="radio" name="pm-wt" value="LP"> LP Siding</label>
+      <label><input type="radio" name="pm-wt" value="Hardie Siding"> Hardie Siding</label>
+      <label><input type="radio" name="pm-wt" value="Vinyl Siding"> Vinyl Siding</label>
     </div>
+    <div class="upg-row">
+      <span class="upg-label">Exterior Wall Area SF
+        <span class="upg-sub">Tuff Rib SF — from plan Ext Wall Area schedule</span>
+      </span>
+      <input class="upg-sf" id="pm-wall-tuff" type="number" min="0" />
+      <span class="upg-unit">SF</span>
+    </div>
+    <div class="inline-row">
+      <label>Rock or Stone Wainscotting</label>
+      <select id="pm-wainscot" style="width:90px">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </div>
+    <div id="pm-wainscot-extra" style="display:none">
+      <div class="upg-row">
+        <span class="upg-label">Rock Wainscot SF</span>
+        <input class="upg-sf" id="pm-wall-rock" type="number" min="0" />
+        <span class="upg-unit">SF</span>
+      </div>
+      <div class="upg-row">
+        <span class="upg-label">Stone Wainscot SF</span>
+        <input class="upg-sf" id="pm-wall-stone" type="number" min="0" />
+        <span class="upg-unit">SF</span>
+      </div>
+    </div>
+    <div class="inline-row">
+      <label>Stone Upgrade</label>
+      <select id="pm-stone-upg" style="width:90px">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </div>
+    <div class="upg-row" id="pm-stone-upg-row" style="display:none">
+      <span class="upg-label">Stone Area SF
+        <span class="upg-sub" id="pm-stone-rate-sub"></span>
+      </span>
+      <input class="upg-sf" id="pm-stone-sf" type="number" min="0" />
+      <span class="upg-unit">SF</span>
+      <span class="upg-cost active" id="pm-stone-cost">—</span>
+    </div>
+  </article>
 
-    <div class="metric-row">
-      <span class="metric-label">Soffit LF</span>
-      <input class="metric-input" id="m-soffitLF" data-metric="soffitLF" type="number" min="0" />
-      <span class="metric-unit">LF</span>
+  <!-- ── Window Schedule ──────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">
+    Window Schedule
+    <span class="psh-count" id="pm-win-total">0 Windows</span>
+  </div>
+  <div class="sqft-summary" id="pm-win-summary" style="grid-template-columns:repeat(2,1fr)">
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-sglw">0</div><div class="sqft-lbl">Single</div></div>
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-dblw">0</div><div class="sqft-lbl">Double / Twin</div></div>
+  </div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0;border-top:none">
+    <div class="upg-row">
+      <span class="upg-label">Single Windows</span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-sglw-dec">−</button>
+        <span class="upg-qty" id="pm-sglw-qty">0</span>
+        <button type="button" id="pm-sglw-inc">+</button>
+      </div>
+      <span class="upg-cost">—</span>
     </div>
+    <div class="upg-row">
+      <span class="upg-label">Double / Twin Windows</span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-dblw-dec">−</button>
+        <span class="upg-qty" id="pm-dblw-qty">0</span>
+        <button type="button" id="pm-dblw-inc">+</button>
+      </div>
+      <span class="upg-cost">—</span>
+    </div>
+    <div class="inline-row">
+      <label>Windows Above 12'</label>
+      <select id="pm-win12" style="width:220px">
+        <option value="0">No Windows Above 12'</option>
+        <option value="1">Windows Above 12'</option>
+      </select>
+    </div>
+    <div id="pm-win12-extra" style="display:none">
+      <div class="upg-row">
+        <span class="upg-label">Single Windows Above 12'
+          <span class="upg-sub">Ground access only — no roof to stand on</span>
+        </span>
+        <div class="upg-stepper">
+          <button type="button" id="pm-s2s-dec">−</button>
+          <span class="upg-qty" id="pm-s2s-qty">0</span>
+          <button type="button" id="pm-s2s-inc">+</button>
+        </div>
+        <span class="upg-cost">—</span>
+      </div>
+      <div class="upg-row">
+        <span class="upg-label">Double Windows Above 12'
+          <span class="upg-sub">Ground access only — no roof to stand on</span>
+        </span>
+        <div class="upg-stepper">
+          <button type="button" id="pm-s2d-dec">−</button>
+          <span class="upg-qty" id="pm-s2d-qty">0</span>
+          <button type="button" id="pm-s2d-inc">+</button>
+        </div>
+        <span class="upg-cost">—</span>
+      </div>
+    </div>
+  </article>
 
-    <div class="metric-row">
-      <span class="metric-label">Beam Wrap LF</span>
-      <input class="metric-input" id="m-beamLF" data-metric="beamLF" type="number" min="0" />
-      <span class="metric-unit">LF</span>
+  <!-- ── Door Schedule ────────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">
+    Door Schedule
+    <span class="psh-count" id="pm-door-total">0 Doors</span>
+  </div>
+  <div class="sqft-summary" style="grid-template-columns:repeat(2,1fr)">
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-dbld">0</div><div class="sqft-lbl">Double Ext (6ft+)</div></div>
+    <div class="sqft-box"><div class="sqft-val" id="pm-sum-sgld">0</div><div class="sqft-lbl">Single Ext (3ft)</div></div>
+  </div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0;border-top:none">
+    <div class="upg-row">
+      <span class="upg-label">Double Ext Doors (6ft+)</span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-dbld-dec">−</button>
+        <span class="upg-qty" id="pm-dbld-qty">0</span>
+        <button type="button" id="pm-dbld-inc">+</button>
+      </div>
+      <span class="upg-cost">—</span>
     </div>
+    <div class="upg-row">
+      <span class="upg-label">Single Ext Doors (3ft)</span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-sgld-dec">−</button>
+        <span class="upg-qty" id="pm-sgld-qty">0</span>
+        <button type="button" id="pm-sgld-inc">+</button>
+      </div>
+      <span class="upg-cost">—</span>
+    </div>
+  </article>
 
-    <div class="metric-row">
-      <span class="metric-label">Windows</span>
-      <input class="metric-input" id="m-windows" data-metric="windows" type="number" min="0" />
-      <span class="metric-unit">ea</span>
+  <!-- ── Punch & Custom ───────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">Punch &amp; Custom</div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0">
+    <div class="upg-row">
+      <span class="upg-label">Punch Amount
+        <span class="upg-sub">Minimum $2,500 — editable upward</span>
+      </span>
+      <input class="upg-sf" id="pm-punch" type="number" min="2500" value="2500" style="width:100px" />
+      <span class="upg-cost active" id="pm-punch-cost">$2,500</span>
     </div>
+    <div id="pm-custom-body"><!-- JS renders custom charge rows --></div>
+  </article>
+  <button class="plans-add-btn" id="pm-custom-add" type="button">+ Add Custom Charge</button>
 
-    <div class="metric-row">
-      <span class="metric-label">Exterior Doors</span>
-      <input class="metric-input" id="m-extDoors" data-metric="extDoors" type="number" min="0" />
-      <span class="metric-unit">ea</span>
+  <!-- ── Additional ───────────────────────────────────────────────────────── -->
+  <div class="plans-section-hdr">Additional</div>
+  <article class="card" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-bottom:0">
+    <div class="upg-row">
+      <span class="upg-label">Timber Framed Awnings
+        <span class="upg-sub">$450 each</span>
+      </span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-awn-dec">−</button>
+        <span class="upg-qty" id="pm-awn-qty">0</span>
+        <button type="button" id="pm-awn-inc">+</button>
+      </div>
+      <span class="upg-cost" id="pm-awn-cost">—</span>
     </div>
+    <div class="upg-row">
+      <span class="upg-label">Cupola Installation
+        <span class="upg-sub">$250 each</span>
+      </span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-cup-dec">−</button>
+        <span class="upg-qty" id="pm-cup-qty">0</span>
+        <button type="button" id="pm-cup-inc">+</button>
+      </div>
+      <span class="upg-cost" id="pm-cup-cost">—</span>
+    </div>
+    <div class="upg-row">
+      <span class="upg-label">Stone Chimney / Roofline Lifts
+        <span class="upg-sub">$1,500 each</span>
+      </span>
+      <div class="upg-stepper">
+        <button type="button" id="pm-chim-dec">−</button>
+        <span class="upg-qty" id="pm-chim-qty">0</span>
+        <button type="button" id="pm-chim-inc">+</button>
+      </div>
+      <span class="upg-cost" id="pm-chim-cost">—</span>
+    </div>
+    <div class="inline-row">
+      <label>Detached Shop / Garage</label>
+      <select id="pm-det-shop" style="width:90px">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </div>
+    <div class="inline-row">
+      <label>Deck Shown on Plans</label>
+      <select id="pm-deck-shown" style="width:90px">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </div>
+  </article>
+
+  <!-- ── Interior Plan Metrics (for cost calculations) ─────────────────── -->
+  <div class="plans-section-hdr" style="margin-top:14px">Interior Plan Metrics</div>
+  <article class="card metrics-grid" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);border-top:none">
 
     <div class="metric-row">
       <span class="metric-label">Cabinet LF</span>
@@ -88,6 +320,18 @@
       <span class="metric-unit">ea</span>
     </div>
 
+    <div class="metric-row">
+      <span class="metric-label">Soffit LF</span>
+      <input class="metric-input" id="m-soffitLF" data-metric="soffitLF" type="number" min="0" />
+      <span class="metric-unit">LF</span>
+    </div>
+
+    <div class="metric-row">
+      <span class="metric-label">Beam Wrap LF</span>
+      <input class="metric-input" id="m-beamLF" data-metric="beamLF" type="number" min="0" />
+      <span class="metric-unit">LF</span>
+    </div>
+
     <div class="metric-row computed">
       <span class="metric-label">HVAC Tons <em>(auto)</em></span>
       <span class="metric-value" id="m-hvacTons">—</span>
@@ -95,4 +339,5 @@
     </div>
 
   </article>
+
 </div>

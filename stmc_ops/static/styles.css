@@ -909,3 +909,394 @@ select {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* ── Plans step – section headers ─────────────────────────────────────────── */
+.plans-section-hdr {
+  background: var(--brand);
+  color: #fff;
+  padding: 9px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin-top: 14px;
+}
+
+.plans-section-hdr .psh-count {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .9;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Plans step – sqft summary strip ─────────────────────────────────────── */
+.sqft-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border-soft);
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+}
+
+.sqft-box {
+  background: var(--surface);
+  padding: 12px 10px;
+  text-align: center;
+}
+
+.sqft-box .sqft-val {
+  font-size: 19px;
+  font-weight: 700;
+  font-family: "DM Mono", monospace;
+  color: var(--text);
+}
+
+.sqft-box .sqft-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-top: 3px;
+}
+
+/* ── Plans step – schedule rows ──────────────────────────────────────────── */
+.sched-hdr {
+  display: grid;
+  grid-template-columns: 1.4fr 120px 100px 30px;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 2px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.sched-row {
+  display: grid;
+  grid-template-columns: 1.4fr 120px 100px 30px;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  align-items: center;
+}
+
+.sched-row select,
+.sched-row input[type="number"] {
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.sched-row select:focus,
+.sched-row input[type="number"]:focus { border-color: var(--brand); }
+.sched-row input[type="number"] { text-align: right; font-family: "DM Mono", monospace; font-weight: 600; }
+
+.roof-sched-hdr {
+  display: grid;
+  grid-template-columns: 1fr 105px 105px 90px 30px;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 2px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.roof-sched-row {
+  display: grid;
+  grid-template-columns: 1fr 105px 105px 90px 30px;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  align-items: center;
+}
+
+.roof-sched-row select,
+.roof-sched-row input[type="number"] {
+  font-size: 12px;
+  padding: 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.roof-sched-row select:focus,
+.roof-sched-row input[type="number"]:focus { border-color: var(--brand); }
+.roof-sched-row input[type="number"] { text-align: right; font-family: "DM Mono", monospace; font-weight: 600; }
+
+.del-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.del-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+
+/* ── Plans step – upgrade rows ───────────────────────────────────────────── */
+.upg-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  gap: 10px;
+}
+
+.upg-row:last-child { border-bottom: none; }
+
+.upg-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.upg-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--text-soft);
+  margin-top: 2px;
+}
+
+.upg-cost {
+  min-width: 68px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Mono", monospace;
+  color: var(--text-soft);
+}
+
+.upg-cost.active { color: var(--brand); }
+
+.upg-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.upg-stepper button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--surface-muted);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.upg-stepper button:hover { background: var(--border-soft); }
+
+.upg-qty {
+  width: 28px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Mono", monospace;
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  line-height: 28px;
+}
+
+.upg-sf {
+  width: 88px;
+  text-align: center;
+  font-family: "DM Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.upg-sf:focus { border-color: var(--brand); }
+.upg-unit { font-size: 10px; color: var(--text-soft); text-transform: uppercase; min-width: 20px; }
+
+/* ── Plans step – pill rows / inline rows ────────────────────────────────── */
+.pill-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pill-row:last-child { border-bottom: none; }
+
+.pill-row .pill-label {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 600;
+  min-width: 88px;
+}
+
+.pill-row label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pill-row input[type="radio"],
+.pill-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+}
+
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.inline-row:last-child { border-bottom: none; }
+.inline-row > label { font-size: 13px; color: var(--text-muted); flex: 1; }
+.inline-row select {
+  width: auto;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+.inline-row select:focus { border-color: var(--brand); }
+
+/* ── Plans step – add button / info banner ───────────────────────────────── */
+.plans-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.plans-add-btn:hover { text-decoration: underline; }
+
+.plans-info-banner {
+  padding: 8px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  font-size: 11px;
+  color: #92400e;
+  line-height: 1.45;
+  margin: 8px 14px;
+  border-radius: 6px;
+}
+
+.plans-info-banner strong { font-weight: 700; }
+
+/* ── Plans step – custom charge rows ─────────────────────────────────────── */
+.custom-charge-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+
+.custom-charge-row input[type="text"] {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 9px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.custom-charge-row input[type="text"]:focus { border-color: var(--brand); }
+
+.custom-charge-row input[type="number"] {
+  width: 78px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: "DM Mono", monospace;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: right;
+  outline: none;
+}
+
+.custom-charge-row input[type="number"]:focus { border-color: var(--brand); }
+
+.custom-charge-row select {
+  width: 62px;
+  padding: 6px 4px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.custom-charge-lbl {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Plans step – responsive ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .sched-hdr, .sched-row {
+    grid-template-columns: 1fr 88px 76px 28px;
+  }
+  .roof-sched-hdr, .roof-sched-row {
+    grid-template-columns: 1fr 80px 80px 74px 28px;
+  }
+}

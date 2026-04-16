@@ -3,16 +3,102 @@
 
   <div class="stl">Concrete</div>
 
-  <div class="sh">Concrete – pass-through
+  <!-- <div class="sh">Concrete – pass-through
     <span>No margin</span>
+  </div> -->
+
+  {# ── Concrete Configuration ───────────────────────────────────────────── #}
+
+  <div class="sh">Concrete Configuration</div>
+  <div class="sb">
+
+    <div class="upg-row">
+      <span class="upg-label">Concrete Area
+        <span class="upg-sub" id="c-area-hint"></span>
+      </span>
+      <button id="c-use-slab-btn" style="display:none;font-size:11px;padding:4px 10px;border:1.5px solid var(--border);border-radius:4px;background:var(--surface-soft);cursor:pointer;color:var(--brand);font-weight:600;white-space:nowrap">Use slab SF</button>
+      <input class="upg-sf" type="number" inputmode="decimal" id="c-area" placeholder="0" min="0">
+      <span class="upg-unit">SF</span>
+    </div>
+
+    <div class="inline-row">
+      <label>Type</label>
+      <select id="c-type">
+        <option value="">-- None --</option>
+        <option value="4fiber">4″ w/ Fiber</option>
+        <option value="6fiber">6″ w/ Fiber</option>
+        <option value="4mono">4″ Mono Footer &amp; Fiber</option>
+        <option value="6mono">6″ Mono Footer &amp; Fiber</option>
+      </select>
+    </div>
+
+    <div class="inline-row">
+      <label>Zone</label>
+      <select id="c-zone">
+        <option value="1">Zone 1 – Middle TN</option>
+        <option value="2">Zone 2 – East &amp; West TN</option>
+        <option value="3">Zone 3 – KY &amp; IN</option>
+      </select>
+    </div>
+
+    <div class="upg-row">
+      <span class="upg-label">Line Pump
+        <span class="upg-sub">$1,750 flat</span>
+      </span>
+      <label style="margin-left:auto"><input type="checkbox" id="c-lp"></label>
+      <span class="upg-cost" id="c-lp-cost">—</span>
+    </div>
+
+    <div class="upg-row">
+      <span class="upg-label">Boom Pump
+        <span class="upg-sub">$2,500 flat</span>
+      </span>
+      <label style="margin-left:auto"><input type="checkbox" id="c-bp"></label>
+      <span class="upg-cost" id="c-bp-cost">—</span>
+    </div>
+
+    <div class="upg-row">
+      <span class="upg-label">Wire on 4′ Grid
+        <span class="upg-sub">+$0.85 / SF</span>
+      </span>
+      <label style="margin-left:auto"><input type="checkbox" id="c-wire"></label>
+      <span class="upg-cost" id="c-wire-cost">—</span>
+    </div>
+
+    <div class="upg-row">
+      <span class="upg-label">Rebar on 4′ Grid
+        <span class="upg-sub">+$1.25 / SF</span>
+      </span>
+      <label style="margin-left:auto"><input type="checkbox" id="c-rebar"></label>
+      <span class="upg-cost" id="c-rebar-cost">—</span>
+    </div>
+
+    <div class="upg-row">
+      <span class="upg-label">2″ Foam Perimeter
+        <span class="upg-sub">$9 / LF</span>
+      </span>
+      <input class="upg-sf" type="number" inputmode="decimal" id="c-foam" placeholder="0" min="0">
+      <span class="upg-unit">LF</span>
+      <span class="upg-cost" id="c-foam-cost">—</span>
+
+
+
+    </div>
+      
+          {# ── Custom Concrete Charges ──────────────────────────────────────────── #}
+
+          <div class="sh">Custom Charges</div>
+          <div class="sb" id="c-custom-body">
+            {# dynamic rows inserted by JS #}
+          </div>
+          <button class="plans-add-btn" id="c-add-custom">+ Add Custom Concrete Charge</button>
   </div>
 
+
+  {# ── Standard Pass-Through Items ────────────────────────────────────── #}
+
+  <div class="sh">Standard Items</div>
   <div class="sb">
-    <div class="rw">
-      <span class="rl">Monolithic slab</span>
-      <span class="rd" id="c-slab-detail">— SF × $8.00</span>
-      <span class="rv" id="c-slab-cost">—</span>
-    </div>
     <div class="rw">
       <span class="rl">Driveway</span>
       <span class="rd">480 SF × $7.50</span>
@@ -28,7 +114,20 @@
       <span class="rd">flat</span>
       <span class="rv">$4,200</span>
     </div>
-    <div class="rw rt">
+  </div>
+
+  {# ── Concrete Summary ─────────────────────────────────────────────────── #}
+
+  <div class="sh">Concrete Summary</div>
+  <div class="sb">
+    <div class="rw">
+      <span class="rl">Monolithic slab</span>
+      <span class="rd" id="c-slab-detail">— SF × $8.00</span>
+      <span class="rv" id="c-slab-cost">—</span>
+    </div>
+    <div id="c-summary-body">
+      {# additional dynamic line items (pump, wire, rebar, foam, custom) #}
+    </div>
       <span class="rl">Concrete total</span>
       <span class="rv" style="color:var(--brand)" id="c-total">—</span>
     </div>
