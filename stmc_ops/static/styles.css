@@ -53,7 +53,7 @@
 
 body {
   font-family: "DM Sans", system-ui, sans-serif;
-  background: var(--bg);
+  background: white;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -83,7 +83,7 @@ select {
 .login-card {
   width: 100%;
   max-width: 400px;
-  background: var(--surface);
+  background: rgb(56, 54, 54);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -124,7 +124,7 @@ select {
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-muted);
   color: var(--text);
   outline: none;
 }
@@ -212,9 +212,82 @@ select {
 
 .nav {
   display: flex;
-  overflow-x: auto;
-  background: var(--surface);
+  align-items: center;
+  background: whitesmoke;
   border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  justify-content: flex-start;
+}
+
+.nav-side {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 90px;
+}
+
+.nav-side-right {
+  justify-content: flex-end;
+}
+
+.nav-action-btn {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--text-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+}
+
+.nav-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  flex-shrink: 0;
+}
+
+.nav-user-name {
+  font-size: 12px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.nav-logout {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--text-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  white-space: nowrap;
 }
 
 .nav button {
@@ -228,9 +301,23 @@ select {
   cursor: pointer;
 }
 
-.nav button.active {
+.nav button.active,
+.nav .nav-link.active {
   color: var(--brand);
   border-bottom-color: var(--brand);
+}
+
+.nav .nav-link {
+  display: inline-block;
+  background: transparent;
+  text-decoration: none;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-soft);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .wrap {
@@ -910,393 +997,350 @@ select {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ── Plans step – section headers ─────────────────────────────────────────── */
-.plans-section-hdr {
-  background: var(--brand);
+/* ═══════════════════════════════════════════════════════════════
+   BUILD WIZARD – component library (model_view / turnkey / shell)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Gray scale tokens (supplement existing :root) ──────────────────────── */
+:root {
+  --g50:  #F9FAFB;
+  --g100: #F3F4F6;
+  --g200: #E5E7EB;
+  --g300: #D1D5DB;
+  --g400: #9CA3AF;
+  --g500: #6B7280;
+  --g600: #4B5563;
+  --g700: #374151;
+  --g800: #1F2937;
+  --g900: #111827;
+  --red:       #a31a1a;
+  --red-light: #FEF2F2;
+  --red-dark:  #7f1313;
+  --amber-light: #FFFBEB;
+  --amber-dark:  #92400E;
+  --blue-light:  #EFF6FF;
+  --green:       #15803D;
+  --font-ui:   "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,.15);
+  --radius-sm: 6px;
+}
+
+/* ── Wizard wrapper ──────────────────────────────────────────────────────── */
+body.wizard-page {
+  background: var(--g100);
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+/* ── Wizard header ───────────────────────────────────────────────────────── */
+.wiz-header {
+  background: var(--red);
   color: #fff;
-  padding: 9px 14px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  text-transform: uppercase;
+  padding: 14px 20px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-radius: var(--radius) var(--radius) 0 0;
-  margin-top: 14px;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
 }
+.wiz-header-center { text-align: center; flex: 1; }
+.wiz-header-sub    { font-size: 10px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
+.wiz-header-title  { font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin-top: 1px; }
+.wiz-header-total  { font-family: var(--font-mono); font-size: 26px; font-weight: 700; margin-top: 4px; letter-spacing: -.02em; }
+.wiz-header-note   { font-size: 10px; opacity: .75; margin-top: 1px; text-transform: uppercase; letter-spacing: .08em; }
+.wiz-header-side   { width: 90px; display: flex; align-items: center; }
+.wiz-header-logout { font-size: 11px; opacity: .8; text-decoration: underline; cursor: pointer; background: none; border: none; color: #fff; }
+.wiz-header-logo   { width: 90px; text-align: right; }
+.wiz-header-logo img { height: 32px; opacity: .9; }
 
-.plans-section-hdr .psh-count {
-  font-family: "DM Mono", monospace;
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.wiz-progress-wrap {
+  background: #fff;
+  border-bottom: 1px solid var(--g200);
+  padding: 10px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  overflow-x: auto;
+}
+.wiz-progress-bar {
+  display: flex;
+  max-width: 1100px;
+  margin: 0 auto;
+  gap: 2px;
+  align-items: flex-start;
+}
+.wiz-prog-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  min-width: 0;
+  font-family: var(--font-ui);
+  color: var(--g500);
   font-size: 12px;
-  font-weight: 700;
-  opacity: .9;
-  text-transform: none;
-  letter-spacing: 0;
+  transition: background .15s, color .15s;
+}
+.wiz-prog-step:hover:not(:disabled) { background: var(--g50); color: var(--g700); }
+.wiz-prog-step:disabled { cursor: not-allowed; opacity: .5; }
+.wiz-prog-step.active  { color: var(--red); font-weight: 600; }
+.wiz-prog-step.done    { color: var(--g700); }
+.wiz-prog-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--g200); color: var(--g600);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.wiz-prog-step.active .wiz-prog-num  { background: var(--red);  color: #fff; }
+.wiz-prog-step.done   .wiz-prog-num  { background: var(--g700); color: #fff; }
+.wiz-prog-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .06em;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.wiz-prog-sep {
+  flex: 0 0 auto; height: 2px; background: var(--g200); width: 10px; align-self: center; margin-top: -14px; margin-inline: -2px;
+}
+.wiz-prog-sep.done { background: var(--g700); }
+
+/* ── Main container ──────────────────────────────────────────────────────── */
+.wiz-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
 }
 
-/* ── Plans step – sqft summary strip ─────────────────────────────────────── */
-.sqft-summary {
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.wiz-card {
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.wiz-card-pad { padding: 16px; }
+
+/* ── Section header ──────────────────────────────────────────────────────── */
+.wiz-sec-hdr {
+  background: var(--g900);
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wiz-sec-hdr-dark {
+  background: var(--g800);
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wiz-sec-body {
+  padding: 12px 16px;
+}
+.wiz-sec-hdr .badge, .wiz-sec-hdr-dark .badge {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  color: rgba(255,255,255,.9);
+}
+
+/* ── Customer grid ───────────────────────────────────────────────────────── */
+.wiz-cust-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  padding: 16px;
+}
+.wiz-field { display: flex; flex-direction: column; gap: 5px; }
+.wiz-field.full { grid-column: 1 / -1; }
+.wiz-field-lbl {
+  font-size: 10px; font-weight: 600; color: var(--g500);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.wiz-inp, .wiz-sel {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid var(--g300); border-radius: var(--radius-sm);
+  background: #fff; color: var(--g900);
+  font-family: var(--font-ui); font-size: 13px; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.wiz-inp:focus, .wiz-sel:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(163,26,26,.1);
+}
+.wiz-inp.mono { font-family: var(--font-mono); }
+.wiz-inp.num  { text-align: right; }
+.wiz-sel {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  padding-right: 30px;
+  cursor: pointer;
+}
+
+/* ── Scope selector cards ────────────────────────────────────────────────── */
+.wiz-scope-wrap { padding: 4px 16px 18px; }
+.wiz-scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wiz-scope-btn {
+  display: flex; flex-direction: column; gap: 5px; text-align: left;
+  padding: 14px 16px;
+  border: 2px solid var(--g300); border-radius: var(--radius);
+  background: #fff; cursor: pointer; transition: all .15s;
+  font-family: var(--font-ui); text-decoration: none; color: inherit;
+}
+.wiz-scope-btn:hover     { border-color: var(--g400); background: var(--g50); }
+.wiz-scope-btn.active    { border-color: var(--red); background: var(--red-light); }
+.wiz-scope-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--g900); }
+.wiz-scope-btn.active .wiz-scope-title { color: var(--red-dark); }
+.wiz-scope-icon  { font-size: 18px; }
+.wiz-scope-sub   { font-size: 12px; color: var(--g500); }
+.wiz-scope-btn.active .wiz-scope-sub { color: var(--red-dark); opacity: .85; }
+
+/* ── Upgrade / option rows ───────────────────────────────────────────────── */
+.upg-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--g200);
+  font-size: 12px;
+}
+.upg-row:last-child { border-bottom: none; }
+.upg-label { flex: 1; color: var(--g700); }
+.upg-sub   { display: block; font-size: 10px; color: var(--g500); margin-top: 1px; }
+.upg-sf    { width: 74px; padding: 5px 8px; border: 1px solid var(--g300); border-radius: var(--radius-sm); text-align: right; font-family: var(--font-mono); font-size: 12px; background: #fff; color: var(--g900); outline: none; }
+.upg-sf:focus { border-color: var(--red); }
+.upg-unit  { font-size: 10px; color: var(--g500); white-space: nowrap; }
+.upg-cost  { font-family: var(--font-mono); font-weight: 600; min-width: 72px; text-align: right; }
+
+/* ── KPI band ────────────────────────────────────────────────────────────── */
+.wiz-kpi-bar {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: var(--border-soft);
-  border-radius: 0 0 var(--radius) var(--radius);
-  overflow: hidden;
+  background: var(--g200);
+  border-top: 1px solid var(--g200);
 }
-
-.sqft-box {
-  background: var(--surface);
-  padding: 12px 10px;
+.wiz-kpi-bar.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.wiz-kpi-bar.cols-4 { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 600px) { .wiz-kpi-bar.cols-4 { grid-template-columns: repeat(4, 1fr); } }
+.wiz-kpi-cell {
+  background: var(--g50);
+  padding: 10px 12px;
   text-align: center;
 }
+.wiz-kpi-cell-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: var(--g500); }
+.wiz-kpi-cell-val { font-family: var(--font-mono); font-size: 15px; font-weight: 700; margin-top: 2px; color: var(--g900); }
 
-.sqft-box .sqft-val {
-  font-size: 19px;
-  font-weight: 700;
-  font-family: "DM Mono", monospace;
-  color: var(--text);
+/* ── Contract total bar ──────────────────────────────────────────────────── */
+.wiz-total-bar {
+  background: var(--red); color: #fff;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 14px 0;
 }
+.wiz-total-bar-label { font-size: 13px; font-weight: 500; }
+.wiz-total-bar-val   { font-family: var(--font-mono); font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
 
-.sqft-box .sqft-lbl {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  margin-top: 3px;
+/* ── Step nav footer ─────────────────────────────────────────────────────── */
+.wiz-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-top: 1px solid var(--g200);
+  padding: 10px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  z-index: 90;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.06);
 }
-
-/* ── Plans step – schedule rows ──────────────────────────────────────────── */
-.sched-hdr {
-  display: grid;
-  grid-template-columns: 1.4fr 120px 100px 30px;
-  gap: 8px;
-  padding: 6px 14px;
-  border-bottom: 2px solid var(--border);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: .4px;
+.wiz-footer-left  { display: flex; gap: 8px; }
+.wiz-footer-right { display: flex; gap: 8px; }
+.wiz-nav-btn {
+  padding: 9px 18px;
+  border: 1.5px solid var(--g300); border-radius: var(--radius);
+  background: #fff; color: var(--g700);
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
 }
-
-.sched-row {
-  display: grid;
-  grid-template-columns: 1.4fr 120px 100px 30px;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border-soft);
-  align-items: center;
+.wiz-nav-btn:hover:not(:disabled) { border-color: var(--g500); background: var(--g50); }
+.wiz-nav-btn:disabled { opacity: .4; cursor: not-allowed; }
+.wiz-nav-next {
+  background: var(--red); color: #fff; border-color: var(--red);
 }
+.wiz-nav-next:hover:not(:disabled) { background: var(--red-dark); border-color: var(--red-dark); }
+.wiz-nav-status { font-size: 11px; color: var(--g500); }
 
-.sched-row select,
-.sched-row input[type="number"] {
-  font-size: 13px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  outline: none;
-  width: 100%;
-}
-
-.sched-row select:focus,
-.sched-row input[type="number"]:focus { border-color: var(--brand); }
-.sched-row input[type="number"] { text-align: right; font-family: "DM Mono", monospace; font-weight: 600; }
-
-.roof-sched-hdr {
-  display: grid;
-  grid-template-columns: 1fr 105px 105px 90px 30px;
-  gap: 8px;
-  padding: 6px 14px;
-  border-bottom: 2px solid var(--border);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: .4px;
-}
-
-.roof-sched-row {
-  display: grid;
-  grid-template-columns: 1fr 105px 105px 90px 30px;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border-soft);
-  align-items: center;
-}
-
-.roof-sched-row select,
-.roof-sched-row input[type="number"] {
-  font-size: 12px;
-  padding: 6px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  outline: none;
-  width: 100%;
-}
-
-.roof-sched-row select:focus,
-.roof-sched-row input[type="number"]:focus { border-color: var(--brand); }
-.roof-sched-row input[type="number"] { text-align: right; font-family: "DM Mono", monospace; font-weight: 600; }
-
-.del-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text-soft);
-  font-size: 15px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.del-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-
-/* ── Plans step – upgrade rows ───────────────────────────────────────────── */
-.upg-row {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-soft);
-  gap: 10px;
-}
-
-.upg-row:last-child { border-bottom: none; }
-
-.upg-label {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.upg-sub {
-  display: block;
-  font-size: 10px;
-  color: var(--text-soft);
-  margin-top: 2px;
-}
-
-.upg-cost {
-  min-width: 68px;
-  text-align: right;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: "DM Mono", monospace;
-  color: var(--text-soft);
-}
-
-.upg-cost.active { color: var(--brand); }
-
-.upg-stepper {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.upg-stepper button {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: var(--surface-muted);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand);
-  cursor: pointer;
-}
-
-.upg-stepper button:hover { background: var(--border-soft); }
-
-.upg-qty {
-  width: 28px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: "DM Mono", monospace;
-  color: var(--text);
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  line-height: 28px;
-}
-
-.upg-sf {
-  width: 88px;
-  text-align: center;
-  font-family: "DM Mono", monospace;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
-  background: var(--surface);
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-.upg-sf:focus { border-color: var(--brand); }
-.upg-unit { font-size: 10px; color: var(--text-soft); text-transform: uppercase; min-width: 20px; }
-
-/* ── Plans step – pill rows / inline rows ────────────────────────────────── */
-.pill-row {
-  display: flex;
-  gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-soft);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.pill-row:last-child { border-bottom: none; }
-
-.pill-row .pill-label {
-  font-size: 12px;
-  color: var(--text);
-  font-weight: 600;
-  min-width: 88px;
-}
-
-.pill-row label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.pill-row input[type="radio"],
-.pill-row input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--brand);
-}
-
+/* ── Inline row helper ───────────────────────────────────────────────────── */
 .inline-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-soft);
+  display: flex; gap: 10px; align-items: center; padding: 6px 0;
+  border-bottom: 1px solid var(--g200); font-size: 12px;
 }
-
 .inline-row:last-child { border-bottom: none; }
-.inline-row > label { font-size: 13px; color: var(--text-muted); flex: 1; }
-.inline-row select {
-  width: auto;
-  flex-shrink: 0;
-  padding: 6px 10px;
-  font-size: 13px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  outline: none;
+.inline-row label { flex: 1; color: var(--g700); }
+.inline-row select, .inline-row input[type="number"] {
+  padding: 6px 10px; border: 1px solid var(--g300); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 12px; background: #fff; outline: none;
 }
-.inline-row select:focus { border-color: var(--brand); }
+.inline-row select:focus, .inline-row input[type="number"]:focus { border-color: var(--red); }
 
-/* ── Plans step – add button / info banner ───────────────────────────────── */
-.plans-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--brand);
-  cursor: pointer;
-  background: none;
-  border: none;
-}
-
-.plans-add-btn:hover { text-decoration: underline; }
-
-.plans-info-banner {
-  padding: 8px 14px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  font-size: 11px;
-  color: #92400e;
-  line-height: 1.45;
-  margin: 8px 14px;
-  border-radius: 6px;
-}
-
-.plans-info-banner strong { font-weight: 700; }
-
-/* ── Plans step – custom charge rows ─────────────────────────────────────── */
-.custom-charge-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+/* ── Banner ──────────────────────────────────────────────────────────────── */
+.wiz-banner {
   padding: 9px 14px;
-  border-bottom: 1px solid var(--border-soft);
-  flex-wrap: wrap;
-}
-
-.custom-charge-row input[type="text"] {
-  flex: 1;
-  min-width: 120px;
-  padding: 6px 9px;
-  font-size: 13px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  outline: none;
-}
-
-.custom-charge-row input[type="text"]:focus { border-color: var(--brand); }
-
-.custom-charge-row input[type="number"] {
-  width: 78px;
-  padding: 6px 8px;
-  font-size: 13px;
-  font-family: "DM Mono", monospace;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  text-align: right;
-  outline: none;
-}
-
-.custom-charge-row input[type="number"]:focus { border-color: var(--brand); }
-
-.custom-charge-row select {
-  width: 62px;
-  padding: 6px 4px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
+  margin-bottom: 10px;
+  border: 1px solid;
+}
+.wiz-banner-info  { background: var(--blue-light);  border-color: #BFDBFE; color: #1E40AF; }
+.wiz-banner-amber { background: var(--amber-light); border-color: #FDE68A; color: var(--amber-dark); }
+.wiz-banner-empty {
+  background: var(--g100); border-color: var(--g200); color: var(--g500);
+  text-align: center; padding: 20px 16px;
 }
 
-.custom-charge-lbl {
-  font-size: 11px;
-  color: var(--text-soft);
-  font-weight: 600;
-  white-space: nowrap;
+/* ── Checklist / checkbox row ────────────────────────────────────────────── */
+.chk-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--g200);
+  font-size: 12px; cursor: pointer; user-select: none;
 }
+.chk-row:last-child { border-bottom: none; }
+.chk-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--red); cursor: pointer; }
+.chk-row-label { flex: 1; color: var(--g700); }
+.chk-row-sub   { font-size: 10px; color: var(--g500); }
+.chk-row-cost  { font-family: var(--font-mono); font-weight: 600; min-width: 72px; text-align: right; color: var(--g900); }
 
-/* ── Plans step – responsive ─────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .sched-hdr, .sched-row {
-    grid-template-columns: 1fr 88px 76px 28px;
-  }
-  .roof-sched-hdr, .roof-sched-row {
-    grid-template-columns: 1fr 80px 80px 74px 28px;
-  }
+/* ── Metric input grid ───────────────────────────────────────────────────── */
+.wiz-metrics-grid { display: grid; gap: 0; }
+.wiz-metric-row {
+  display: grid; grid-template-columns: 1fr 90px 28px;
+  gap: 8px; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--g200); font-size: 12px;
+}
+.wiz-metric-row:last-child { border-bottom: none; }
+.wiz-metric-label { color: var(--g600); }
+.wiz-metric-input {
+  width: 90px; text-align: right; padding: 5px 8px;
+  border: 1px solid var(--g300); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 12px; background: #fff;
+  color: var(--g900); outline: none;
+}
+.wiz-metric-input:focus { border-color: var(--red); }
+.wiz-metric-unit { font-size: 10px; color: var(--g400); }
+.wiz-metric-value { font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-align: right; color: var(--g700); }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .wiz-cust-grid  { grid-template-columns: 1fr; }
+  .wiz-scope-grid { grid-template-columns: 1fr; }
+  .wiz-kpi-bar.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .wiz-kpi-bar    { grid-template-columns: repeat(2, 1fr); }
+  .wiz-header-total { font-size: 20px; }
 }

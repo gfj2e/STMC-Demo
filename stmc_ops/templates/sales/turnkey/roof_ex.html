@@ -1,0 +1,47 @@
+{% comment %}Turnkey – Step 2: Roof & Exterior Labor{% endcomment %}
+<div class="wiz-step" id="tk-step-2" style="display:none">
+
+  <div class="wiz-card">
+    <div class="wiz-sec-hdr">
+      Roof &amp; Exterior Labor
+      <span class="badge" id="ext-cust-price">—</span>
+    </div>
+    <div class="wiz-sec-body" id="ext-lines-body">
+      <!-- populated by turnkey.js -->
+    </div>
+
+    <div class="wiz-kpi-bar">
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Customer Price</div>
+        <div class="wiz-kpi-cell-val" id="ext-kpi-customer">—</div>
+      </div>
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">True Cost</div>
+        <div class="wiz-kpi-cell-val" id="ext-kpi-truecost">—</div>
+      </div>
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Margin</div>
+        <div class="wiz-kpi-cell-val" id="ext-kpi-margin">—</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Manual line overrides -->
+  <div class="wiz-card">
+    <div class="wiz-sec-hdr-dark">Manual Overrides</div>
+    <div class="wiz-sec-body">
+      <div class="wiz-banner wiz-banner-info">Adjust quantities below to override auto-calculated values from plan metrics.</div>
+
+      <div class="upg-row">
+        <span class="upg-label">Customer slab price<span class="upg-sub" id="ext-cust-slab-detail">— SF × $12</span></span>
+        <span class="upg-cost" id="ext-cust-total">—</span>
+      </div>
+      <div class="upg-row">
+        <span class="upg-label">True exterior labor cost</span>
+        <span class="upg-cost" id="ext-true-cost">—</span>
+      </div>
+    </div>
+  </div>
+
+</div>

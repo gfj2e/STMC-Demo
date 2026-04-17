@@ -1,0 +1,96 @@
+{% comment %}Turnkey – Step 5: Finish Selections{% endcomment %}
+<div class="wiz-step" id="tk-step-5" style="display:none">
+
+  <div class="wiz-card">
+    <div class="wiz-sec-hdr">Interior Finish Selections</div>
+    <div class="wiz-sec-body">
+      <div class="wiz-banner wiz-banner-info" style="margin-bottom:10px">Choose finish selections for the customer. Each adder above the base package flows to the interior contract total.</div>
+
+      <div class="inline-row">
+        <label>Flooring Type</label>
+        <select id="sel-floor">
+          <option value="lvp">LVP (base)</option>
+          <option value="hardwood">Hardwood</option>
+          <option value="tile">Tile</option>
+          <option value="carpet">Carpet</option>
+          <option value="mix">Mixed (quote)</option>
+        </select>
+      </div>
+
+      <div class="upg-row">
+        <span class="upg-label">Floor SF<span class="upg-sub" id="sel-floor-hint">From living SF</span></span>
+        <input class="upg-sf" type="number" id="sel-floor-sf" placeholder="0" min="0" />
+        <span class="upg-unit">SF</span>
+        <span class="upg-cost" id="sel-floor-cost">—</span>
+      </div>
+
+      <div class="inline-row">
+        <label>Primary Bath Tile</label>
+        <select id="sel-bath-tile">
+          <option value="standard">Standard (base)</option>
+          <option value="mid">Mid-Grade</option>
+          <option value="premium">Premium</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Interior Paint</label>
+        <select id="sel-paint">
+          <option value="standard">Standard White / 2 color</option>
+          <option value="accent">Accent walls</option>
+          <option value="full">Full color package</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Trim Package</label>
+        <select id="sel-trim">
+          <option value="standard">Standard colonist</option>
+          <option value="craftsman">Craftsman</option>
+          <option value="farmhouse">Farmhouse / Shiplap</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Lighting Package</label>
+        <select id="sel-lighting">
+          <option value="standard">Standard</option>
+          <option value="upgraded">Upgraded / Recessed</option>
+          <option value="premium">Premium + pendants</option>
+        </select>
+      </div>
+
+      <div class="chk-row">
+        <input type="checkbox" id="sel-fireplace" />
+        <span class="chk-row-label">Fireplace / Mantle<span class="chk-row-sub">Flat rate</span></span>
+        <span class="chk-row-cost" id="sel-fireplace-cost">—</span>
+      </div>
+
+      <div class="chk-row">
+        <input type="checkbox" id="sel-tile-shower" />
+        <span class="chk-row-label">Tile Shower Surround<span class="chk-row-sub">Per bathroom</span></span>
+        <span class="chk-row-cost" id="sel-tile-shower-cost">—</span>
+      </div>
+
+      <div class="chk-row">
+        <input type="checkbox" id="sel-deck" />
+        <span class="chk-row-label">Covered Deck / Porch Extension<span class="chk-row-sub">Quote-based</span></span>
+        <span class="chk-row-cost" id="sel-deck-cost">—</span>
+      </div>
+
+    </div>
+
+    <div class="wiz-kpi-bar cols-2">
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Selections Adder</div>
+        <div class="wiz-kpi-cell-val" id="sel-kpi-adder">$0</div>
+      </div>
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Flooring Total</div>
+        <div class="wiz-kpi-cell-val" id="sel-kpi-floor">—</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>

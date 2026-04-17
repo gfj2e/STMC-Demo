@@ -1,0 +1,87 @@
+{% comment %}Shell – Step 1: Concrete{% endcomment %}
+<div class="wiz-step" id="sh-step-1" style="display:none">
+
+  <div class="wiz-card">
+    <div class="wiz-sec-hdr">Concrete</div>
+    <div class="wiz-sec-body">
+
+      <div class="upg-row">
+        <span class="upg-label">Concrete Area
+          <span class="upg-sub" id="sh-c-area-hint">—</span>
+        </span>
+        <button id="sh-c-use-slab-btn" style="font-size:11px;padding:4px 10px;border:1.5px solid var(--g300);border-radius:4px;background:var(--g50);cursor:pointer;color:var(--red);font-weight:600;white-space:nowrap" type="button">Use slab SF</button>
+        <input class="upg-sf" type="number" id="sh-c-area" placeholder="0" min="0" />
+        <span class="upg-unit">SF</span>
+      </div>
+
+      <div class="inline-row">
+        <label>Concrete Type</label>
+        <select id="sh-c-type">
+          <option value="">— None —</option>
+          <option value="4fiber">4″ w/ Fiber</option>
+          <option value="6fiber">6″ w/ Fiber</option>
+          <option value="4mono">4″ Mono Footer &amp; Fiber</option>
+          <option value="6mono">6″ Mono Footer &amp; Fiber</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Zone</label>
+        <select id="sh-c-zone">
+          <option value="1">Zone 1 – Middle TN</option>
+          <option value="2">Zone 2 – East &amp; West TN</option>
+          <option value="3">Zone 3 – KY &amp; IN</option>
+        </select>
+      </div>
+
+      <div class="chk-row">
+        <input type="checkbox" id="sh-c-lp" />
+        <span class="chk-row-label">Line Pump<span class="chk-row-sub"> $1,750 flat</span></span>
+        <span class="chk-row-cost" id="sh-c-lp-cost">—</span>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="sh-c-bp" />
+        <span class="chk-row-label">Boom Pump<span class="chk-row-sub"> $2,500 flat</span></span>
+        <span class="chk-row-cost" id="sh-c-bp-cost">—</span>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="sh-c-wire" />
+        <span class="chk-row-label">Wire on 4′ Grid<span class="chk-row-sub"> +$0.85 / SF</span></span>
+        <span class="chk-row-cost" id="sh-c-wire-cost">—</span>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="sh-c-rebar" />
+        <span class="chk-row-label">Rebar on 4′ Grid<span class="chk-row-sub"> +$1.25 / SF</span></span>
+        <span class="chk-row-cost" id="sh-c-rebar-cost">—</span>
+      </div>
+
+      <div class="upg-row">
+        <span class="upg-label">Driveway<span class="upg-sub">SF × zone rate</span></span>
+        <input class="upg-sf" type="number" id="sh-c-drive" placeholder="0" min="0" />
+        <span class="upg-unit">SF</span>
+        <span class="upg-cost" id="sh-c-drive-cost">—</span>
+      </div>
+
+      <div class="upg-row">
+        <span class="upg-label">Walkway<span class="upg-sub">SF × zone rate</span></span>
+        <input class="upg-sf" type="number" id="sh-c-walk" placeholder="0" min="0" />
+        <span class="upg-unit">SF</span>
+        <span class="upg-cost" id="sh-c-walk-cost">—</span>
+      </div>
+
+    </div>
+
+    <div class="wiz-kpi-bar cols-2">
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Slab Cost</div>
+        <div class="wiz-kpi-cell-val" id="sh-c-slab-cost">—</div>
+      </div>
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Concrete Total</div>
+        <div class="wiz-kpi-cell-val" id="sh-c-total">—</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>

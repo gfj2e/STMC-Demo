@@ -1,0 +1,84 @@
+{% comment %}Turnkey – Step 4: Cabinets{% endcomment %}
+<div class="wiz-step" id="tk-step-4" style="display:none">
+
+  <div class="wiz-card">
+    <div class="wiz-sec-hdr">Cabinet Package</div>
+    <div class="wiz-sec-body">
+      <div class="wiz-banner wiz-banner-info" style="margin-bottom:10px">Select a cabinet package, door style, and countertop. Any upgrade cost above the standard package is added to the contract total.</div>
+
+      <div class="inline-row">
+        <label>Cabinet Line</label>
+        <select id="cab-line">
+          <option value="standard">Standard (included)</option>
+          <option value="mid">Mid-Grade</option>
+          <option value="premium">Premium</option>
+          <option value="custom">Custom / Quote</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Door Style</label>
+        <select id="cab-door">
+          <option value="shaker">Shaker</option>
+          <option value="flat">Flat Panel</option>
+          <option value="raised">Raised Panel</option>
+          <option value="beadboard">Beadboard</option>
+        </select>
+      </div>
+
+      <div class="inline-row">
+        <label>Finish Color</label>
+        <select id="cab-finish">
+          <option value="white">White</option>
+          <option value="gray">Gray / Greige</option>
+          <option value="navy">Navy / Dark</option>
+          <option value="natural">Natural Wood</option>
+          <option value="tbd">TBD / Customer Choice</option>
+        </select>
+      </div>
+
+      <div class="upg-row">
+        <span class="upg-label">Cabinet LF<span class="upg-sub" id="cab-lf-hint">From metrics</span></span>
+        <input class="upg-sf" type="number" id="cab-lf" placeholder="0" min="0" />
+        <span class="upg-unit">LF</span>
+      </div>
+
+      <div class="upg-row">
+        <span class="upg-label">Countertop SF<span class="upg-sub" id="cab-ct-hint">Auto: LF × 2</span></span>
+        <input class="upg-sf" type="number" id="cab-ct" placeholder="0" min="0" />
+        <span class="upg-unit">SF</span>
+      </div>
+
+      <div class="inline-row">
+        <label>Counter Material</label>
+        <select id="cab-counter">
+          <option value="laminate">Laminate (base)</option>
+          <option value="granite">Granite</option>
+          <option value="quartz">Quartz</option>
+          <option value="butcher">Butcher Block</option>
+          <option value="custom">Custom / Quote</option>
+        </select>
+      </div>
+
+      <div class="chk-row">
+        <input type="checkbox" id="cab-island" />
+        <span class="chk-row-label">Kitchen Island<span class="chk-row-sub">Flat rate addition</span></span>
+        <span class="chk-row-cost" id="cab-island-cost">—</span>
+      </div>
+
+    </div>
+
+    <div class="wiz-kpi-bar cols-2">
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Cabinet Package</div>
+        <div class="wiz-kpi-cell-val" id="cab-kpi-package">—</div>
+      </div>
+      <div class="wiz-kpi-cell">
+        <div class="wiz-kpi-cell-lbl">Countertop</div>
+        <div class="wiz-kpi-cell-val" id="cab-kpi-counter">—</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>

@@ -1,0 +1,14 @@
+{% load static %}
+<nav class="nav" id="mv-tab-nav">
+  <div class="nav-tabs">
+    <a class="nav-link active" data-mv-tab="new-contract" href="{% url 'sales' %}">New Contract</a>
+    <a class="nav-link" data-mv-tab="my-projects" href="{% url 'sales' %}">My Projects</a>
+    <a class="nav-link" data-mv-tab="models" href="{% url 'sales' %}">Models</a>
+    <a class="nav-link" data-mv-tab="rates" href="{% url 'sales' %}">Rate Card</a>
+  </div>
+  <div class="nav-user">
+    <button class="nav-logout logout-link">Logout</button>
+    <span class="nav-user-name" id="hN"></span>
+    <span class="nav-badge" id="hA"></span>
+  </div>
+</nav>

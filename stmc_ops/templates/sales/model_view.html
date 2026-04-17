@@ -1,44 +1,194 @@
-{% comment %}Sales wizard – Step 0: Select Model{% endcomment %}
-<div class="wizard-step" id="step-model">
-  <h2 class="wizard-title">Select model</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STMC Build Wizard – New Contract</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'styles.css' %}" />
+</head>
+<body class="wizard-page">
 
-  <article class="card">
-    <div class="field">
-      <label for="sw-model-select">Model</label>
-      <select id="sw-model-select">
-        <option value="" disabled selected>Loading models…</option>
-      </select>
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header class="wiz-header">
+    <div class="wiz-header-center">
+      <div class="wiz-header-sub">Summertown Metals &amp; Construction</div>
+      <div class="wiz-header-title">Build Wizard</div>
+      <div class="wiz-header-note">New Contract</div>
     </div>
-    <div class="field">
-      <label for="sw-customer">Customer</label>
-      <input id="sw-customer" type="text" placeholder="Customer name" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label for="sw-order">Order #</label>
-      <input id="sw-order" type="text" placeholder="Order number" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label for="sw-address">Job Site Address</label>
-      <input id="sw-address" type="text" placeholder="Job site address" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label for="sw-salesrep">Sales Rep</label>
-      <input id="sw-salesrep" type="text" placeholder="Sales rep name" autocomplete="off" />
-    </div>
-  </article>
+  </header>
 
-  <div class="kpis cols-3" id="model-kpis" style="display:none">
-    <article class="kpi">
-      <div class="kpi-label">Living SF</div>
-      <div class="kpi-value mono" id="kpi-living-sf">—</div>
-    </article>
-    <article class="kpi">
-      <div class="kpi-label">Turnkey / SF</div>
-      <div class="kpi-value mono" id="kpi-turnkey-sf">—</div>
-    </article>
-    <article class="kpi">
-      <div class="kpi-label">Region</div>
-      <div class="kpi-value" id="kpi-region">—</div>
-    </article>
+  <!-- ── Sales nav tabs ──────────────────────────────────────────────── -->
+  {% include "sales/_nav.html" with btn_text="Logout" %}
+
+  <!-- ══ NEW CONTRACT TAB (wizard) ════════════════════════════════════════ -->
+  <section class="mv-tab-section" id="mv-tab-new-contract">
+
+  <!-- ── Progress bar ───────────────────────────────────────────────────── -->
+  <div class="wiz-progress-wrap" id="mv-progress-wrap">
+    <div class="wiz-progress-bar" id="mv-progress-bar">
+      <!-- built by JS -->
+    </div>
   </div>
-</div>
+
+  <!-- ── Main content ───────────────────────────────────────────────────── -->
+  <div class="wiz-container">
+
+    <!-- Step 0: Customer Info + Model & Region -->
+    <div class="wiz-step" id="mv-step-0">
+
+      <div class="wiz-card">
+        <div class="wiz-sec-hdr">Customer &amp; Project Info</div>
+        <div class="wiz-cust-grid">
+
+          <div class="wiz-field full">
+            <label class="wiz-field-lbl">Customer Name</label>
+            <input class="wiz-inp" type="text" id="mv-customer-name" placeholder="First &amp; Last Name" autocomplete="name" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">Phone</label>
+            <input class="wiz-inp" type="tel" id="mv-phone" placeholder="(555) 000-0000" autocomplete="tel" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">Email</label>
+            <input class="wiz-inp" type="email" id="mv-email" placeholder="email@example.com" autocomplete="email" />
+          </div>
+          <div class="wiz-field full">
+            <label class="wiz-field-lbl">Street Address</label>
+            <input class="wiz-inp" type="text" id="mv-address" placeholder="123 Main St" autocomplete="street-address" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">City</label>
+            <input class="wiz-inp" type="text" id="mv-city" placeholder="City" autocomplete="address-level2" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">State</label>
+            <input class="wiz-inp" type="text" id="mv-state" placeholder="TN" maxlength="2" style="text-transform:uppercase" autocomplete="address-level1" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">ZIP Code</label>
+            <input class="wiz-inp" type="text" id="mv-zip" placeholder="00000" maxlength="10" autocomplete="postal-code" />
+          </div>
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">Subdivision / Community</label>
+            <input class="wiz-inp" type="text" id="mv-subdivision" placeholder="Optional" />
+          </div>
+
+        </div>
+      </div>
+
+      <div class="wiz-card" style="margin-top:14px">
+        <div class="wiz-sec-hdr">Select Model &amp; Region</div>
+        <div class="wiz-card-pad">
+
+          <div class="wiz-field" style="margin-bottom:14px">
+            <label class="wiz-field-lbl">Home Model</label>
+            <select class="wiz-sel" id="mv-model-select">
+              <option value="">— Select model —</option>
+            </select>
+          </div>
+
+          <div class="wiz-field">
+            <label class="wiz-field-lbl">Region</label>
+            <select class="wiz-sel" id="mv-region-select">
+              <option value="">— Select region —</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Model KPI band -->
+        <div id="mv-model-kpis" style="display:none">
+          <div class="wiz-kpi-bar cols-4">
+            <div class="wiz-kpi-cell">
+              <div class="wiz-kpi-cell-lbl">Living SF</div>
+              <div class="wiz-kpi-cell-val" id="mv-kpi-sf">—</div>
+            </div>
+            <div class="wiz-kpi-cell">
+              <div class="wiz-kpi-cell-lbl">Turnkey / SF</div>
+              <div class="wiz-kpi-cell-val" id="mv-kpi-rate">—</div>
+            </div>
+            <div class="wiz-kpi-cell">
+              <div class="wiz-kpi-cell-lbl">Materials</div>
+              <div class="wiz-kpi-cell-val" id="mv-kpi-mat">—</div>
+            </div>
+            <div class="wiz-kpi-cell">
+              <div class="wiz-kpi-cell-lbl">Region</div>
+              <div class="wiz-kpi-cell-val" id="mv-kpi-region" style="font-size:11px">—</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="wiz-card" style="margin-top:14px">
+        <div class="wiz-sec-hdr">Select Contract Scope</div>
+        <div class="wiz-scope-wrap">
+          <p style="font-size:12px;color:var(--g500);margin-bottom:14px;">Choose the type of contract for this build.</p>
+          <div class="wiz-scope-grid">
+            <button class="wiz-scope-btn" id="mv-scope-turnkey" type="button">
+              <div class="wiz-scope-title"><span class="wiz-scope-icon">🏠</span> Full Turnkey</div>
+              <div class="wiz-scope-sub">Complete build – materials, labor, concrete, and interior finishes included.</div>
+            </button>
+            <button class="wiz-scope-btn" id="mv-scope-shell" type="button">
+              <div class="wiz-scope-title"><span class="wiz-scope-icon">🔩</span> Shell Only</div>
+              <div class="wiz-scope-sub">Foundation, framing, metal shell, and exterior – interior by owner.</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /.wiz-container -->
+
+  <!-- ── Footer nav ─────────────────────────────────────────────────────── -->
+  <div class="wiz-footer" id="mv-wizard-footer">
+    <div class="wiz-footer-left">
+      <button class="wiz-nav-btn" id="mv-back" style="display:none" type="button">← Back</button>
+    </div>
+    <span class="wiz-nav-status" id="mv-status">Step 1 of 3</span>
+    <div class="wiz-footer-right">
+      <button class="wiz-nav-btn wiz-nav-next" id="mv-next" type="button">Next →</button>
+    </div>
+  </div>
+
+  </section><!-- /.mv-tab-new-contract -->
+
+  <!-- ══ MY PROJECTS TAB ══════════════════════════════════════════════════ -->
+  <section class="mv-tab-section" id="mv-tab-my-projects" style="display:none">
+    <div class="wrap">
+      {% include "sales/old/my_projects.html" %}
+    </div>
+  </section>
+
+  <!-- ══ MODELS TAB ════════════════════════════════════════════════════════ -->
+  <section class="mv-tab-section" id="mv-tab-models" style="display:none">
+    <div class="wrap">
+      {% include "sales/old/models.html" %}
+    </div>
+  </section>
+
+  <!-- ══ RATE CARD TAB ═════════════════════════════════════════════════════ -->
+  <section class="mv-tab-section" id="mv-tab-rates" style="display:none">
+    <div class="wrap">
+      {% include "sales/old/rate_card.html" %}
+    </div>
+  </section>
+
+  <script>
+    window.STMC_ROUTES = {
+      login:   "{% url 'login' %}",
+      sales:   "{% url 'sales' %}",
+      turnkey: "{% url 'turnkey' %}",
+      shell:   "{% url 'shell_wizard' %}",
+      pm:      "{% url 'manager' %}",
+      exec:    "{% url 'owner' %}"
+    };
+    window.STMC_DATA_URL = "{% static 'data.json' %}";
+  </script>
+  <script src="{% static 'script.js' %}" defer></script>
+  <script src="{% static 'model_view.js' %}" defer></script>
+</body>
+</html>
