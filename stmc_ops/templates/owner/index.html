@@ -98,6 +98,12 @@
 .draw-label{font-size:13px;font-weight:600;color:var(--g800)}
 .draw-date{font-size:11px;color:var(--g500)}
 .draw-amt{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--g900);white-space:nowrap}
+/* ── Mark complete button ── */
+.btn-complete{padding:7px 14px;font-size:12px;font-weight:500;border:none;border-radius:var(--radius-sm);background:var(--green);color:#fff;cursor:pointer;font-family:var(--font-ui)}
+.btn-complete:hover{opacity:.85}
+/* ── Toast ── */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;z-index:400;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -149,6 +155,9 @@
 
 </div>
 
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <script>
 const SEED='/stmc_ops/app/seed-data/';
 const LOGIN_URL='{% url "login" %}';
@@ -158,6 +167,47 @@ let PROJECTS=[];
 if(!localStorage.getItem('stmc_user')){window.location.href=LOGIN_URL;}
 
 function fmt(n){return'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}
+
+function getCookie(name){
+  const v=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v?v.pop():'';
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+async function markComplete(pid,dn){
+  const p=PROJECTS.find(x=>String(x.id)===String(pid));
+  if(!p)return;
+  const d=p.dr.find(x=>String(x.n)===String(dn));
+  if(!d)return;
+  try{
+    const res=await fetch('/stmc_ops/app/draw/complete/',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body:JSON.stringify({job_id:pid,draw_number:dn})
+    });
+    if(!res.ok)throw new Error('Server error');
+    const result=await res.json();
+    const seedRes=await fetch(SEED);
+    const data=await seedRes.json();
+    const own=data.owner||{};
+    PROJECTS=own.projects||[];
+    renderKpis(own.kpis||[]);
+    renderNotifications(own.notifications||[]);
+    renderDashProjects(PROJECTS);
+    renderAllProjects(PROJECTS);
+    renderPayments(PROJECTS);
+    showToast('\u2713 '+d.l+' complete');
+  }catch(e){
+    showToast('Error saving \u2014 try again');
+    console.error(e);
+  }
+}
 
 function _initials(n){return(n||'').split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?'}
 
@@ -186,9 +236,16 @@ function switchTab(btn,tab){
 }
 
 function phasePill(ph){
-  const map={'framing':'brand','roofing':'brand','siding':'brand','interior':'warning','paint':'warning','punch':'success','complete':'success'};
+  const map={'framing':'success','roughin':'success','roofing':'success','siding':'success','punch':'success','complete':'success','final':'success','closed':'success','interior':'warning','paint':'warning','estimate':'muted'};
+  const lbl={'estimate':'Estimate','framing':'Framing','roughin':'Rough-In','interior':'Interior','punch':'Punch','final':'Final','closed':'Closed','roofing':'Roofing','siding':'Siding','paint':'Paint','complete':'Complete'};
   const t=map[(ph||'').toLowerCase()]||'muted';
-  return`<span class="pill pill-${t}">${ph}</span>`;
+  return`<span class="pill pill-${t}">${lbl[ph]||ph}</span>`;
+}
+function stepPill(p){
+  const cur=(p.dr||[]).find(d=>d.s==='c');
+  if(!cur)return phasePill(p.ph);
+  const lbl=cur.l.replace(/^\d+\w*\s*[\u2014\-]\s*/,'');
+  return`<span class="pill pill-success">${lbl}</span>`;
 }
 
 function drawNumClass(s){return s==='p'?'paid':s==='c'?'current':''}
@@ -247,14 +304,26 @@ function renderNotifications(notifs){
 }
 
 function renderDashProjects(projects){
-  const heading=`<div class="stl">Active projects <span class="stl-badge">${projects.length}</span></div>`;
-  const cards=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const heading=`<div class="stl">Active projects <span class="stl-badge">${active.length}</span></div>`;
+  const buildCard=p=>{
     const collected=p.dr?p.dr.filter(d=>d.s==='p').reduce((a,d)=>a+d.a,0):0;
     const totalBg=Object.values(p.bg||{}).reduce((a,b)=>a+b,0);
     const totalAc=Object.values(p.ac||{}).reduce((a,b)=>a+b,0);
-    const pct=totalBg>0?Math.min(100,Math.round(totalAc/totalBg*100)):0;
-    const rem=totalBg-totalAc;
+    const pct=p.ct>0?Math.min(100,Math.round(collected/p.ct*100)):0;
+    const rem=p.ct-collected;
     const draws=(p.dr||[]).map(d=>phR(d)).join('');
+    const cur=p.dr&&p.dr.find(d=>d.s==='c');
+    const completeBox=cur&&p.ph!=='closed'?`
+      <div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;font-weight:500;color:#1D4ED8">${cur.l} ready?</div>
+          <div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
+        </div>
+        <button class="btn-complete" onclick="markComplete('${p.id}','${cur.n}')">Mark complete</button>
+      </div>`:'';
     return`
     <div class="proj-card">
       <div class="proj-hdr" onclick="toggleProj(this)">
@@ -264,26 +333,32 @@ function renderDashProjects(projects){
             <p class="proj-sub">${p.md} &middot; ${p.cu} &middot; PM: ${p.pm}</p>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            ${phasePill(p.ph)}
+            ${stepPill(p)}
             <span class="chevron">&#8964;</span>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${fmt(p.ct)}</div></div>
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(collected)}</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Budget</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Remaining</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
         </div>
+        <div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:${pct}%"></div></div>
       </div>
-      <div class="proj-body">${draws}</div>
+      <div class="proj-body">${draws}${completeBox}</div>
     </div>`;
-  }).join('');
-  document.getElementById('dash-projects').innerHTML=heading+cards;
+  };
+  const activeSect=active.length?active.map(buildCard).join(''):'<div class="banner banner-empty">No active projects.</div>';
+  const closedSect=closed.length?sectionHdr('Closed',closed.length)+closed.map(buildCard).join(''):'';
+  document.getElementById('dash-projects').innerHTML=heading+(active.length?'':'')+activeSect+closedSect;
 }
 
 function renderAllProjects(projects){
   const el=document.getElementById('all-projects-list');
-  el.innerHTML=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const buildCard=p=>{
     const trades=Object.keys(p.bg||{});
     const totalBg=trades.reduce((a,t)=>a+(p.bg[t]||0),0);
     const totalAc=trades.reduce((a,t)=>a+(p.ac[t]||0),0);
@@ -291,6 +366,7 @@ function renderAllProjects(projects){
     const margin=p.ct>0&&totalBg>0?Math.round((p.ct-totalBg)/p.ct*100):0;
     const marginColor=margin>=30?'var(--green)':margin>=15?'var(--amber)':'#DC2626';
     const pct=totalBg>0?Math.min(Math.round(totalAc/totalBg*100),100):0;
+    const collectedPct=p.ct>0?Math.min(100,Math.round(collected/p.ct*100)):0;
     const rows=trades.map(t=>{
       const bg=p.bg[t]||0,ac=p.ac[t]||0,ov=ac>bg;
       return`<div class="rw">
@@ -314,18 +390,37 @@ function renderAllProjects(projects){
         <div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">${fmt(totalBg)}</div></div>
         <div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:${marginColor}">${margin}%</div></div>
       </div>
-      <div class="ybanner">PM BUDGET &mdash; ${pct}% spent</div>
+      <div class="ybanner">COLLECTED &mdash; ${collectedPct}% of contract</div>
       <div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
-        <div style="height:100%;border-radius:3px;background:var(--green);width:${pct}%"></div>
+        <div style="height:100%;border-radius:3px;background:var(--green);width:${collectedPct}%"></div>
       </div>
       ${rows}
+      ${_completeBox(p)}
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.map(buildCard).join('')||'<div class="banner banner-empty">No active projects.</div>';
+  const closedSect=closed.length?sectionHdr('Closed Projects',closed.length)+closed.map(buildCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active Projects',active.length):'')+activeSect+closedSect;
+}
+
+function _completeBox(p){
+  const cur=p.dr&&p.dr.find(d=>d.s==='c');
+  return cur?`
+    <div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;font-weight:500;color:#1D4ED8">${cur.l} ready?</div>
+        <div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
+      </div>
+      <button class="btn-complete" onclick="markComplete('${p.id}','${cur.n}')">Mark complete</button>
+    </div>`:'';
 }
 
 function renderPayments(projects){
   const el=document.getElementById('payments-list');
-  el.innerHTML=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const payCard=p=>{
     const total=p.ct||0;
     const paid=p.dr?p.dr.filter(d=>d.s==='p').reduce((a,d)=>a+d.a,0):0;
     const pct=total>0?Math.min(100,Math.round(paid/total*100)):0;
@@ -349,9 +444,12 @@ function renderPayments(projects){
         <div class="pay-labels"><span>Collected — ${pct}%</span><span>Remaining: ${fmt(total-paid)}</span></div>
         <div class="pay-track" style="margin-top:6px"><div class="pay-fill" style="width:${pct}%"></div></div>
       </div>
-      <div style="padding:8px 16px 12px">${rows}</div>
+      <div style="padding:8px 16px 12px">${rows}${_completeBox(p)}</div>
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.length?active.map(payCard).join(''):'<div class="banner banner-empty">No active payments.</div>';
+  const closedSect=closed.length?sectionHdr('Closed Projects',closed.length)+closed.map(payCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active Projects',active.length):'')+activeSect+closedSect;
 }
 
 async function init(){

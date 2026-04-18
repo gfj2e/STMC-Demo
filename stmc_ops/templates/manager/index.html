@@ -17,8 +17,12 @@
 
 /* ── KPI strip ── */
 .kpi-strip{display:flex;gap:12px;padding:16px;overflow-x:auto;background:var(--g50);border-bottom:1px solid var(--g200)}
-.kpi-tile{flex:1;min-width:120px;background:#fff;border:1px solid var(--g200);border-radius:var(--radius);padding:14px 16px;text-align:center}
+.kpi-tile{flex:1;min-width:120px;background:#fff;border:1px solid var(--g200);border-radius:var(--radius);padding:0 16px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;height:88px}
 .kpi-val{font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--g900)}
+.kpi-val.kpi-val-sm{font-family:var(--font-ui);font-size:13px;font-weight:700;display:inline-block;padding:5px 14px;border-radius:999px;background:var(--g100)}
+.kpi-val.kpi-val-sm.tone-success{background:#D1FAE5;color:#065F46}
+.kpi-val.kpi-val-sm.tone-warning{background:#FEF3C7;color:#92400E}
+.kpi-val.kpi-val-sm.tone-danger{background:#FEE2E2;color:#991B1B}
 .kpi-val.tone-success{color:var(--green)}
 .kpi-val.tone-warning{color:var(--amber)}
 .kpi-val.tone-danger{color:#DC2626}
@@ -112,8 +116,6 @@
 <div class="header" id="pm-header">
   <div class="header-sub">Project Manager</div>
   <div class="header-title">PM Dashboard</div>
-  <div class="header-total" id="pm-health">—</div>
-  <div class="header-subtotal-note">Budget Health</div>
 </div>
 
 <!-- KPI strip -->
@@ -181,9 +183,16 @@ function switchTab(btn,tab){
 }
 
 function phasePill(ph){
-  const map={'framing':'brand','roofing':'brand','siding':'brand','interior':'warning','paint':'warning','punch':'success','complete':'success'};
+  const map={'framing':'success','roughin':'success','roofing':'success','siding':'success','punch':'success','complete':'success','final':'success','closed':'success','interior':'warning','paint':'warning','estimate':'muted'};
+  const lbl={'estimate':'Estimate','framing':'Framing','roughin':'Rough-In','interior':'Interior','punch':'Punch','final':'Final','closed':'Closed','roofing':'Roofing','siding':'Siding','paint':'Paint','complete':'Complete'};
   const t=map[(ph||'').toLowerCase()]||'muted';
-  return`<span class="pill pill-${t}">${ph}</span>`;
+  return`<span class="pill pill-${t}">${lbl[ph]||ph}</span>`;
+}
+function stepPill(p){
+  const cur=(p.dr||[]).find(d=>d.s==='c');
+  if(!cur)return phasePill(p.ph);
+  const lbl=cur.l.replace(/^\d+\w*\s*[\u2014\-]\s*/,'');
+  return`<span class="pill pill-success">${lbl}</span>`;
 }
 
 function drawStatusClass(s){
@@ -217,37 +226,65 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),3200);
 }
 
-function markComplete(pid, dn){
+async function markComplete(pid, dn){
   const p=PROJECTS.find(x=>String(x.id)===String(pid));
   if(!p)return;
   const d=p.dr.find(x=>String(x.n)===String(dn));
   if(!d)return;
-  // Mark current draw as paid with today's date
-  const today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  d.s='p';
-  d.t=today;
-  // Advance next pending draw to current
-  const next=p.dr.find(x=>x.s==='x');
-  if(next)next.s='c';
-  // Re-render all tabs
-  renderBuilds(PROJECTS);
-  renderBudgets(PROJECTS);
-  renderDraws(PROJECTS);
-  showToast('\u2713 '+d.l+' complete');
+
+  // Persist to DB
+  try{
+    const res=await fetch('/stmc_ops/app/draw/complete/',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body:JSON.stringify({job_id:pid,draw_number:dn})
+    });
+    if(!res.ok)throw new Error('Server error');
+    const result=await res.json();
+
+    // Update in-memory
+    d.s='p';
+    d.t=result.paid_date||new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const next=p.dr.find(x=>x.s==='x');
+    if(next)next.s='c';
+
+    // Re-render all tabs + KPIs from fresh server data
+    const seedRes=await fetch(SEED);
+    const data=await seedRes.json();
+    const mgr=data.manager||{};
+    PROJECTS=mgr.projects||[];
+    const kpis=mgr.kpis||[];
+    renderKpis(kpis);
+    renderBuilds(PROJECTS);
+    renderBudgets(PROJECTS);
+    renderDraws(PROJECTS);
+    showToast('\u2713 '+d.l+' complete');
+  }catch(e){
+    showToast('Error saving — try again');
+    console.error(e);
+  }
+}
+
+function getCookie(name){
+  const v=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v?v.pop():'';
 }
 
 function renderBuilds(projects){
   const el=document.getElementById('builds-list');
   if(!projects.length){el.innerHTML='<div class="banner banner-empty">No active builds.</div>';return}
-  el.innerHTML=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const buildCard=p=>{
     const totalBg=Object.values(p.bg||{}).reduce((a,b)=>a+b,0);
     const totalAc=Object.values(p.ac||{}).reduce((a,b)=>a+b,0);
-    const pct=totalBg>0?Math.min(100,Math.round(totalAc/totalBg*100)):0;
     const collected=p.dr?p.dr.filter(d=>d.s==='p').reduce((a,d)=>a+d.a,0):0;
-    const rem=totalBg-totalAc;
+    const pct=p.ct>0?Math.min(100,Math.round(collected/p.ct*100)):0;
+    const rem=p.ct-collected;
     const draws=(p.dr||[]).map(d=>phR(d)).join('');
     return`
-    <div class="proj-card">
+    <div class="proj-card" style="${p.ph==='closed'?'opacity:.75':''}">
       <div class="proj-hdr" onclick="toggleProj(this)">
         <div class="proj-hdr-top">
           <div>
@@ -255,34 +292,43 @@ function renderBuilds(projects){
             <p class="proj-sub">${p.md} &middot; ${p.cu} &middot; PM: ${p.pm}</p>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            ${phasePill(p.ph)}
+            ${stepPill(p)}
             <span class="chevron">&#8964;</span>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${fmt(p.ct)}</div></div>
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(collected)}</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Budget</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Remaining</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
         </div>
+        <div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:${pct}%"></div></div>
       </div>
       <div class="proj-body">${draws}</div>
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.length?active.map(buildCard).join(''):'<div class="banner banner-empty">No active builds.</div>';
+  const closedSect=closed.length?sectionHdr('Closed Builds',closed.length)+closed.map(buildCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active Builds',active.length):'')+activeSect+closedSect;
 }
 
 function renderBudgets(projects){
   const el=document.getElementById('budgets-list');
   if(!projects.length){el.innerHTML='<div class="banner banner-empty">No budget data.</div>';return}
-  el.innerHTML=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const budgetCard=p=>{
     const trades=Object.keys(p.bg||{});
     const totalBg=trades.reduce((a,t)=>a+(p.bg[t]||0),0);
     const totalAc=trades.reduce((a,t)=>a+(p.ac[t]||0),0);
     const rem=totalBg-totalAc;
-    const pct=totalBg>0?Math.min(Math.round(totalAc/totalBg*100),100):0;
+    const collected=p.dr?p.dr.filter(d=>d.s==='p').reduce((a,d)=>a+d.a,0):0;
+    const colRem=p.ct-collected;
+    const pct=p.ct>0?Math.min(100,Math.round(collected/p.ct*100)):0;
     const over=rem<0, warn=!over&&rem<totalBg*.1;
-    const tagCls=over?'pill-brand':warn?'pill-warning':'pill-success';
-    const barColor=over?'#DC2626':'var(--green)';
+    const tagCls=pct>=100?'pill-brand':pct>=50?'pill-success':'pill-warning';
+    const barColor='var(--green)';
     const rows=trades.map(t=>{
       const bg=p.bg[t]||0,ac=p.ac[t]||0,vr=bg-ac,ov=ac>bg;
       return`<div class="rw">
@@ -299,11 +345,11 @@ function renderBudgets(projects){
             <div style="font-size:14px;font-weight:600">${p.nm}</div>
             <div style="font-size:11px;color:var(--g500)">${p.md} &middot; ${p.cu}</div>
           </div>
-          <span class="pill ${tagCls}">${pct}% spent</span>
+          <span class="pill ${tagCls}">${pct}% collected</span>
         </div>
         <div class="budget-bar-track" style="margin-bottom:4px"><div class="budget-bar-fill" style="width:${Math.min(pct,100)}%;background:${barColor}"></div></div>
         <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin-bottom:10px">
-          <span>${fmt(totalAc)} spent</span><span>${fmt(rem)} remaining</span>
+          <span>${fmt(collected)} collected</span><span>${fmt(colRem)} remaining</span>
         </div>
         ${rows}
         <div class="rw rt">
@@ -313,13 +359,19 @@ function renderBudgets(projects){
         </div>
       </div>
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.length?active.map(budgetCard).join(''):'<div class="banner banner-empty">No active budgets.</div>';
+  const closedSect=closed.length?sectionHdr('Closed',closed.length)+closed.map(budgetCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active',active.length):'')+activeSect+closedSect;
 }
 
 function renderDraws(projects){
   const el=document.getElementById('draws-list');
   if(!projects.length){el.innerHTML='<div class="banner banner-empty">No draw data.</div>';return}
-  el.innerHTML=projects.map(p=>{
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const drawCard=p=>{
     const rows=(p.dr||[]).map(d=>phR(d)).join('');
     const cur=p.dr&&p.dr.find(d=>d.s==='c');
     const completeBox=cur?`
@@ -339,13 +391,16 @@ function renderDraws(projects){
         ${completeBox}
       </div>
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.length?active.map(drawCard).join(''):'<div class="banner banner-empty">No active draws.</div>';
+  const closedSect=closed.length?sectionHdr('Closed',closed.length)+closed.map(drawCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active',active.length):'')+activeSect+closedSect;
 }
 
 function renderKpis(kpis){
   document.getElementById('pm-kpis').innerHTML=kpis.map(k=>`
     <div class="kpi-tile">
-      <div class="kpi-val ${k.tone?'tone-'+k.tone:''}">${k.value}</div>
+      <div class="kpi-val ${k.tone?'tone-'+k.tone:''} ${k.sm?'kpi-val-sm':''}">${ k.value}</div>
       <div class="kpi-lbl">${k.label}</div>
     </div>`).join('');
 }
@@ -365,8 +420,6 @@ async function init(){
     const mgr=data.manager||{};
     PROJECTS=mgr.projects||[];
     const kpis=mgr.kpis||[];
-    const healthKpi=kpis.find(k=>k.label==='Budget health');
-    if(healthKpi)document.getElementById('pm-health').textContent=healthKpi.value;
     renderKpis(kpis);
     renderBuilds(PROJECTS);
     renderBudgets(PROJECTS);

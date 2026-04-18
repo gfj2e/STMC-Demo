@@ -7,13 +7,116 @@
   <title>STMC Operations – Login</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'styles.css' %}" />
+  <style>
+    /* Force light theme on login page */
+    :root {
+      --bg: #f5f4f0;
+      --surface: #ffffff;
+      --surface-muted: #f0efeb;
+      --text: #1a1a1a;
+      --text-muted: #6b6a65;
+      --text-soft: #9c9b96;
+      --border: rgba(0,0,0,0.1);
+      --border-soft: rgba(0,0,0,0.06);
+    }
+
+    html, body { height: 100%; }
+
+    body[data-page="login"] {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: #f5f4f0;
+      color: #1a1a1a;
+    }
+
+    /* ── Top header bar ── */
+    .login-header {
+      background: #a31a1a;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .login-header-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+    }
+    .login-header-tag {
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      font-weight: 500;
+      letter-spacing: .3px;
+    }
+
+    /* ── Main content ── */
+    .login-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      background: #f5f4f0;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 14px;
+      padding: 32px 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    }
+
+    .brand-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: #a31a1a;
+      margin-bottom: 4px;
+    }
+    .brand-subtitle {
+      text-align: center;
+      font-size: 12px;
+      color: #9c9b96;
+      margin-bottom: 28px;
+    }
+
+    /* ── Footer ── */
+    .login-footer {
+      background: #a31a1a;
+      padding: 14px 24px;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,.6);
+      letter-spacing: .3px;
+    }
+    .login-footer strong {
+      color: rgba(255,255,255,.85);
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body data-page="login">
 
+  <!-- Header -->
+  <header class="login-header">
+    <div>
+      <div class="login-header-name">Summertown Metals</div>
+      <div class="login-header-tag">Operations Platform</div>
+    </div>
+  </header>
+
+  <!-- Login card -->
   <main class="login-wrap">
     <section class="login-card">
       <h1 class="brand-title">SUMMERTOWN METALS</h1>
-      <p class="brand-subtitle">Operations platform</p>
+      <p class="brand-subtitle">Sign in to continue</p>
 
       <div class="field">
         <label for="lU">Sign in as</label>
@@ -32,6 +135,11 @@
       <button id="signInBtn" class="btn btn-primary btn-full" type="button">Sign in</button>
     </section>
   </main>
+
+  <!-- Footer -->
+  <footer class="login-footer">
+    &copy; 2026 <strong>Summertown Metals</strong>. All rights reserved.
+  </footer>
 
   <script>
     window.STMC_ROUTES = {

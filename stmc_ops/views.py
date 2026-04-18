@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import (
     ApplianceConfig,
@@ -262,8 +263,10 @@ def _estimate_job_contract(job):
 def _phase_tone(phase_code):
     if phase_code in {"punch", "final", "closed"}:
         return "success"
+    if phase_code in {"framing", "roughin", "siding", "roofing"}:
+        return "success"
     if phase_code == "estimate":
-        return "warning"
+        return "muted"
     return "warning"
 
 
@@ -302,7 +305,7 @@ def _build_manager_owner_data():
         model_name = job.floor_plan.name if job.floor_plan else "Custom"
         customer_display = job.customer_addr or name
         pm_name = job.sales_rep or "P. Olson"
-        phase = job.get_current_phase_display()
+        phase = job.current_phase
 
         # Trade budgets from DB
         bg = {}
@@ -351,12 +354,25 @@ def _build_manager_owner_data():
             "dr": dr,
         })
 
-    active_builds = len(projects)
+    active_builds = sum(1 for p in projects if p["ph"] != "closed")
+    # Recalculate totals from active projects only
+    contract_total = sum(p["ct"] for p in projects if p["ph"] != "closed")
+    collected_total = sum(sum(d["a"] for d in p["dr"] if d["s"] == "p") for p in projects if p["ph"] != "closed")
+    awaiting_total = sum(max(0, p["ct"] - sum(d["a"] for d in p["dr"] if d["s"] == "p")) for p in projects if p["ph"] != "closed")
     avg_budget_health = (sum(budget_health_scores) / len(budget_health_scores)) if budget_health_scores else 0
     draws_pending = sum(
         1 for p in projects if any(d["s"] == "c" for d in p["dr"])
     )
-    budget_health = int(round(avg_budget_health, 0))
+    budget_health_pct = int(round(avg_budget_health, 0))
+    if budget_health_pct >= 80:
+        budget_health_label = "On Track"
+        budget_health_tone = "success"
+    elif budget_health_pct >= 50:
+        budget_health_label = "At Risk"
+        budget_health_tone = "warning"
+    else:
+        budget_health_label = "Over Budget"
+        budget_health_tone = "danger"
 
     # Build notifications from current draws
     notifications = []
@@ -372,7 +388,7 @@ def _build_manager_owner_data():
     manager = {
         "kpis": [
             {"label": "My builds", "value": str(active_builds)},
-            {"label": "Budget health", "value": f"{budget_health}%", "tone": "success" if budget_health >= 70 else "warning"},
+            {"label": "Budget health", "value": budget_health_label, "tone": budget_health_tone, "sm": True},
             {"label": "Draws pending", "value": str(draws_pending), "tone": "warning" if draws_pending else "success"},
         ],
         "projects": projects,
@@ -477,6 +493,59 @@ def _build_app_seed_data():
         "manager": manager,
         "owner": owner,
     }
+
+
+@csrf_exempt
+def mark_draw_complete_view(request):
+    """POST {job_id, draw_number} — marks the draw paid, advances next pending draw to current."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+        job_id = int(body["job_id"])
+        draw_number = int(body["draw_number"])
+    except (KeyError, ValueError, TypeError):
+        return JsonResponse({"error": "Invalid payload"}, status=400)
+
+    try:
+        draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
+    except JobDraw.DoesNotExist:
+        return JsonResponse({"error": "Draw not found"}, status=404)
+
+    dt = timezone.now()
+    today = dt.strftime("%b ") + str(dt.day)
+
+    draw.status = JobDraw.STATUS_PAID
+    draw.paid_date = today
+    draw.save(update_fields=["status", "paid_date"])
+
+    # Advance the next pending draw to current
+    next_draw = JobDraw.objects.filter(
+        job_id=job_id, status=JobDraw.STATUS_PENDING
+    ).order_by("draw_number").first()
+
+    # Map draw_number → phase that should be active while that draw is current
+    DRAW_PHASE_MAP = {
+        1: "framing",
+        2: "framing",
+        3: "roughin",
+        4: "interior",
+        5: "punch",
+        6: "final",
+    }
+
+    if next_draw:
+        next_draw.status = JobDraw.STATUS_CURRENT
+        next_draw.save(update_fields=["status"])
+        new_phase = DRAW_PHASE_MAP.get(next_draw.draw_number)
+    else:
+        new_phase = "closed"
+
+    if new_phase:
+        Job.objects.filter(pk=job_id).update(current_phase=new_phase)
+
+    return JsonResponse({"ok": True, "paid_date": today})
 
 
 def _build_seed_rates():

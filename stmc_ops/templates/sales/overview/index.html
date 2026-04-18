@@ -155,9 +155,16 @@ function switchTab(link,tab){
 }
 
 function phasePill(ph){
-  const map={'framing':'brand','roofing':'brand','siding':'brand','interior':'warning','paint':'warning','punch':'success','complete':'success'};
+  const map={'framing':'success','roughin':'success','roofing':'success','siding':'success','punch':'success','complete':'success','final':'success','closed':'success','interior':'warning','paint':'warning','estimate':'muted'};
+  const lbl={'estimate':'Estimate','framing':'Framing','roughin':'Rough-In','interior':'Interior','punch':'Punch','final':'Final','closed':'Closed','roofing':'Roofing','siding':'Siding','paint':'Paint','complete':'Complete'};
   const t=map[(ph||'').toLowerCase()]||'muted';
-  return`<span class="pill pill-${t}">${ph}</span>`;
+  return`<span class="pill pill-${t}">${lbl[ph]||ph}</span>`;
+}
+function stepPill(p){
+  const cur=(p.dr||[]).find(d=>d.s==='c');
+  if(!cur)return phasePill(p.ph);
+  const lbl=cur.l.replace(/^\d+\w*\s*[\u2014\-]\s*/,'');
+  return`<span class="pill pill-success">${lbl}</span>`;
 }
 
 function toggleProj(hdr){
@@ -185,20 +192,23 @@ function phR(d){
 function renderProjects(projects){
   const el=document.getElementById('projects-list');
   if(!projects||!projects.length){el.innerHTML='<div class="banner banner-empty">No projects yet.</div>';return}
-  const totalContract=projects.reduce((a,p)=>a+p.ct,0);
+  const active=projects.filter(p=>p.ph!=='closed');
+  const closed=projects.filter(p=>p.ph==='closed');
+  const sectionHdr=(label,count)=>`<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">${label} <span style="font-weight:400">(${count})</span></div>`;
+  const totalContract=active.reduce((a,p)=>a+p.ct,0);
   document.getElementById('sales-total').textContent=fmt(totalContract);
 
   // KPIs
   document.getElementById('sales-kpis').innerHTML=[
-    {label:'Active builds',value:String(projects.length)},
+    {label:'Active builds',value:String(active.length)},
   ].map(k=>`<div class="kpi-tile"><div class="kpi-val">${k.value}</div><div class="kpi-lbl">${k.label}</div></div>`).join('');
 
-  el.innerHTML=projects.map(p=>{
+  const projCard=p=>{
     const collected=p.dr?p.dr.filter(d=>d.s==='p').reduce((a,d)=>a+d.a,0):0;
     const totalBg=Object.values(p.bg||{}).reduce((a,b)=>a+b,0);
     const totalAc=Object.values(p.ac||{}).reduce((a,b)=>a+b,0);
-    const pct=totalBg>0?Math.min(100,Math.round(totalAc/totalBg*100)):0;
-    const rem=totalBg-totalAc;
+    const pct=p.ct>0?Math.min(100,Math.round(collected/p.ct*100)):0;
+    const rem=p.ct-collected;
     const draws=(p.dr||[]).map(d=>phR(d)).join('');
     return`
     <div class="proj-card">
@@ -209,20 +219,24 @@ function renderProjects(projects){
             <p class="proj-sub">${p.md} &middot; ${p.cu} &middot; PM: ${p.pm}</p>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            ${phasePill(p.ph)}
+            ${stepPill(p)}
             <span class="chevron">&#8964;</span>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${fmt(p.ct)}</div></div>
           <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(collected)}</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Budget</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
-          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Remaining</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">${pct}%</div></div>
+          <div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">${fmt(rem)}</div></div>
         </div>
+        <div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:${pct}%"></div></div>
       </div>
       <div class="proj-body">${draws}</div>
     </div>`;
-  }).join('');
+  };
+  const activeSect=active.length?active.map(projCard).join(''):'<div class="banner banner-empty">No active projects.</div>';
+  const closedSect=closed.length?sectionHdr('Closed',closed.length)+closed.map(projCard).join(''):'';
+  el.innerHTML=(active.length?sectionHdr('Active',active.length):'')+activeSect+closedSect;
 }
 
 function renderModels(models){

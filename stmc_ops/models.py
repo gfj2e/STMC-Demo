@@ -344,6 +344,7 @@ class Job(models.Model):
     PHASE_CHOICES = [
         ('estimate', 'Estimate'),
         ('framing', 'Framing'),
+        ('roughin', 'Rough-In'),
         ('interior', 'Interior'),
         ('punch', 'Punch'),
         ('final', 'Final'),
