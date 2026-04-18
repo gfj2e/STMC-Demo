@@ -736,3 +736,48 @@ class JobBudgetLine(models.Model):
 
     class Meta:
         unique_together = ['job', 'trade']
+
+
+# ═══════════════════════════════════════════════════════════════
+# DEMO DASHBOARD TABLES — Granular budget/draw data for PM & Owner views
+# ═══════════════════════════════════════════════════════════════
+
+class JobTradeBudget(models.Model):
+    """Per-trade budget and actual amounts — used by manager/owner dashboards."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='demo_trade_budgets')
+    trade_name = models.CharField(max_length=40)
+    budgeted = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    actual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'trade_name']
+        unique_together = ['job', 'trade_name']
+
+    def __str__(self):
+        return f"{self.job.customer_name} — {self.trade_name}"
+
+
+class JobDraw(models.Model):
+    """Individual draw entry — used by manager/owner draw-schedule views."""
+    STATUS_PAID = 'p'
+    STATUS_CURRENT = 'c'
+    STATUS_PENDING = 'x'
+    STATUS_CHOICES = [
+        ('p', 'Paid'),
+        ('c', 'Current'),
+        ('x', 'Pending'),
+    ]
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='demo_draws')
+    draw_number = models.IntegerField()
+    label = models.CharField(max_length=60)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    status = models.CharField(max_length=2, choices=STATUS_CHOICES, default='x')
+    paid_date = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        ordering = ['draw_number']
+        unique_together = ['job', 'draw_number']
+
+    def __str__(self):
+        return f"{self.job.customer_name} — {self.label}"

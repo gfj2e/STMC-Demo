@@ -15,6 +15,7 @@ from django.core.management.base import BaseCommand
 from decimal import Decimal
 from stmc_ops.models import (
     AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, ExteriorRateCard, Job,
+    JobTradeBudget, JobDraw,
     UpgradeCategory, UpgradeSection, UpgradeItem, ApplianceConfig, IslandAddon,
 )
 
@@ -513,76 +514,178 @@ class Command(BaseCommand):
             "CAJUN": FloorPlanModel.objects.filter(name__iexact="CAJUN").first(),
             "MINI PETTUS": FloorPlanModel.objects.filter(name__iexact="MINI PETTUS").first(),
         }
-        pm_user = AppUser.objects.filter(role="pm", is_active=True).order_by("sort_order").first()
 
-        demo_rows = [
+        # Full demo project data matching STMC_Full_Platform_Demo.html PJ array
+        demo_jobs = [
             {
                 "order_number": "DEMO-1001",
                 "customer_name": "Theiss Build",
+                "customer_display": "Julie Theiss",
                 "phase": "framing",
-                "draw_stage": "draw3",
-                "draw_status": "current",
-                "progress": Decimal("21.00"),
-                "budget_total": Decimal("129200.00"),
-                "budget_spent": Decimal("26675.00"),
+                "pm_name": "P. Olson",
+                "model_key": "HUNTLEY 2.0",
+                "contract_total": Decimal("282127.00"),
+                "p10_material": Decimal("63075.00"),
+                "adjusted_int": Decimal("219052.00"),
                 "collected": Decimal("106233.00"),
-                "draw_amount": Decimal("25000.00"),
-                "model": model_lookup.get("HUNTLEY 2.0"),
+                "trade_budgets": [
+                    ("Framing",     25000,  23800, 1),
+                    ("Roofing",      8200,      0, 2),
+                    ("Siding",       4800,      0, 3),
+                    ("Ext Trim",     6100,      0, 4),
+                    ("D&W",          2900,      0, 5),
+                    ("Cabinets",    22140,      0, 6),
+                    ("Flooring",     4032,      0, 7),
+                    ("Drywall",      9055,      0, 8),
+                    ("Paint",        6720,      0, 9),
+                    ("Trim",         7450,      0, 10),
+                    ("Electrical",  11760,      0, 11),
+                    ("Plumbing",     7200,      0, 12),
+                    ("Insulation",   6468,      0, 13),
+                    ("HVAC",        12000,      0, 14),
+                    ("General",      5375,   2875, 15),
+                ],
+                "draws": [
+                    (0, "Deposit",            2500, "p", "Feb 17"),
+                    (1, "1st \u2014 Materials", 75333, "p", "Mar 2"),
+                    (2, "2nd \u2014 Concrete",  28400, "p", "Mar 18"),
+                    (3, "3rd \u2014 Framing",   25000, "c", ""),
+                    (4, "4th \u2014 Rough-ins", 56425, "x", ""),
+                    (5, "5th \u2014 Finishes",  56425, "x", ""),
+                    (6, "6th \u2014 Final",     38044, "x", ""),
+                ],
             },
             {
                 "order_number": "DEMO-1002",
                 "customer_name": "Henderson Build",
+                "customer_display": "James Henderson",
                 "phase": "interior",
-                "draw_stage": "draw5",
-                "draw_status": "current",
-                "progress": Decimal("94.00"),
-                "budget_total": Decimal("139607.00"),
-                "budget_spent": Decimal("131100.00"),
-                "collected": Decimal("222234.00"),
-                "draw_amount": Decimal("63664.00"),
-                "model": model_lookup.get("CAJUN"),
+                "pm_name": "P. Olson",
+                "model_key": "CAJUN",
+                "contract_total": Decimal("318320.00"),
+                "p10_material": Decimal("71150.00"),
+                "adjusted_int": Decimal("247170.00"),
+                "collected": Decimal("224734.00"),
+                "trade_budgets": [
+                    ("Framing",     28080,  27500, 1),
+                    ("Roofing",      9600,   9200, 2),
+                    ("Siding",       5400,   5100, 3),
+                    ("Ext Trim",     7200,   6800, 4),
+                    ("D&W",          3400,   3400, 5),
+                    ("Cabinets",    24500,  23200, 6),
+                    ("Flooring",     4320,   4100, 7),
+                    ("Drywall",      9702,   9500, 8),
+                    ("Paint",        7200,      0, 9),
+                    ("Trim",         8100,      0, 10),
+                    ("Electrical",  12600,  12200, 11),
+                    ("Plumbing",     8400,   8100, 12),
+                    ("Insulation",   6930,   6800, 13),
+                    ("HVAC",        12000,  11500, 14),
+                    ("General",      5875,   4200, 15),
+                ],
+                "draws": [
+                    (0, "Deposit",            2500, "p", "Jan 5"),
+                    (1, "1st \u2014 Materials", 82000, "p", "Jan 12"),
+                    (2, "2nd \u2014 Concrete",  31590, "p", "Jan 28"),
+                    (3, "3rd \u2014 Framing",   45480, "p", "Feb 18"),
+                    (4, "4th \u2014 Rough-ins", 63664, "p", "Mar 15"),
+                    (5, "5th \u2014 Finishes",  63664, "c", ""),
+                    (6, "6th \u2014 Final",     29422, "x", ""),
+                ],
             },
             {
                 "order_number": "DEMO-1003",
                 "customer_name": "Cooper Ranch",
+                "customer_display": "Sarah Cooper",
                 "phase": "punch",
-                "draw_stage": "draw6",
-                "draw_status": "current",
-                "progress": Decimal("83.00"),
-                "budget_total": Decimal("167296.00"),
-                "budget_spent": Decimal("138450.00"),
+                "pm_name": "P. Olson",
+                "model_key": "MINI PETTUS",
+                "contract_total": Decimal("399457.00"),
+                "p10_material": Decimal("100750.00"),
+                "adjusted_int": Decimal("298707.00"),
                 "collected": Decimal("350159.00"),
-                "draw_amount": Decimal("49298.00"),
-                "model": model_lookup.get("MINI PETTUS"),
+                "trade_budgets": [
+                    ("Framing",     32000,  31200, 1),
+                    ("Roofing",     11200,  10800, 2),
+                    ("Siding",       6200,   6100, 3),
+                    ("Ext Trim",     8400,   8200, 4),
+                    ("D&W",          3800,   3650, 5),
+                    ("Cabinets",    28600,  27900, 6),
+                    ("Flooring",     4910,   4750, 7),
+                    ("Drywall",     11028,  10800, 8),
+                    ("Paint",        8184,   7900, 9),
+                    ("Trim",         9200,   8900, 10),
+                    ("Electrical",  14322,  14100, 11),
+                    ("Plumbing",     9600,   9400, 12),
+                    ("Insulation",   7877,   7600, 13),
+                    ("HVAC",        16000,  15500, 14),
+                    ("General",      5875,   5600, 15),
+                ],
+                "draws": [
+                    (0, "Deposit",            2500, "p", "Nov 1"),
+                    (1, "1st \u2014 Materials", 104000, "p", "Nov 8"),
+                    (2, "2nd \u2014 Concrete",   32742, "p", "Nov 25"),
+                    (3, "3rd \u2014 Framing",    51135, "p", "Dec 20"),
+                    (4, "4th \u2014 Rough-ins",  79891, "p", "Jan 30"),
+                    (5, "5th \u2014 Finishes",   79891, "p", "Mar 5"),
+                    (6, "6th \u2014 Final",      49298, "c", ""),
+                ],
             },
         ]
 
         seeded = 0
-        for row in demo_rows:
-            model = row["model"]
-            material = model.p10_material if model else Decimal("0")
-            adjusted_int_contract = model.int_contract if model else Decimal("0")
+        for row in demo_jobs:
+            model = model_lookup.get(row["model_key"])
+            budget_total = sum(t[1] for t in row["trade_budgets"])
+            budget_spent = sum(t[2] for t in row["trade_budgets"])
 
-            Job.objects.update_or_create(
+            job, _ = Job.objects.update_or_create(
                 order_number=row["order_number"],
                 defaults={
                     "customer_name": row["customer_name"],
-                    "sales_rep": pm_user.name if pm_user else "",
+                    "customer_addr": row["customer_display"],
+                    "sales_rep": row["pm_name"],
                     "branch": branch_default,
                     "floor_plan": model,
-                    "job_mode": "turnkey" if model else "shell",
-                    "p10_material": material,
-                    "adjusted_int_contract": adjusted_int_contract,
+                    "job_mode": "turnkey",
+                    "p10_material": row["p10_material"],
+                    "adjusted_int_contract": row["adjusted_int"],
                     "current_phase": row["phase"],
-                    "draw_stage": row["draw_stage"],
-                    "draw_status": row["draw_status"],
-                    "progress_percent": row["progress"],
-                    "budget_total_amount": row["budget_total"],
-                    "budget_spent_amount": row["budget_spent"],
+                    "budget_total_amount": Decimal(str(budget_total)),
+                    "budget_spent_amount": Decimal(str(budget_spent)),
                     "collected_amount": row["collected"],
-                    "current_draw_amount": row["draw_amount"],
+                    "current_draw_amount": Decimal(str(
+                        next((d[2] for d in row["draws"] if d[3] == "c"), 0)
+                    )),
                 },
             )
+
+            # Seed trade-level budgets
+            for trade_name, budgeted, actual, sort_order in row["trade_budgets"]:
+                JobTradeBudget.objects.update_or_create(
+                    job=job,
+                    trade_name=trade_name,
+                    defaults={
+                        "budgeted": Decimal(str(budgeted)),
+                        "actual": Decimal(str(actual)),
+                        "sort_order": sort_order,
+                    },
+                )
+
+            # Seed draw schedule
+            for draw_number, label, amount, status, paid_date in row["draws"]:
+                JobDraw.objects.update_or_create(
+                    job=job,
+                    draw_number=draw_number,
+                    defaults={
+                        "label": label,
+                        "amount": Decimal(str(amount)),
+                        "status": status,
+                        "paid_date": paid_date,
+                    },
+                )
+
             seeded += 1
 
-        self.stdout.write(f'  Demo Jobs: {seeded}')
+        self.stdout.write(f'  Demo Jobs: {seeded} (with trade budgets and draw schedules)')
+

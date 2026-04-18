@@ -16,6 +16,8 @@ from .models import (
     InteriorRateCard,
     IslandAddon,
     Job,
+    JobDraw,
+    JobTradeBudget,
     PlanMetric,
     RoofAreaPreset,
     SlabAreaPreset,
@@ -283,15 +285,13 @@ def _progress_from_fields(job, budget_total, budget_spent):
 
 
 def _build_manager_owner_data():
-    jobs = list(Job.objects.select_related("floor_plan").order_by("-updated_at", "-created_at")[:12])
+    jobs = list(
+        Job.objects.select_related("floor_plan")
+        .prefetch_related("demo_trade_budgets", "demo_draws")
+        .order_by("order_number")[:12]
+    )
 
-    pipeline = []
-    budgets = []
-    draws = []
-    owner_projects = []
-    owner_payments = []
-    notifications = []
-
+    projects = []
     contract_total = 0
     collected_total = 0
     awaiting_total = 0
@@ -299,46 +299,38 @@ def _build_manager_owner_data():
 
     for job in jobs:
         name = job.customer_name or f"Build #{job.id}"
-        model = job.floor_plan.name if job.floor_plan else "Custom"
-        contract = _estimate_job_contract(job)
-
-        budget_total = _to_number(job.budget_total_amount)
-        if budget_total <= 0:
-            budget_total = _to_number(job.int_true_cost)
-        if budget_total <= 0 and contract > 0:
-            budget_total = round(contract * 0.48, 2)
-
-        spent = _to_number(job.budget_spent_amount)
-        if spent <= 0 and budget_total > 0 and _to_number(job.progress_percent) > 0:
-            spent = round((budget_total * _to_number(job.progress_percent)) / 100.0, 2)
-        spent = _clamp(spent, 0, budget_total) if budget_total > 0 else max(0, spent)
-
-        progress = _progress_from_fields(job, budget_total, spent)
-        remaining = max(0, round(budget_total - spent, 2))
-
-        phase_code = job.current_phase or "estimate"
+        model_name = job.floor_plan.name if job.floor_plan else "Custom"
+        customer_display = job.customer_addr or name
+        pm_name = job.sales_rep or "P. Olson"
         phase = job.get_current_phase_display()
-        phase_tone = _phase_tone(phase_code)
 
-        draw_stage = job.get_draw_stage_display()
-        draw_status = job.get_draw_status_display()
-        draw_status_tone = _draw_status_tone(job.draw_status)
-        draw_amount = _to_number(job.current_draw_amount)
-        if draw_amount <= 0 and contract > 0:
-            draw_amount = round(contract * 0.15, 2)
+        # Trade budgets from DB
+        bg = {}
+        ac = {}
+        for tb in job.demo_trade_budgets.all():
+            bg[tb.trade_name] = int(tb.budgeted)
+            ac[tb.trade_name] = int(tb.actual)
 
-        collected = _to_number(job.collected_amount)
-        if collected <= 0 and contract > 0 and progress > 0:
-            collected = round((contract * progress) / 100.0, 2)
-        collected = _clamp(collected, 0, contract) if contract > 0 else max(0, collected)
+        budget_total = sum(bg.values()) if bg else _to_number(job.budget_total_amount)
+        budget_spent = sum(ac.values()) if ac else _to_number(job.budget_spent_amount)
 
-        margin = ((contract - budget_total) / contract * 100) if contract > 0 and budget_total > 0 else 0
-        margin_pct = _to_number(round(margin, 1))
-        margin_tone = "success" if margin >= 30 else ("warning" if margin >= 15 else "danger")
-        collected_pct = int(_clamp(round((collected / contract) * 100), 0, 100)) if contract > 0 else 0
+        # Draw schedule from DB
+        dr = []
+        for draw in job.demo_draws.all():
+            dr.append({
+                "n": draw.draw_number,
+                "l": draw.label,
+                "a": int(draw.amount),
+                "s": draw.status,
+                "t": draw.paid_date,
+            })
+
+        # Contract total = sum of all draws
+        contract = int(sum(d["a"] for d in dr)) if dr else _to_number(_estimate_job_contract(job))
+        collected = int(sum(d["a"] for d in dr if d["s"] == "p")) if dr else _to_number(job.collected_amount)
 
         if budget_total > 0:
-            utilization = (spent / budget_total) * 100
+            utilization = (budget_spent / budget_total) * 100
             score = _clamp(100 - max(0, utilization - 100), 0, 100)
             budget_health_scores.append(score)
 
@@ -346,108 +338,141 @@ def _build_manager_owner_data():
         collected_total += collected
         awaiting_total += max(0, contract - collected)
 
-        pipeline.append(
-            {
-                "build": name,
-                "model": model,
-                "phase": phase,
-                "phaseTone": phase_tone,
-                "contract": _format_money(contract),
-            }
-        )
-        budgets.append(
-            {
-                "build": name,
-                "spent": _format_money(spent),
-                "total": _format_money(budget_total),
-                "remaining": _format_money(remaining),
-                "progress": progress,
-            }
-        )
+        projects.append({
+            "id": job.id,
+            "nm": name,
+            "md": model_name,
+            "cu": customer_display,
+            "ph": phase,
+            "pm": pm_name,
+            "ct": contract,
+            "bg": bg,
+            "ac": ac,
+            "dr": dr,
+        })
 
-        draws.append(
-            {
-                "build": name,
-                "currentDraw": draw_stage,
-                "status": draw_status,
-                "statusTone": draw_status_tone,
-                "amount": _format_money(draw_amount),
-            }
-        )
-
-        owner_projects.append(
-            {
-                "project": name,
-                "pm": "P. Olson",
-                "contract": _format_money(contract),
-                "margin": f"{_to_number(margin_pct)}%",
-                "marginTone": margin_tone,
-            }
-        )
-        owner_payments.append(
-            {
-                "project": name,
-                "collectedPercent": collected_pct,
-            }
-        )
-        notifications.append(
-            {
-                "title": "Draw update",
-                "message": f"{name}: {draw_stage} is {draw_status.lower()}.",
-                "tone": draw_status_tone,
-            }
-        )
-
-    active_builds = len(jobs)
+    active_builds = len(projects)
     avg_budget_health = (sum(budget_health_scores) / len(budget_health_scores)) if budget_health_scores else 0
-    draws_pending = sum(1 for item in draws if item["status"] == "Current")
-    budget_health = _to_number(round(avg_budget_health, 0))
+    draws_pending = sum(
+        1 for p in projects if any(d["s"] == "c" for d in p["dr"])
+    )
+    budget_health = int(round(avg_budget_health, 0))
+
+    # Build notifications from current draws
+    notifications = []
+    for p in projects[:3]:
+        cur_draw = next((d for d in p["dr"] if d["s"] == "c"), None)
+        if cur_draw:
+            notifications.append({
+                "title": "Draw ready",
+                "message": f"{p['nm']}: {cur_draw['l']} ready — {_format_money(cur_draw['a'])}.",
+                "tone": "brand",
+            })
 
     manager = {
         "kpis": [
-            {"label": "My builds", "value": str(active_builds), "mono": True},
-            {
-                "label": "Budget health",
-                "value": f"{int(budget_health)}%",
-                "tone": "success" if budget_health >= 70 else "warning",
-            },
+            {"label": "My builds", "value": str(active_builds)},
+            {"label": "Budget health", "value": f"{budget_health}%", "tone": "success" if budget_health >= 70 else "warning"},
             {"label": "Draws pending", "value": str(draws_pending), "tone": "warning" if draws_pending else "success"},
         ],
-        "pipeline": pipeline,
-        "budgets": budgets,
-        "draws": draws,
+        "projects": projects,
     }
 
     owner = {
         "kpis": [
-            {"label": "Active builds", "value": str(active_builds), "mono": True},
-            {"label": "Contract value", "value": _format_money(contract_total), "mono": True},
-            {"label": "Collected", "value": _format_money(collected_total), "mono": True, "tone": "success"},
-            {"label": "Awaiting", "value": _format_money(awaiting_total), "mono": True, "tone": "warning"},
+            {"label": "Active builds", "value": str(active_builds)},
+            {"label": "Contract value", "value": _format_money(contract_total)},
+            {"label": "Collected", "value": _format_money(collected_total), "tone": "success"},
+            {"label": "Awaiting", "value": _format_money(awaiting_total), "tone": "warning"},
         ],
-        "notifications": notifications[:3] if notifications else [
-            {"title": "No active builds", "message": "Start a new job to populate owner dashboard data.", "tone": "brand"}
+        "notifications": notifications if notifications else [
+            {"title": "No active builds", "message": "Start a new job to populate owner dashboard data.", "tone": "brand"},
         ],
-        "projects": owner_projects,
-        "payments": owner_payments,
+        "projects": projects,
     }
 
     return manager, owner
+
+
+def _build_simple_rate_card():
+    """Simplified exterior+interior rate card for the Sales rate card tab."""
+    exterior = []
+    interior = []
+
+    # Simplified contractor exterior rates used in the estimator
+    ext_keys = [
+        ("ctr_fSlab_u", "Framing — Slab", "Framing", "e"),
+        ("ctr_fPorch_u", "Framing — Porch", "Framing", "e"),
+        ("ctr_r612_u", "Roof Metal", "Roofing", "e"),
+        ("ctr_osb", "Roof Sheathing", "Roofing", "e"),
+        ("ctr_mWall_u", "Wall Metal", "Siding", "e"),
+        ("ctr_sof_u", "Soffit", "Ext Trim", "e"),
+        ("ctr_bw_u", "Beam Wrap", "Ext Trim", "e"),
+        ("ctr_sglD", "Ext Door Install", "D&W", "e"),
+        ("ctr_sglW", "Window Install", "D&W", "e"),
+    ]
+    int_keys = [
+        ("cabinets", "Cabinets", "Cabinets", "i"),
+        ("countertops", "Countertops", "Cabinets", "i"),
+        ("floorMat", "Flooring Material", "Flooring", "i"),
+        ("floorLab", "Flooring Install", "Flooring", "i"),
+        ("drywallMat", "Drywall Material", "Drywall", "i"),
+        ("drywallLab", "Drywall Labor", "Drywall", "i"),
+        ("paint", "Paint", "Paint", "i"),
+        ("trimMat", "Trim Material", "Trim", "i"),
+        ("doorMat", "Interior Doors", "Trim", "i"),
+        ("trimDoorLab", "Trim Install Labor", "Trim", "i"),
+        ("electrical", "Electrical", "Electrical", "i"),
+        ("plumbingLab", "Plumbing", "Plumbing", "i"),
+        ("insulation", "Insulation", "Insulation", "i"),
+        ("hvac", "HVAC", "HVAC", "i"),
+        ("permits", "Permits", "General", "i"),
+        ("cleaning", "Cleaning", "General", "i"),
+        ("dumpster", "Dumpster", "General", "i"),
+    ]
+
+    ext_rate_map = {r.key: r for r in ExteriorRateCard.objects.filter(
+        key__in=[k[0] for k in ext_keys]
+    )}
+    int_rate_map = {r.key: r for r in InteriorRateCard.objects.filter(
+        key__in=[k[0] for k in int_keys]
+    )}
+
+    for key, label, group, _ in ext_keys:
+        rc = ext_rate_map.get(key)
+        exterior.append({
+            "l": label,
+            "g": group,
+            "r": _to_number(rc.rate) if rc else 0,
+            "u": f"/{rc.unit}" if rc and rc.unit not in ("flat",) else "flat",
+        })
+
+    for key, label, group, _ in int_keys:
+        rc = int_rate_map.get(key)
+        interior.append({
+            "l": label,
+            "g": group,
+            "r": _to_number(rc.rate) if rc else 0,
+            "u": rc.unit if rc else "/SF",
+        })
+
+    return {"exterior": exterior, "interior": interior}
 
 
 def _build_app_seed_data():
     users = _build_users_data()
     regions = _build_regions_data()
     manager, owner = _build_manager_owner_data()
+    rate_card = _build_simple_rate_card()
 
     return {
         "users": users,
         "regions": regions,
         "sales": {
             "rateCardVersion": timezone.now().strftime("%Y-%m"),
-            "wizard": {
-                "models": _build_sales_model_list(),
-            },
+            "models": _build_sales_model_list(),
+            "rateCard": rate_card,
+            "projects": manager["projects"],  # Sales reps see same jobs list
         },
         "manager": manager,
         "owner": owner,
@@ -752,3 +777,7 @@ def manager_view(request):
 
 def owner_view(request):
     return render(request, "owner/index.html")
+
+
+def sales_overview_view(request):
+    return render(request, "sales/overview/index.html")
