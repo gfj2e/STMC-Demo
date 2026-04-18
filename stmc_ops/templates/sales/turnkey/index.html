@@ -1,0 +1,223 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>STMC Contracts BuildWizard - Turnkey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}" />
+  <style>
+    .logout-link {
+      border: none;
+      background: transparent;
+      color: #fca5a5;
+      font-size: 11px;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 0;
+    }
+    .app-nav {
+      position: sticky;
+      top: 0;
+      z-index: 119;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      overflow-x: auto;
+    }
+    .app-nav-link {
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4b5563;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .app-nav-link.active {
+      color: #a31a1a;
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+  </style>
+</head>
+<body>
+
+{% include "sales/_nav.html" %}
+
+<div class="header">
+  <div class="header-sub">Summertown Metals Contracting</div>
+  <div class="header-title">STMC Contracts BuildWizard</div>
+  <div class="header-total" id="hdrTotal">$0</div>
+  <div class="header-subtotal-note" id="hdrSub">Total Exterior Shell Package</div>
+  <div class="header-split" id="hdrSplit" style="display:none"></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bar" id="progressBar"></div>
+</div>
+
+<div class="container" id="stepContainer"></div>
+
+<div class="nav-wrap">
+  <div class="nav">
+    <button class="nav-btn nav-prev" id="navPrev" onclick="wizPrev()">&larr; Previous</button>
+    <div class="nav-status" id="navStatus"></div>
+    <button class="nav-btn nav-next" id="navNext" onclick="wizNext()">Next &rarr;</button>
+  </div>
+</div>
+
+<div class="footer">
+  <span class="footer-left">
+    <button class="footer-btn" onclick="manualSave()">Save Draft</button>
+    <button class="footer-btn" onclick="openLoadDraft()">Load Draft</button>
+    <button class="footer-btn" onclick="exportStateJSON()">Export</button>
+    <button class="footer-btn" onclick="importStateJSON()">Import</button>
+    <button class="footer-btn" onclick="cloudSaveJob()">Cloud Save</button>
+    <button class="footer-btn" onclick="cloudLoadJob()">Cloud Load</button>
+    <button class="footer-btn" onclick="openBackendSettings()">Backend</button>
+    <button class="footer-btn" onclick="resetAll()">Reset</button>
+  </span>
+  <span class="footer-right" id="footerSaveStatus">Ready</span>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="printSheet" style="display:none"></div>
+
+<div class="modal-overlay" id="loadDraftModal" style="display:none" onclick="closeLoadDraftIfOverlay(event)">
+  <div class="modal">
+    <div class="modal-hdr">Load Saved Draft</div>
+    <div class="modal-body" id="loadDraftList"></div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeLoadDraft()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="backendSettingsModal" style="display:none" onclick="closeBackendSettingsIfOverlay(event)">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr">Backend Connection Settings</div>
+    <div class="modal-body" style="padding:16px;max-height:60vh;overflow-y:auto">
+      <div class="banner banner-info" style="margin-bottom:14px">
+        Configure the connection to your STMC backend database. When enabled, the tool uses backend rate cards and cloud jobs.
+      </div>
+      <div class="field">
+        <label class="field-lbl">Backend Status</label>
+        <div class="radio-pills" id="backendEnabledPills"></div>
+      </div>
+      <div class="field">
+        <label class="field-lbl">API Base URL</label>
+        <input class="inp mono" type="text" id="backendBaseUrl" placeholder="https://api.stmc.example.com/v1" oninput="BACKEND.config.set('baseUrl', this.value)">
+      </div>
+      <div class="field">
+        <label class="field-lbl">Auth Token (Bearer)</label>
+        <input class="inp mono" type="password" id="backendAuthToken" placeholder="paste your API token here" oninput="BACKEND.config.set('authToken', this.value)">
+      </div>
+      <div class="field">
+        <label class="field-lbl">Rate Card Version</label>
+        <input class="inp mono" type="text" id="backendRateVersion" readonly>
+      </div>
+      <div id="backendStatusBox" style="margin-top:14px;padding:10px 12px;border-radius:6px;background:var(--g100);font-size:12px;line-height:1.5"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="footer-btn" onclick="BACKEND.testConnection()">Test Connection</button>
+        <button class="footer-btn" onclick="BACKEND.data.fetchAll()">Refresh Rate Cards</button>
+        <button class="footer-btn" onclick="BACKEND.auth.logout(); refreshBackendSettingsUI(); showToast('Logged out')">Logout</button>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeBackendSettings()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cloudJobsModal" style="display:none" onclick="closeCloudJobsIfOverlay(event)">
+  <div class="modal">
+    <div class="modal-hdr">Cloud Jobs</div>
+    <div class="modal-body" id="cloudJobsList" style="padding:12px;max-height:50vh;overflow-y:auto"></div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeCloudJobs()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+{{ wizard_seed_data|json_script:"stmc-wizard-seed-data" }}
+<script>
+  window.STMC_WIZARD_DATA = JSON.parse(document.getElementById("stmc-wizard-seed-data").textContent);
+  window.STMC_WIZARD_DEFAULT_MODE = "{{ wizard_mode }}";
+</script>
+<script src="{% static 'contracts/buildwizard.js' %}" defer></script>
+<script>
+  (function initSalesNavbar() {
+    function initials(value) {
+      if (!value) return "SL";
+      var parts = String(value).trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return "SL";
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var loginUrl = "{% url 'login' %}";
+      var userId = localStorage.getItem("stmc_user");
+      var regionId = localStorage.getItem("stmc_region");
+      if (!userId) {
+        window.location.href = loginUrl;
+        return;
+      }
+
+      var nameEl = document.getElementById("appUserName");
+      var regionEl = document.getElementById("appUserRegion");
+      var badgeEl = document.getElementById("appUserBadge");
+      var navNameEl = document.getElementById("hN");
+      var navBadgeEl = document.getElementById("hA");
+
+      function setUser(name, region) {
+        if (nameEl) nameEl.textContent = name || "Sales";
+        if (regionEl) regionEl.textContent = region || "Region";
+        if (badgeEl) badgeEl.textContent = initials(name || userId);
+        if (navNameEl) navNameEl.textContent = name || "Sales";
+        if (navBadgeEl) navBadgeEl.textContent = initials(name || userId);
+      }
+
+      setUser(userId, regionId || "Region");
+
+      fetch("{% static 'data.json' %}", { cache: "no-store" })
+        .then(function (response) {
+          if (!response.ok) return null;
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data) return;
+          var users = data.users || [];
+          var regions = data.regions || [];
+          var user = users.find(function (item) { return item.id === userId; });
+          if (!user) {
+            window.location.href = loginUrl;
+            return;
+          }
+          var region = regions.find(function (item) { return item.id === regionId; });
+          setUser(user.name, region ? region.name : (regionId || "Region"));
+        })
+        .catch(function () {
+          setUser(userId, regionId || "Region");
+        });
+
+      document.querySelectorAll(".logout-link").forEach(function (button) {
+        button.addEventListener("click", function () {
+          localStorage.removeItem("stmc_user");
+          localStorage.removeItem("stmc_region");
+          window.location.href = loginUrl;
+        });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

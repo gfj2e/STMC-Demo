@@ -4,21 +4,6 @@
 (function () {
   var S = window.STMC;
 
-  function renderKpis(containerId, kpis) {
-    var container = S.$id(containerId);
-    if (!container) return;
-    container.innerHTML = (kpis || []).map(function (kpi) {
-      var cls = ["kpi-value"];
-      if (kpi.mono) cls.push("mono");
-      var tone = S.getToneClass(kpi.tone, "value");
-      if (tone) cls.push(tone);
-      return "<article class=\"kpi\">" +
-        "<div class=\"kpi-label\">" + S.escapeHtml(kpi.label) + "</div>" +
-        "<div class=\"" + cls.join(" ") + "\">" + S.escapeHtml(kpi.value) + "</div>" +
-        "</article>";
-    }).join("");
-  }
-
   function renderPipeline(pipeline) {
     var body = S.$id("mgr-pipeline-body");
     if (!body) return;
@@ -71,7 +56,7 @@
         S.bindTabNav();
 
         var mgr = data.manager || {};
-        renderKpis("mgr-build-kpis", mgr.kpis);
+        S.renderKpis("mgr-build-kpis", mgr.kpis);
         renderPipeline(mgr.pipeline);
         renderBudgets(mgr.budgets);
         renderDraws(mgr.draws);

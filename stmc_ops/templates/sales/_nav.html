@@ -1,14 +1,14 @@
 {% load static %}
-<nav class="nav" id="mv-tab-nav">
-  <div class="nav-tabs">
-    <a class="nav-link active" data-mv-tab="new-contract" href="{% url 'sales' %}">New Contract</a>
-    <a class="nav-link" data-mv-tab="my-projects" href="{% url 'sales' %}">My Projects</a>
-    <a class="nav-link" data-mv-tab="models" href="{% url 'sales' %}">Models</a>
-    <a class="nav-link" data-mv-tab="rates" href="{% url 'sales' %}">Rate Card</a>
+<nav class="app-nav" id="mv-tab-nav" aria-label="Sales Navigation">
+  <div class="nav-tabs" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <a class="app-nav-link active" data-mv-tab="new-contract" href="{% url 'sales' %}">New Contract</a>
+    <a class="app-nav-link" data-mv-tab="my-projects" href="{% url 'sales' %}">My Projects</a>
+    <a class="app-nav-link" data-mv-tab="models" href="{% url 'sales' %}">Models</a>
+    <a class="app-nav-link" data-mv-tab="rates" href="{% url 'sales' %}">Rate Card</a>
   </div>
-  <div class="nav-user">
-    <button class="nav-logout logout-link">Logout</button>
-    <span class="nav-user-name" id="hN"></span>
-    <span class="nav-badge" id="hA"></span>
+  <div class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
+    <button class="logout-link" type="button">Logout</button>
+    <span class="nav-user-name" id="hN" style="font-size:11px;color:#4b5563"></span>
+    <span class="nav-badge" id="hA" style="width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#111827;color:#fff;font-size:10px;font-weight:700"></span>
   </div>
 </nav>

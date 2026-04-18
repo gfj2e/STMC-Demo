@@ -17,11 +17,6 @@
     if (el) el.textContent = value;
   }
 
-  function setValue(id, value) {
-    var el = $id(id);
-    if (el) el.value = value;
-  }
-
   // ── String / number helpers ───────────────────────────────────────────────
   function escapeHtml(value) {
     return String(value)
@@ -30,23 +25,6 @@
       .replace(/>/g,  "&gt;")
       .replace(/"/g,  "&quot;")
       .replace(/'/g,  "&#39;");
-  }
-
-  function parseNumber(value) {
-    if (typeof value === "number") return value;
-    if (typeof value === "string") {
-      var n = Number(value.replace(/[^0-9.-]/g, ""));
-      return isNaN(n) ? 0 : n;
-    }
-    return 0;
-  }
-
-  function formatMoney(amount) {
-    return "$" + Math.round(parseNumber(amount)).toLocaleString();
-  }
-
-  function formatCount(value) {
-    return Math.round(parseNumber(value)).toLocaleString();
   }
 
   function clampPercent(value) {
@@ -97,12 +75,6 @@
       userId:   localStorage.getItem("stmc_user")   || "",
       regionId: localStorage.getItem("stmc_region") || (regions.length ? regions[0].id : "")
     };
-  }
-
-  function getSessionRegion() {
-    var session = getSession();
-    var regions = getCollection("regions");
-    return findById(regions, session.regionId) || regions[0] || {};
   }
 
   // ── Routing ───────────────────────────────────────────────────────────────
@@ -198,13 +170,27 @@
     });
   }
 
+  function renderKpis(containerId, kpis) {
+    var container = $id(containerId);
+    if (!container) return;
+    container.innerHTML = (kpis || []).map(function (kpi) {
+      var cls = ["kpi-value"];
+      if (kpi.mono) cls.push("mono");
+      var tone = getToneClass(kpi.tone, "value");
+      if (tone) cls.push(tone);
+      return "<article class=\"kpi\">" +
+        "<div class=\"kpi-label\">" + escapeHtml(kpi.label) + "</div>" +
+        "<div class=\"" + cls.join(" ") + "\">" + escapeHtml(kpi.value) + "</div>" +
+        "</article>";
+    }).join("");
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
   window.STMC = {
     loadData:           loadData,
     getCollection:      getCollection,
     findById:           findById,
     getSession:         getSession,
-    getSessionRegion:   getSessionRegion,
     setSession:         setSession,
     clearSession:       clearSession,
     getLoginUrl:        getLoginUrl,
@@ -212,16 +198,13 @@
     applyHeaderSession: applyHeaderSession,
     bindLogout:         bindLogout,
     bindTabNav:         bindTabNav,
+    renderKpis:         renderKpis,
     showToast:          showToast,
     showLoadError:      showLoadError,
     escapeHtml:         escapeHtml,
-    parseNumber:        parseNumber,
-    formatMoney:        formatMoney,
-    formatCount:        formatCount,
     clampPercent:       clampPercent,
     getToneClass:       getToneClass,
     setText:            setText,
-    setValue:           setValue,
     $id:                $id
   };
 

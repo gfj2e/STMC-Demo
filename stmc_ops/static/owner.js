@@ -4,21 +4,6 @@
 (function () {
   var S = window.STMC;
 
-  function renderKpis(containerId, kpis) {
-    var container = S.$id(containerId);
-    if (!container) return;
-    container.innerHTML = (kpis || []).map(function (kpi) {
-      var cls = ["kpi-value"];
-      if (kpi.mono) cls.push("mono");
-      var tone = S.getToneClass(kpi.tone, "value");
-      if (tone) cls.push(tone);
-      return "<article class=\"kpi\">" +
-        "<div class=\"kpi-label\">" + S.escapeHtml(kpi.label) + "</div>" +
-        "<div class=\"" + cls.join(" ") + "\">" + S.escapeHtml(kpi.value) + "</div>" +
-        "</article>";
-    }).join("");
-  }
-
   function renderNotifications(notifications) {
     var container = S.$id("own-notifications");
     if (!container) return;
@@ -67,7 +52,7 @@
         S.bindTabNav();
 
         var own = data.owner || {};
-        renderKpis("own-kpis", own.kpis);
+        S.renderKpis("own-kpis", own.kpis);
         renderNotifications(own.notifications);
         renderProjects(own.projects);
         renderPayments(own.payments);
