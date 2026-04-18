@@ -63,7 +63,7 @@
       })
       .catch(function (err) {
         console.error(err);
-        S.showLoadError("Unable to load demo data. Check data.json and refresh.");
+        S.showLoadError("Unable to load app data. Refresh and try again.");
       });
   });
 

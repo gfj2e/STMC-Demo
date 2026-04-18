@@ -1,35 +1,54 @@
 /* STMC BuildWizard runtime data (from Django endpoint/context, not embedded HTML JSON) */
 var __WIZ = window.STMC_WIZARD_DATA || {};
-var P = __WIZ.P || { sales: {}, ctr: {}, conc: { types: { "4fiber": {}, "6fiber": {}, "4mono": {}, "6mono": {} }, minF: 3500, minM: 5500, lp: 1750, bp: 2500, wire: 0.85, rebar: 1.25, foam: 9 }, punch: 2500 };
-var SA = __WIZ.SA || ["1st Floor Living Area","2nd Floor Area","Bonus Room","Garage Area","Carport Area","Front Porch Area","Back Porch Area","Custom"];
-var RD = __WIZ.RD || {};
-var MD = __WIZ.MD || {};
-var PM = __WIZ.PM || {};
-var P10 = __WIZ.P10 || {};
-var BRANCHES = __WIZ.BRANCHES || {};
-var PLAN_METRICS = __WIZ.PLAN_METRICS || {};
-var INT_CONTRACT = __WIZ.INT_CONTRACT || {};
-var BASE_COSTS = __WIZ.BASE_COSTS || {};
-var INT_RC = __WIZ.INT_RC || {};
-var MODELS = __WIZ.MODELS || {};
-var PDF_FILES = __WIZ.PDF_FILES || {};
-var CRAFTSMAN = __WIZ.CRAFTSMAN || {};
-var APPLIANCE_LABELS = __WIZ.APPLIANCE_LABELS || {};
-var APPLIANCE_COSTS = __WIZ.APPLIANCE_COSTS || {};
-var ISLAND_ADDON_LABELS = __WIZ.ISLAND_ADDON_LABELS || {};
+var __WIZ_MISSING_KEYS = [];
+
+function __wizRequired(key){
+  var value = __WIZ[key];
+  if(value === undefined || value === null) __WIZ_MISSING_KEYS.push(key);
+  return value;
+}
+
+function renderWizardConfigError(){
+  if(!__WIZ_MISSING_KEYS.length) return;
+  var missing = __WIZ_MISSING_KEYS.join(", ");
+  console.error("[STMC] Missing required seed keys:", missing);
+  var step = document.getElementById("stepContainer");
+  if(step){
+    step.innerHTML = ''
+      + '<div class="card">'
+      +   '<div class="section-hdr"><span>Wizard Configuration Error</span></div>'
+      +   '<div class="card-pad">Missing required seed data from backend: <strong>' + esc(missing) + '</strong><br>'
+      +   'Run seed commands and refresh this page.</div>'
+      + '</div>';
+  }
+  var navPrev = document.getElementById("navPrev");
+  var navNext = document.getElementById("navNext");
+  var navStatus = document.getElementById("navStatus");
+  if(navPrev) navPrev.disabled = true;
+  if(navNext) navNext.disabled = true;
+  if(navStatus) navStatus.textContent = "Configuration error";
+}
+
+var P = __wizRequired("P");
+var SA = __wizRequired("SA");
+var RD = __wizRequired("RD");
+var MD = __wizRequired("MD");
+var PM = __wizRequired("PM");
+var P10 = __wizRequired("P10");
+var BRANCHES = __wizRequired("BRANCHES");
+var PLAN_METRICS = __wizRequired("PLAN_METRICS");
+var INT_CONTRACT = __wizRequired("INT_CONTRACT");
+var BASE_COSTS = __wizRequired("BASE_COSTS");
+var INT_RC = __wizRequired("INT_RC");
+var MODELS = __wizRequired("MODELS");
+var PDF_FILES = __wizRequired("PDF_FILES");
+var CRAFTSMAN = __wizRequired("CRAFTSMAN");
+var APPLIANCE_LABELS = __wizRequired("APPLIANCE_LABELS");
+var APPLIANCE_COSTS = __wizRequired("APPLIANCE_COSTS");
+var ISLAND_ADDON_LABELS = __wizRequired("ISLAND_ADDON_LABELS");
 var __WIZ_DEFAULT_MODE = window.STMC_WIZARD_DEFAULT_MODE || "";
 var __WIZ_LOCK_MODE = window.STMC_WIZARD_LOCK_MODE || "";
-var MODEL_ALIASES = {
-  "BERKLEY":              "THE BERKLEY",
-  "DAUGHTERY":            "DAUGHERTY",
-  "EAST FORK":            "EAST FORK DELUXE",
-  "FOX RUN":              "FOX RUN BARNDOMINIUM",
-  "HADLEY":               "THE HADLEY",
-  "SHADY MEADOW":         "SHADY MEADOWS",
-  "THE SOUTHERN MONITOR": "SOUTHERN MONITOR",
-  "TIMBERCREST":          "TIMBER CREST",
-  "WOODSIDE SPECIAL 2.0": "WOODSIDE SPECIAL DELUXE"
-};
+var MODEL_ALIASES = __wizRequired("MODEL_ALIASES");
 
 function canonicalModel(m){ return (m && MODEL_ALIASES[m]) ? MODEL_ALIASES[m] : m; }
 
@@ -59,11 +78,13 @@ function applyModelAliases(){
   });
 }
 
-applyModelAliases();
+if(__WIZ_MISSING_KEYS.length === 0){
+  applyModelAliases();
+}
 
 /* CANONICAL_MODELS — the alphabetized list shown in the model dropdown.
    39 preset models from PM + CUSTOM FLOOR PLAN pinned at end. */
-var CANONICAL_MODELS = Object.keys(PM).sort();
+var CANONICAL_MODELS = __WIZ_MISSING_KEYS.length === 0 ? Object.keys(PM).sort() : [];
 // Ensure CUSTOM FLOOR PLAN exists in MODELS (it was in INT App MODELS).
 // It's NOT in PM since PM is exterior-only presets. We keep it as a special entry.
 
@@ -641,6 +662,8 @@ function buildCtrItems(S){
 function sumItems(items){ var t=0; items.forEach(function(i){ t += i.cost; }); return t; }
 function sumSection(items, sec){ var t=0; items.forEach(function(i){ if(i.section===sec) t+=i.cost; }); return t; }
 function getSections(items){ var seen={}, out=[]; items.forEach(function(i){ if(!seen[i.section]){ seen[i.section]=1; out.push(i.section); } }); return out; }
+function defaultRoofName(){ return (ROOF_AREA_NAMES && ROOF_AREA_NAMES.length) ? ROOF_AREA_NAMES[0] : ""; }
+function defaultRoofType(){ return (ROOF_TYPES && ROOF_TYPES.length) ? ROOF_TYPES[0].v : ""; }
 
 /* ═══════════════════════════════════════════════════════════════
    LOAD MODEL — populates STATE from PM/MD/RD/P10 for the canonical model.
@@ -665,8 +688,8 @@ function loadModel(m){
   var p = PM[m] || {};
   STATE.ext.stories = p.st || 1;
   STATE.ext.slab = (MD[m] && MD[m].sqft ? MD[m].sqft : []).map(function(s){return {n:s.n, sf:s.sf, tg:0}});
-  STATE.ext.roof = (RD[m] || []).map(function(r){return {n:r.n, steep:0, type:"metal", sf:r.sf}});
-  if(STATE.ext.roof.length === 0) STATE.ext.roof = [{n:"House Roof", steep:0, type:"metal", sf:0}];
+  STATE.ext.roof = (RD[m] || []).map(function(r){return {n:r.n, steep:0, type:defaultRoofType(), sf:r.sf}});
+  if(STATE.ext.roof.length === 0) STATE.ext.roof = [{n:defaultRoofName(), steep:0, type:defaultRoofType(), sf:0}];
   STATE.ext.wallTuff = p.ew || 0;
   STATE.ext.wallRock = 0;
   STATE.ext.wallStone = 0;
@@ -682,7 +705,7 @@ function loadModel(m){
   STATE.ext.awnQty = 0; STATE.ext.cupQty = 0; STATE.ext.chimQty = 0;
   STATE.ext.foundType = "concrete"; STATE.ext.bsmtFrame = 0; STATE.ext.crawlSF = 0;
   STATE.ext.sheath = 0; STATE.ext.g26 = 0;
-  STATE.ext.punchAmt = 2500;
+  STATE.ext.punchAmt = pn(P.punch);
   STATE.ext.customCharges = [];
   STATE.ext.ctrOverrides = {};
 
@@ -1221,8 +1244,8 @@ function onSlabRowDelete(i){
 /* ═══════════════════════════════════════════════════════════════
    STEP 3 — ROOF & EXTERIOR
    ═══════════════════════════════════════════════════════════════ */
-var ROOF_AREA_NAMES = ["House Roof","Main Roof","Main House","Front Porch","Back Porch","Porch Roof","Porch & Garage","Garage","Garage Roof","Carport","Carport Roof","Dormers","Lean-To","Bonus Room","Side Entry","Side Shed","Custom"];
-var ROOF_TYPES = [{v:"metal",l:"Metal"},{v:"ss",l:"Standing Seam"},{v:"shingles",l:"Shingles"}];
+var ROOF_AREA_NAMES = __wizRequired("ROOF_AREA_NAMES");
+var ROOF_TYPES = __wizRequired("ROOF_TYPES");
 
 function renderStep3(){
   var E = STATE.ext;
@@ -1453,7 +1476,7 @@ function onRoofRowArea(i, v){ STATE.ext.roof[i].n = v; renderCurrentStep(); }
 function onRoofRowType(i, v){ STATE.ext.roof[i].type = v; renderCurrentStep(); }
 function onRoofRowSteep(i, v){ STATE.ext.roof[i].steep = v; renderCurrentStep(); }
 function onRoofRowSF(i, v){ STATE.ext.roof[i].sf = pn(v); refreshLiveTotals(); }
-function onRoofRowAdd(){ STATE.ext.roof.push({n:"House Roof", steep:0, type:"metal", sf:0}); renderCurrentStep(); }
+function onRoofRowAdd(){ STATE.ext.roof.push({n:defaultRoofName(), steep:0, type:defaultRoofType(), sf:0}); renderCurrentStep(); }
 function onRoofRowDelete(i){
   if(STATE.ext.roof.length <= 1) return;
   STATE.ext.roof.splice(i, 1);
@@ -1478,13 +1501,7 @@ function onCustChargeDelete(i){
 /* ═══════════════════════════════════════════════════════════════
    STEP 4 — CONCRETE
    ═══════════════════════════════════════════════════════════════ */
-var CONC_TYPES = [
-  {v:"",l:"None / Not Yet Selected"},
-  {v:"4fiber",l:"4\" w/ Fiber"},
-  {v:"6fiber",l:"6\" w/ Fiber"},
-  {v:"4mono",l:"4\" Mono Footer & Fiber"},
-  {v:"6mono",l:"6\" Mono Footer & Fiber"}
-];
+var CONC_TYPES = __wizRequired("CONC_TYPES");
 
 function renderStep4(){
   var c = STATE.conc;
@@ -1755,24 +1772,7 @@ function computeCadCharges(S){
 }
 
 // Interior trade groups that drive Step 9 base budget calculations.
-var INT_TRADE_GROUPS = [
-  {key:"cabinets",       name:"Cabinets",                rates:["cabinets"]},
-  {key:"countertops",    name:"Countertops",             rates:["countertops"]},
-  {key:"flooring",       name:"Flooring",                rates:["floorMat","floorLab"]},
-  {key:"drywall",        name:"Drywall",                 rates:["drywallMat","drywallLab"]},
-  {key:"paint",          name:"Paint",                   rates:["paint","paintExtDoor"]},
-  {key:"trim",           name:"Trim & Doors",            rates:["trimMat","doorMat","trimDoorLab"]},
-  {key:"electrical",     name:"Electrical",              rates:["electrical"]},
-  {key:"plumbing",       name:"Plumbing",                rates:["plumbFixBase","plumbFixBath","plumbingLab"]},
-  {key:"insulation",     name:"Insulation",              rates:["insulation"]},
-  {key:"hvac",           name:"HVAC",                    rates:["hvac"]},
-  {key:"lighting",       name:"Lighting",                rates:["lightBase","lightBath"]},
-  {key:"fireplaces",     name:"Fireplaces",              rates:[]},
-  {key:"tile",           name:"Tile",                    rates:[]},
-  {key:"concreteFinish", name:"Concrete Floor Finish",   rates:[]},
-  {key:"general",        name:"Permits & General",       rates:["permits","cleaning","dumpster"]},
-  {key:"customSelections", name:"Custom Selections",     rates:[]}
-];
+var INT_TRADE_GROUPS = __wizRequired("INT_TRADE_GROUPS");
 
 function calcIntTradeBase(tg, S){
   // Sum of (rate × driver) for every rate in the trade group.
@@ -2643,184 +2643,9 @@ function updCtNotes(val){ STATE.ct.notes = val; scheduleSave(); }
    per pill reads config + STATE.sel[pill] to produce toggles/steppers/SF/LF.
    ═══════════════════════════════════════════════════════════════ */
 
-var SEL_DEFS = {
-  docusign: {
-    label: "Docusign Upgrades",
-    sections: [
-      {title:"Kitchen Sink Upgrades", items:[
-        {id:"selFarmSink", type:"toggle", label:"Farm Sink", price:778, trade:"plumbing"}
-      ]},
-      {title:"Bathtub Upgrades", items:[
-        {id:"selFreestandingTub", type:"qty", label:"59×32 Freestanding Bathtub w/ End Drain (White)", price:248, unit:"each", trade:"plumbing"},
-        {id:"selFloorMount", type:"qty", label:"Floor Mount", price:475, unit:"each", trade:"plumbing"}
-      ]},
-      {title:"Ceiling Fan Upgrades", items:[
-        {id:"selCeilingFan60", type:"qty", label:"60\" Ceiling Fans", price:141, unit:"each", trade:"lighting"}
-      ]},
-      {title:"Fireplace Upgrades", subsections:[
-        {heading:"Wood Burning Fireplaces", items:[
-          {id:"selEL42", type:"qty", label:"EL42", price:5500, unit:"each", trade:"fireplaces"},
-          {id:"selBIR42B", type:"qty", label:"BIR42-B", price:10200, unit:"each", trade:"fireplaces"},
-          {id:"sel18OCT", type:"qty", label:"18OCT", price:7000, unit:"each", trade:"fireplaces"},
-          {id:"selNorthStarC", type:"qty", label:"NorthStar-C — Heat & Glo", price:11300, unit:"each", trade:"fireplaces"}
-        ]},
-        {heading:"Gas Fireplaces", items:[
-          {id:"selBUF36T", type:"qty", label:"BUF36-T", price:4500, unit:"each", trade:"fireplaces"},
-          {id:"selBUF42T", type:"qty", label:"BUF42-T", price:5500, unit:"each", trade:"fireplaces"}
-        ]}
-      ]},
-      {title:"Water Heater Upgrades", items:[
-        {id:"selWH40Gal", type:"toggle", label:"40-Gal Gas Water Heater", price:1039, trade:"plumbing"},
-        {id:"selWHTanklessNP", type:"toggle", label:"Tankless Water Heater (No Pump)", price:2048, trade:"plumbing", special:"tankless"},
-        {id:"selWHTanklessWP", type:"toggle", label:"Tankless Water Heater (With Pump)", price:2411, trade:"plumbing", special:"tankless"}
-      ]},
-      {title:"Utilities", items:[
-        {id:"selWaterLF", type:"lf", label:"Water", price:12, trade:"plumbing"},
-        {id:"selSewerLF", type:"lf", label:"Sewer", price:20, trade:"plumbing"}
-      ]},
-      {title:"Gas Type", type:"radio", id:"gasType", options:[
-        {v:"", l:"— Not Selected —"},
-        {v:"natural", l:"Natural Gas"},
-        {v:"propane", l:"Propane"}
-      ]},
-      {title:"Appliance Selection", header:"$1,000 per — gas line hookup costs", items:[
-        {id:"selAppStove", type:"toggle", label:"Stove", price:1000, trade:"plumbing"},
-        {id:"selAppDryer", type:"toggle", label:"Dryer", price:1000, trade:"plumbing"},
-        {id:"selAppWH", type:"toggle", label:"Water Heater", price:1000, trade:"plumbing"},
-        {id:"selAppOther", type:"toggle", label:"Other", price:1000, trade:"plumbing"}
-      ]},
-      {title:"Electrical Upgrades", items:[
-        {id:"selElec200OH", type:"toggle", label:"200 AMP Overhead Connection", price:2500, trade:"electrical"},
-        {id:"selElec200UG", type:"toggle", label:"200 AMP Underground Connection", price:5000, trade:"electrical"},
-        {id:"selElec400UG", type:"toggle", label:"400 AMP Underground Connection", price:8000, trade:"electrical"},
-        {id:"selJunctionBox", type:"qty", label:"Interior Junction Box", price:500, unit:"each", trade:"electrical"}
-      ]}
-    ]
-  },
-  electrical: {
-    label: "Electrical",
-    sections: [
-      {title:"Electrical Service", items:[
-        {id:"miniSplit", type:"toggle", label:"Mini Split", price:3200, trade:"electrical"}
-      ], note:"200/400 AMP service connections are on the Docusign pill — not duplicated here."},
-      {title:"HVAC Upgrades", items:[
-        {id:"hvacTon", type:"qty", label:"HVAC Upgrade ($750/ton + $1,039 gas line flat)", price:750, unit:"ton", trade:"hvac", baseAddOn:1039}
-      ]},
-      {title:"Lighting", items:[
-        {id:"canLight", type:"qty", label:"Can Lights", price:250, unit:"each", trade:"electrical"},
-        {id:"floorLight", type:"qty", label:"Floor Lights", price:529, unit:"each", trade:"electrical"}
-      ], note:"Ceiling Fans are on the Docusign pill — not duplicated here."},
-      {title:"Outlets & Technology", items:[
-        {id:"out220", type:"qty", label:"220V Outlet", price:1227, unit:"each", trade:"electrical"},
-        {id:"outRV", type:"qty", label:"50-Amp RV Outlet", price:519, unit:"each", trade:"electrical"},
-        {id:"outFloor", type:"qty", label:"Floor Outlet", price:455, unit:"each", trade:"electrical"},
-        {id:"outExtra", type:"qty", label:"Extra Outlet", price:155, unit:"each", trade:"electrical"},
-        {id:"outIsland", type:"qty", label:"Power to Island", price:155, unit:"each", trade:"electrical"},
-        {id:"usbc", type:"qty", label:"USB-C Outlets", price:55, unit:"each", trade:"electrical"},
-        {id:"mudBox", type:"qty", label:"Mud Box", price:250, unit:"each", trade:"electrical"},
-        {id:"dimmer", type:"qty", label:"Dimmer Switch", price:95, unit:"each", trade:"electrical"},
-        {id:"cat6", type:"qty", label:"Cat 6 Data Drops", price:525, unit:"each", trade:"electrical"}
-      ]},
-      {title:"Junction Boxes", items:[
-        {id:"jbExt", type:"qty", label:"Junction Box — Exterior", price:630, unit:"each", trade:"electrical"},
-        {id:"jbMetal", type:"qty", label:"Junction Box — Metal Ceiling / T&G", price:355, unit:"each", trade:"electrical"}
-      ], note:"Interior Junction Box is on the Docusign pill — not duplicated here."},
-      {title:"Finish Electrical", items:[
-        {id:"fanRemote", type:"qty", label:"Fan Remote", price:75, unit:"each", trade:"electrical"},
-        {id:"fanDimmer", type:"qty", label:"Fan Dimmer", price:95, unit:"each", trade:"electrical"}
-      ]}
-    ]
-  },
-  plumbing: {
-    label: "Plumbing",
-    sections: [
-      {title:"Tile & Shower", items:[
-        {id:"tileShowerSF", type:"sf", label:"Tile Shower — Custom SF (Cust. Supplies Tile)", price:50, trade:"tile"},
-        {id:"tileFloorSF", type:"sf", label:"Tile Floors — Custom SF (Cust. Supplies Tile)", price:30, trade:"tile"},
-        {id:"showerAcrylic", type:"toggle", label:"Std 3×5 Tile Shower — Acrylic Base", price:3000, trade:"tile"},
-        {id:"showerTile", type:"toggle", label:"Std 3×5 Tile Shower — Tile Floor", price:3200, trade:"tile"},
-        {id:"showerBench", type:"toggle", label:"Tile Shower Bench", price:484, trade:"tile"},
-        {id:"showerNiche", type:"toggle", label:"Tile Shower Niche", price:459, trade:"tile"}
-      ]},
-      {title:"Plumbing Stubs & Add-Ons", items:[
-        {id:"freeTub", type:"qty", label:"Freestanding Tub & Faucet (full package)", price:3876, unit:"each", trade:"plumbing", fp:1},
-        {id:"sinkStub", type:"qty", label:"Additional Sink Stub", price:800, unit:"each", trade:"plumbing", fp:1},
-        {id:"iceLine", type:"qty", label:"Ice Machine Line", price:800, unit:"each", trade:"plumbing", fp:0.5},
-        {id:"dogWash", type:"qty", label:"Dog Wash Drain", price:1000, unit:"each", trade:"plumbing", fp:1},
-        {id:"garageStub", type:"qty", label:"Garage Stub", price:1550, unit:"each", trade:"plumbing", fp:2},
-        {id:"addSpigot", type:"qty", label:"Additional Spigots (2 included standard)", price:400, unit:"each", trade:"plumbing"},
-        {id:"gasLine", type:"qty", label:"Gas Line per Fixture", price:1039, unit:"each", trade:"plumbing"},
-        {id:"floorDrain", type:"qty", label:"Floor Drain (must show on blueprints)", price:1500, unit:"each", trade:"plumbing", fp:1},
-        {id:"potFiller", type:"toggle", label:"Pot Filler — Install Only", price:450, trade:"plumbing", fp:0.5}
-      ]},
-      {title:"Bath Accessories", items:[
-        {id:"div10", type:"toggle", label:"Division 10 Install — Mirrors & Accessories (Cust. Supplies / No Warranty)", price:1600, trade:"plumbing"},
-        {id:"grabBar", type:"qty", label:"ADA Grab Bars — Structural + Install w/ Warranty", price:1000, unit:"each", trade:"plumbing"}
-      ]}
-    ]
-  },
-  trim: {
-    label: "Trim",
-    sections: [
-      {title:"Wall & Ceiling Finishes", items:[
-        {id:"vgroove", type:"sf", label:"1×6 V-Groove / T&G Ceiling", price:2.25, trade:"trim"},
-        {id:"shiplap", type:"sf", label:"Shiplap — Primed", price:8, trade:"trim"},
-        {id:"beams", type:"lf", label:"Faux Beams", price:50, trade:"trim"},
-        {id:"backsplash", type:"sf", label:"Kitchen Backsplash — Cust. Supplies", price:80, trade:"trim"},
-        {id:"underCabLight", type:"qty", label:"Under Cabinet Lighting", price:225, unit:"light", trade:"trim"}
-      ]},
-      {title:"Trim & Windows", items:[
-        {id:"winTrim", type:"sf", label:"Window Trim", price:1, trade:"trim"},
-        {id:"trim1x4", type:"qty", label:"Trim 1×4", price:75, unit:"opening", trade:"trim"},
-        {id:"trim325", type:"qty", label:"Trim 3.25\"", price:60, unit:"opening", trade:"trim"}
-      ]},
-      {title:"Doors & Stairs", items:[
-        {id:"stairs", type:"toggle", label:"Finished Stairs", price:1800, trade:"trim"},
-        {id:"pineDoor", type:"qty", label:"Pine Doors", price:400, unit:"each", trade:"trim"},
-        {id:"door36", type:"qty", label:"36\" Doors Upgrade", price:100, unit:"each", trade:"trim"},
-        {id:"barnDoor", type:"qty", label:"Barn Doors — Install Only (Cust. Supplies Door)", price:275, unit:"each", trade:"trim"},
-        {id:"pocketDoor", type:"qty", label:"Pocket Doors", price:649, unit:"each", trade:"trim"},
-        {id:"doggyDoor", type:"toggle", label:"Doggy Door", price:655, trade:"trim"}
-      ]},
-      {title:"Flooring Upgrades", items:[
-        {id:"woodSupply", type:"sf", label:"Wood Floors — Supply & Install", price:8.50, trade:"flooring"},
-        {id:"woodInstall", type:"sf", label:"Wood Floors — Install Only", price:5.50, trade:"flooring"},
-        {id:"carpet", type:"sf", label:"Carpet", price:3.50, trade:"flooring"},
-        {id:"radiant", type:"sf", label:"Radiant Flooring (1 Zone)", price:13.20, trade:"flooring"},
-        {id:"closetShelf", type:"lf", label:"Closet Shelving", price:80, trade:"trim"}
-      ]},
-      {title:"Concrete Floor Finishes", type:"concreteFinishLines", referencePricing:[
-        {l:"Joint Filler on Saw-Cut Joints", r:"$3.00/SF"},
-        {l:"Grind & Seal — Solvent Base", r:"$4.50/SF"},
-        {l:"Grind & Seal — Water Base", r:"$4.25/SF"},
-        {l:"Exterior Clean & Seal", r:"$3.75/SF"},
-        {l:"Polish Concrete", r:"$5.50/SF"},
-        {l:"Flake Epoxy", r:"$5.75/SF"},
-        {l:"Metallic Epoxy", r:"$12.50/SF"},
-        {l:"Add Dye", r:"+$0.75/SF"},
-        {l:"Travel Fee (75+ miles)", r:"$350 flat"}
-      ]}
-    ]
-  }
-};
+var SEL_DEFS = __wizRequired("SEL_DEFS");
 
-var CUSTOM_TRADE_CATS = [
-  {v:"trim",           l:"Trim & Doors",     route:"trim",           hasSub:true},
-  {v:"flooring",       l:"Flooring",          route:"flooring",       hasSub:true},
-  {v:"drywall",        l:"Drywall",           route:"drywall",        hasSub:true},
-  {v:"paint",          l:"Paint",             route:"paint",          hasSub:true},
-  {v:"electrical",     l:"Electrical",        route:"electrical",     hasSub:true},
-  {v:"plumbing",       l:"Plumbing",          route:"plumbing",       hasSub:true},
-  {v:"insulation",     l:"Insulation",        route:"insulation",     hasSub:true},
-  {v:"hvac",           l:"HVAC",              route:"hvac",           hasSub:true},
-  {v:"cabinets",       l:"Cabinets",          route:"cabinets",       hasSub:false},
-  {v:"countertops",    l:"Countertops",       route:"countertops",    hasSub:false},
-  {v:"tile",           l:"Tile",              route:"tile",           hasSub:false},
-  {v:"concreteFinish", l:"Concrete Finish",   route:"concreteFinish", hasSub:false},
-  {v:"fireplaces",     l:"Fireplaces",        route:"fireplaces",     hasSub:false},
-  {v:"lighting",       l:"Lighting",          route:"lighting",       hasSub:false},
-  {v:"general",        l:"General / Other",   route:"general",        hasSub:false}
-];
+var CUSTOM_TRADE_CATS = __wizRequired("CUSTOM_TRADE_CATS");
 
 /* ── INIT: idempotent normalizer for STATE.sel ── */
 function initSelState(){
@@ -2943,7 +2768,7 @@ function renderStep7(){
   h += '<div class="card">';
   h +=   '<div class="sub-pills">';
   ["docusign","electrical","plumbing","trim","custom"].forEach(function(k){
-    var lbl = {docusign:"Docusign Upgrades", electrical:"Electrical", plumbing:"Plumbing", trim:"Trim & Flooring", custom:"Custom"}[k];
+    var lbl = k === "custom" ? "Custom" : (((SEL_DEFS[k] || {}).label) || k);
     var tot = totals[k];
     var sign = (tot < 0) ? "−" : "";
     var absT = Math.abs(tot);
@@ -4769,6 +4594,10 @@ function importStateJSON(){
    PAGE INIT
    ═══════════════════════════════════════════════════════════════ */
 (function init(){
+  if(__WIZ_MISSING_KEYS.length){
+    renderWizardConfigError();
+    return;
+  }
   // Initialize backend (loads config from localStorage, fetches rate cards if enabled)
   try { BACKEND.init(); } catch(e){ console.warn("[BACKEND] init error:", e); }
   // Try to restore from autosave on load

@@ -2,7 +2,7 @@
 // Loaded on every page before role-specific scripts.
 
 (function (window) {
-  var DATA_FILE = window.STMC_DATA_URL || "/static/data.json";
+  var DATA_FILE = window.STMC_DATA_URL || "/stmc_ops/app/seed-data/";
   var ROUTES    = window.STMC_ROUTES   || {};
 
   var demoData = null;

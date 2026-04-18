@@ -11,6 +11,20 @@ Auto-generated from V7 HTML + INT_CONTRACTS_APP HTML source files.
 
 Yes = 1
 No = 0
+
+# Canonical alias map used by the wizard for legacy model names.
+MODEL_ALIASES = {
+    "BERKLEY": "THE BERKLEY",
+    "DAUGHTERY": "DAUGHERTY",
+    "EAST FORK": "EAST FORK DELUXE",
+    "FOX RUN": "FOX RUN BARNDOMINIUM",
+    "HADLEY": "THE HADLEY",
+    "SHADY MEADOW": "SHADY MEADOWS",
+    "THE SOUTHERN MONITOR": "SOUTHERN MONITOR",
+    "TIMBERCREST": "TIMBER CREST",
+    "WOODSIDE SPECIAL 2.0": "WOODSIDE SPECIAL DELUXE",
+}
+
 from django.core.management.base import BaseCommand
 from stmc_ops.models import (
     FloorPlanModel, SlabAreaPreset, RoofAreaPreset, CraftsmanPreset, PlanMetric

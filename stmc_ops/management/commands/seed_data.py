@@ -12,16 +12,70 @@ This file contains the STRUCTURE seed. The model preset seed is in seed_models.p
 """
 
 from django.core.management.base import BaseCommand
+from decimal import Decimal
 from stmc_ops.models import (
-    Branch, BudgetTrade, BudgetTradeRate, InteriorRateCard, ExteriorRateCard,
+    AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, ExteriorRateCard, Job,
     UpgradeCategory, UpgradeSection, UpgradeItem, ApplianceConfig, IslandAddon,
 )
+
+
+# Wizard display options that are not model rows but still part of seeded config.
+WIZARD_ROOF_AREA_NAMES = [
+    "House Roof", "Main Roof", "Main House", "Front Porch", "Back Porch", "Porch Roof",
+    "Porch & Garage", "Garage", "Garage Roof", "Carport", "Carport Roof", "Dormers",
+    "Lean-To", "Bonus Room", "Side Entry", "Side Shed", "Custom",
+]
+
+WIZARD_ROOF_TYPES = [
+    {"v": "metal", "l": "Metal"},
+    {"v": "ss", "l": "Standing Seam"},
+    {"v": "shingles", "l": "Shingles"},
+]
+
+WIZARD_CONC_TYPES = [
+    {"v": "", "l": "None / Not Yet Selected"},
+    {"v": "4fiber", "l": "4\" w/ Fiber"},
+    {"v": "6fiber", "l": "6\" w/ Fiber"},
+    {"v": "4mono", "l": "4\" Mono Footer & Fiber"},
+    {"v": "6mono", "l": "6\" Mono Footer & Fiber"},
+]
+
+WIZARD_CUSTOM_TRADE_CATS = [
+    {"v": "trim", "l": "Trim & Doors", "route": "trim", "hasSub": True},
+    {"v": "flooring", "l": "Flooring", "route": "flooring", "hasSub": True},
+    {"v": "drywall", "l": "Drywall", "route": "drywall", "hasSub": True},
+    {"v": "paint", "l": "Paint", "route": "paint", "hasSub": True},
+    {"v": "electrical", "l": "Electrical", "route": "electrical", "hasSub": True},
+    {"v": "plumbing", "l": "Plumbing", "route": "plumbing", "hasSub": True},
+    {"v": "insulation", "l": "Insulation", "route": "insulation", "hasSub": True},
+    {"v": "hvac", "l": "HVAC", "route": "hvac", "hasSub": True},
+    {"v": "cabinets", "l": "Cabinets", "route": "cabinets", "hasSub": False},
+    {"v": "countertops", "l": "Countertops", "route": "countertops", "hasSub": False},
+    {"v": "tile", "l": "Tile", "route": "tile", "hasSub": False},
+    {"v": "concreteFinish", "l": "Concrete Finish", "route": "concreteFinish", "hasSub": False},
+    {"v": "fireplaces", "l": "Fireplaces", "route": "fireplaces", "hasSub": False},
+    {"v": "lighting", "l": "Lighting", "route": "lighting", "hasSub": False},
+    {"v": "general", "l": "General / Other", "route": "general", "hasSub": False},
+]
+
+WIZARD_CONCRETE_FINISH_REFERENCE_PRICING = [
+    {"l": "Joint Filler on Saw-Cut Joints", "r": "$3.00/SF"},
+    {"l": "Grind & Seal - Solvent Base", "r": "$4.50/SF"},
+    {"l": "Grind & Seal - Water Base", "r": "$4.25/SF"},
+    {"l": "Exterior Clean & Seal", "r": "$3.75/SF"},
+    {"l": "Polish Concrete", "r": "$5.50/SF"},
+    {"l": "Flake Epoxy", "r": "$5.75/SF"},
+    {"l": "Metallic Epoxy", "r": "$12.50/SF"},
+    {"l": "Add Dye", "r": "+$0.75/SF"},
+    {"l": "Travel Fee (75+ miles)", "r": "$350 flat"},
+]
 
 
 class Command(BaseCommand):
     help = 'Seed STMC reference data (branches, rate cards, trades, upgrades)'
 
     def handle(self, *args, **options):
+        self.seed_users()
         self.seed_branches()
         self.seed_interior_rate_card()
         self.seed_exterior_rate_card()
@@ -30,7 +84,21 @@ class Command(BaseCommand):
         self.seed_appliance_configs()
         self.seed_island_addons()
         self.seed_upgrade_catalog()
+        self.seed_demo_jobs()
         self.stdout.write(self.style.SUCCESS('All reference data seeded.'))
+
+    # ─────────────────────────────────────────
+    # APP USERS
+    # ─────────────────────────────────────────
+    def seed_users(self):
+        data = [
+            {"user_id": "derek", "name": "Derek Stoll", "initials": "DS", "role": "sales", "title": "Sales Rep", "sort_order": 1},
+            {"user_id": "phillip", "name": "Phillip Olson", "initials": "PO", "role": "pm", "title": "Project Manager", "sort_order": 2},
+            {"user_id": "matt", "name": "Matt Stoll", "initials": "MS", "role": "exec", "title": "Executive / Owner", "sort_order": 3},
+        ]
+        for d in data:
+            AppUser.objects.update_or_create(user_id=d["user_id"], defaults=d)
+        self.stdout.write(f'  App Users: {len(data)}')
 
     # ─────────────────────────────────────────
     # BRANCHES
@@ -434,3 +502,87 @@ class Command(BaseCommand):
         # Concrete Floor Finishes section intentionally empty — uses JobConcreteFinishLine custom rows
 
         self.stdout.write(f'  Upgrade Catalog: seeded all categories, sections, and items')
+
+    # ─────────────────────────────────────────
+    # DEMO JOBS (manager/owner dashboards)
+    # ─────────────────────────────────────────
+    def seed_demo_jobs(self):
+        branch_default = Branch.objects.filter(key="summertown").first() or Branch.objects.first()
+        model_lookup = {
+            "HUNTLEY 2.0": FloorPlanModel.objects.filter(name__iexact="HUNTLEY 2.0").first(),
+            "CAJUN": FloorPlanModel.objects.filter(name__iexact="CAJUN").first(),
+            "MINI PETTUS": FloorPlanModel.objects.filter(name__iexact="MINI PETTUS").first(),
+        }
+        pm_user = AppUser.objects.filter(role="pm", is_active=True).order_by("sort_order").first()
+
+        demo_rows = [
+            {
+                "order_number": "DEMO-1001",
+                "customer_name": "Theiss Build",
+                "phase": "framing",
+                "draw_stage": "draw3",
+                "draw_status": "current",
+                "progress": Decimal("21.00"),
+                "budget_total": Decimal("129200.00"),
+                "budget_spent": Decimal("26675.00"),
+                "collected": Decimal("106233.00"),
+                "draw_amount": Decimal("25000.00"),
+                "model": model_lookup.get("HUNTLEY 2.0"),
+            },
+            {
+                "order_number": "DEMO-1002",
+                "customer_name": "Henderson Build",
+                "phase": "interior",
+                "draw_stage": "draw5",
+                "draw_status": "current",
+                "progress": Decimal("94.00"),
+                "budget_total": Decimal("139607.00"),
+                "budget_spent": Decimal("131100.00"),
+                "collected": Decimal("222234.00"),
+                "draw_amount": Decimal("63664.00"),
+                "model": model_lookup.get("CAJUN"),
+            },
+            {
+                "order_number": "DEMO-1003",
+                "customer_name": "Cooper Ranch",
+                "phase": "punch",
+                "draw_stage": "draw6",
+                "draw_status": "current",
+                "progress": Decimal("83.00"),
+                "budget_total": Decimal("167296.00"),
+                "budget_spent": Decimal("138450.00"),
+                "collected": Decimal("350159.00"),
+                "draw_amount": Decimal("49298.00"),
+                "model": model_lookup.get("MINI PETTUS"),
+            },
+        ]
+
+        seeded = 0
+        for row in demo_rows:
+            model = row["model"]
+            material = model.p10_material if model else Decimal("0")
+            adjusted_int_contract = model.int_contract if model else Decimal("0")
+
+            Job.objects.update_or_create(
+                order_number=row["order_number"],
+                defaults={
+                    "customer_name": row["customer_name"],
+                    "sales_rep": pm_user.name if pm_user else "",
+                    "branch": branch_default,
+                    "floor_plan": model,
+                    "job_mode": "turnkey" if model else "shell",
+                    "p10_material": material,
+                    "adjusted_int_contract": adjusted_int_contract,
+                    "current_phase": row["phase"],
+                    "draw_stage": row["draw_stage"],
+                    "draw_status": row["draw_status"],
+                    "progress_percent": row["progress"],
+                    "budget_total_amount": row["budget_total"],
+                    "budget_spent_amount": row["budget_spent"],
+                    "collected_amount": row["collected"],
+                    "current_draw_amount": row["draw_amount"],
+                },
+            )
+            seeded += 1
+
+        self.stdout.write(f'  Demo Jobs: {seeded}')

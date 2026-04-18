@@ -3,19 +3,32 @@ from decimal import Decimal
 
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from .models import (
     ApplianceConfig,
+    AppUser,
+    BudgetTrade,
     Branch,
     CraftsmanPreset,
     ExteriorRateCard,
     FloorPlanModel,
     InteriorRateCard,
     IslandAddon,
+    Job,
     PlanMetric,
     RoofAreaPreset,
     SlabAreaPreset,
+    UpgradeCategory,
 )
+from .management.commands.seed_data import (
+    WIZARD_CONC_TYPES,
+    WIZARD_CONCRETE_FINISH_REFERENCE_PRICING,
+    WIZARD_CUSTOM_TRADE_CATS,
+    WIZARD_ROOF_AREA_NAMES,
+    WIZARD_ROOF_TYPES,
+)
+from .management.commands.seed_models import MODEL_ALIASES
 
 
 def index(request):
@@ -42,6 +55,403 @@ def _to_number(value):
     if number.is_integer():
         return int(number)
     return round(number, 4)
+
+
+def _model_id_from_name(name):
+    value = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")
+    return value or "custom_model"
+
+
+def _build_interior_trade_groups():
+    groups = []
+    trades = BudgetTrade.objects.filter(scope="interior").order_by("sort_order", "name")
+    for trade in trades:
+        rates = [
+            mapping.rate_card.key
+            for mapping in trade.rate_mappings.select_related("rate_card").all().order_by("rate_card__key")
+        ]
+        groups.append({"key": trade.key, "name": trade.name, "rates": rates})
+    return groups
+
+
+def _build_selection_defs():
+    # Build the Step 7 config from seeded upgrade catalog rows.
+    type_map = {
+        "toggle": "toggle",
+        "qty": "qty",
+        "sf": "sf",
+        "lf": "lf",
+        "radio": "radio",
+    }
+    wanted = ["docusign", "electrical", "plumbing", "trim"]
+    categories = (
+        UpgradeCategory.objects.filter(key__in=wanted)
+        .prefetch_related("sections__items", "sections__items__budget_trade")
+        .order_by("sort_order")
+    )
+    by_key = {cat.key: cat for cat in categories}
+
+    defs = {}
+    for key in wanted:
+        cat = by_key.get(key)
+        sections = []
+        if cat:
+            for section in cat.sections.all():
+                if section.name == "Gas Type":
+                    sections.append(
+                        {
+                            "title": "Gas Type",
+                            "type": "radio",
+                            "id": "gasType",
+                            "options": [
+                                {"v": "", "l": "-- Not Selected --"},
+                                {"v": "natural", "l": "Natural Gas"},
+                                {"v": "propane", "l": "Propane"},
+                            ],
+                        }
+                    )
+                    continue
+
+                sec = {"title": section.name, "items": []}
+                for item in section.items.all():
+                    row = {
+                        "id": item.item_id,
+                        "type": type_map.get(item.input_type, "toggle"),
+                        "label": item.label,
+                        "price": _to_number(item.price),
+                    }
+                    if item.unit:
+                        row["unit"] = item.unit
+                    if item.budget_trade:
+                        row["trade"] = item.budget_trade.key
+                    if item.has_base_addon and _to_number(item.base_addon_amount) > 0:
+                        row["baseAddOn"] = _to_number(item.base_addon_amount)
+                    fp = _to_number(item.adds_fixture_points)
+                    if fp > 0:
+                        row["fp"] = fp
+                    if item.is_split_budget:
+                        row["special"] = "tankless"
+                    sec["items"].append(row)
+                sections.append(sec)
+
+        defs[key] = {
+            "label": cat.name if cat else key.title(),
+            "sections": sections,
+        }
+
+    # Keep concrete finish reference pricing available for the Trim pill.
+    trim_defs = defs.get("trim", {"label": "Trim", "sections": []})
+    trim_defs["sections"].append(
+        {
+            "title": "Concrete Floor Finishes",
+            "type": "concreteFinishLines",
+            "referencePricing": WIZARD_CONCRETE_FINISH_REFERENCE_PRICING,
+        }
+    )
+    defs["trim"] = trim_defs
+    return defs
+
+
+def _build_custom_trade_categories():
+    # Filter to seeded interior trades that actually exist.
+    valid_keys = set(BudgetTrade.objects.filter(scope="interior").values_list("key", flat=True))
+    return [row for row in WIZARD_CUSTOM_TRADE_CATS if row["v"] in valid_keys]
+
+
+def _format_money(value):
+    amount = float(_to_number(value))
+    return f"${amount:,.0f}"
+
+
+def _clamp(number, low, high):
+    return max(low, min(high, number))
+
+
+def _build_users_data():
+    users = []
+    for user in AppUser.objects.filter(is_active=True).order_by("sort_order", "name"):
+        users.append(
+            {
+                "id": user.user_id,
+                "name": user.name,
+                "initials": user.initials,
+                "role": user.role,
+                "title": user.title,
+            }
+        )
+    if users:
+        return users
+    return [
+        {
+            "id": "derek",
+            "name": "Derek Stoll",
+            "initials": "DS",
+            "role": "sales",
+            "title": "Sales Rep",
+        },
+        {
+            "id": "phillip",
+            "name": "Phillip Olson",
+            "initials": "PO",
+            "role": "pm",
+            "title": "Project Manager",
+        },
+        {
+            "id": "matt",
+            "name": "Matt Stoll",
+            "initials": "MS",
+            "role": "exec",
+            "title": "Executive / Owner",
+        },
+    ]
+
+
+def _build_regions_data():
+    branches = Branch.objects.all().order_by("label")
+    regions = []
+    for branch in branches:
+        regions.append(
+            {
+                "id": branch.key,
+                "name": branch.label,
+                "laborMultiplier": 1.0,
+                "concreteMultiplier": 1.0,
+                "turnkeyPremium": 0,
+            }
+        )
+    return regions
+
+
+def _build_sales_model_list():
+    plans = FloorPlanModel.objects.prefetch_related("plan_metrics").all()
+    model_rows = []
+    for plan in plans:
+        model_id = _model_id_from_name(plan.name)
+        metrics = {metric.key: _to_number(metric.value) for metric in plan.plan_metrics.all()}
+        living_sf = _to_number(metrics.get("Total Living SF", 0))
+        turnkey_rate = round((_to_number(plan.int_contract) / living_sf), 1) if living_sf else 0
+        model_rows.append(
+            {
+                "id": model_id,
+                "name": plan.name,
+                "livingSf": int(living_sf) if living_sf else 0,
+                "materialTotal": _to_number(plan.p10_material),
+                "laborBudget": _to_number(round(_to_number(plan.p10_material) * 0.42, 2)),
+                "concreteBudget": _to_number(round((living_sf or 0) * 8.0, 2)),
+                "turnkeyRate": _to_number(turnkey_rate),
+            }
+        )
+    return model_rows
+
+
+def _estimate_job_contract(job):
+    material = _to_number(job.p10_material)
+    if not material and job.floor_plan:
+        material = _to_number(job.floor_plan.p10_material)
+
+    int_part = 0
+    if job.job_mode == "turnkey":
+        int_part = _to_number(job.adjusted_int_contract) or _to_number(job.int_contract)
+        if not int_part and job.floor_plan:
+            int_part = _to_number(job.floor_plan.int_contract)
+    return material + int_part
+
+
+def _phase_tone(phase_code):
+    if phase_code in {"punch", "final", "closed"}:
+        return "success"
+    if phase_code == "estimate":
+        return "warning"
+    return "warning"
+
+
+def _draw_status_tone(status_code):
+    if status_code in {"paid", "closed"}:
+        return "success"
+    if status_code == "hold":
+        return "danger"
+    return "warning"
+
+
+def _progress_from_fields(job, budget_total, budget_spent):
+    explicit = _to_number(job.progress_percent)
+    if explicit > 0:
+        return int(_clamp(round(explicit), 0, 100))
+    if budget_total > 0:
+        return int(_clamp(round((budget_spent / budget_total) * 100), 0, 100))
+    return 0
+
+
+def _build_manager_owner_data():
+    jobs = list(Job.objects.select_related("floor_plan").order_by("-updated_at", "-created_at")[:12])
+
+    pipeline = []
+    budgets = []
+    draws = []
+    owner_projects = []
+    owner_payments = []
+    notifications = []
+
+    contract_total = 0
+    collected_total = 0
+    awaiting_total = 0
+    budget_health_scores = []
+
+    for job in jobs:
+        name = job.customer_name or f"Build #{job.id}"
+        model = job.floor_plan.name if job.floor_plan else "Custom"
+        contract = _estimate_job_contract(job)
+
+        budget_total = _to_number(job.budget_total_amount)
+        if budget_total <= 0:
+            budget_total = _to_number(job.int_true_cost)
+        if budget_total <= 0 and contract > 0:
+            budget_total = round(contract * 0.48, 2)
+
+        spent = _to_number(job.budget_spent_amount)
+        if spent <= 0 and budget_total > 0 and _to_number(job.progress_percent) > 0:
+            spent = round((budget_total * _to_number(job.progress_percent)) / 100.0, 2)
+        spent = _clamp(spent, 0, budget_total) if budget_total > 0 else max(0, spent)
+
+        progress = _progress_from_fields(job, budget_total, spent)
+        remaining = max(0, round(budget_total - spent, 2))
+
+        phase_code = job.current_phase or "estimate"
+        phase = job.get_current_phase_display()
+        phase_tone = _phase_tone(phase_code)
+
+        draw_stage = job.get_draw_stage_display()
+        draw_status = job.get_draw_status_display()
+        draw_status_tone = _draw_status_tone(job.draw_status)
+        draw_amount = _to_number(job.current_draw_amount)
+        if draw_amount <= 0 and contract > 0:
+            draw_amount = round(contract * 0.15, 2)
+
+        collected = _to_number(job.collected_amount)
+        if collected <= 0 and contract > 0 and progress > 0:
+            collected = round((contract * progress) / 100.0, 2)
+        collected = _clamp(collected, 0, contract) if contract > 0 else max(0, collected)
+
+        margin = ((contract - budget_total) / contract * 100) if contract > 0 and budget_total > 0 else 0
+        margin_pct = _to_number(round(margin, 1))
+        margin_tone = "success" if margin >= 30 else ("warning" if margin >= 15 else "danger")
+        collected_pct = int(_clamp(round((collected / contract) * 100), 0, 100)) if contract > 0 else 0
+
+        if budget_total > 0:
+            utilization = (spent / budget_total) * 100
+            score = _clamp(100 - max(0, utilization - 100), 0, 100)
+            budget_health_scores.append(score)
+
+        contract_total += contract
+        collected_total += collected
+        awaiting_total += max(0, contract - collected)
+
+        pipeline.append(
+            {
+                "build": name,
+                "model": model,
+                "phase": phase,
+                "phaseTone": phase_tone,
+                "contract": _format_money(contract),
+            }
+        )
+        budgets.append(
+            {
+                "build": name,
+                "spent": _format_money(spent),
+                "total": _format_money(budget_total),
+                "remaining": _format_money(remaining),
+                "progress": progress,
+            }
+        )
+
+        draws.append(
+            {
+                "build": name,
+                "currentDraw": draw_stage,
+                "status": draw_status,
+                "statusTone": draw_status_tone,
+                "amount": _format_money(draw_amount),
+            }
+        )
+
+        owner_projects.append(
+            {
+                "project": name,
+                "pm": "P. Olson",
+                "contract": _format_money(contract),
+                "margin": f"{_to_number(margin_pct)}%",
+                "marginTone": margin_tone,
+            }
+        )
+        owner_payments.append(
+            {
+                "project": name,
+                "collectedPercent": collected_pct,
+            }
+        )
+        notifications.append(
+            {
+                "title": "Draw update",
+                "message": f"{name}: {draw_stage} is {draw_status.lower()}.",
+                "tone": draw_status_tone,
+            }
+        )
+
+    active_builds = len(jobs)
+    avg_budget_health = (sum(budget_health_scores) / len(budget_health_scores)) if budget_health_scores else 0
+    draws_pending = sum(1 for item in draws if item["status"] == "Current")
+    budget_health = _to_number(round(avg_budget_health, 0))
+
+    manager = {
+        "kpis": [
+            {"label": "My builds", "value": str(active_builds), "mono": True},
+            {
+                "label": "Budget health",
+                "value": f"{int(budget_health)}%",
+                "tone": "success" if budget_health >= 70 else "warning",
+            },
+            {"label": "Draws pending", "value": str(draws_pending), "tone": "warning" if draws_pending else "success"},
+        ],
+        "pipeline": pipeline,
+        "budgets": budgets,
+        "draws": draws,
+    }
+
+    owner = {
+        "kpis": [
+            {"label": "Active builds", "value": str(active_builds), "mono": True},
+            {"label": "Contract value", "value": _format_money(contract_total), "mono": True},
+            {"label": "Collected", "value": _format_money(collected_total), "mono": True, "tone": "success"},
+            {"label": "Awaiting", "value": _format_money(awaiting_total), "mono": True, "tone": "warning"},
+        ],
+        "notifications": notifications[:3] if notifications else [
+            {"title": "No active builds", "message": "Start a new job to populate owner dashboard data.", "tone": "brand"}
+        ],
+        "projects": owner_projects,
+        "payments": owner_payments,
+    }
+
+    return manager, owner
+
+
+def _build_app_seed_data():
+    users = _build_users_data()
+    regions = _build_regions_data()
+    manager, owner = _build_manager_owner_data()
+
+    return {
+        "users": users,
+        "regions": regions,
+        "sales": {
+            "rateCardVersion": timezone.now().strftime("%Y-%m"),
+            "wizard": {
+                "models": _build_sales_model_list(),
+            },
+        },
+        "manager": manager,
+        "owner": owner,
+    }
 
 
 def _build_seed_rates():
@@ -282,6 +692,13 @@ def _build_contract_seed_data():
     return {
         **base,
         "SA": slab_area_options,
+        "MODEL_ALIASES": MODEL_ALIASES,
+        "ROOF_AREA_NAMES": WIZARD_ROOF_AREA_NAMES,
+        "ROOF_TYPES": WIZARD_ROOF_TYPES,
+        "CONC_TYPES": WIZARD_CONC_TYPES,
+        "INT_TRADE_GROUPS": _build_interior_trade_groups(),
+        "SEL_DEFS": _build_selection_defs(),
+        "CUSTOM_TRADE_CATS": _build_custom_trade_categories(),
         "PM": pm,
         "MD": md,
         "RD": rd,
@@ -323,6 +740,10 @@ def sales_turnkey_view(request):
 
 def sales_contract_seed_data_view(request):
     return JsonResponse(_build_contract_seed_data())
+
+
+def app_seed_data_view(request):
+    return JsonResponse(_build_app_seed_data())
 
 
 def manager_view(request):

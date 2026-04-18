@@ -188,7 +188,7 @@
 
       setUser(userId, regionId || "Region");
 
-      fetch("{% static 'data.json' %}", { cache: "no-store" })
+      fetch("{% url 'app_seed_data' %}", { cache: "no-store" })
         .then(function (response) {
           if (!response.ok) return null;
           return response.json();

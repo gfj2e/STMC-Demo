@@ -13,7 +13,7 @@ Design principles:
 """
 
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 import json
 
 
@@ -34,6 +34,29 @@ class Branch(models.Model):
 
     def __str__(self):
         return self.label
+
+
+class AppUser(models.Model):
+    """Simple app user directory for login role routing."""
+    ROLE_CHOICES = [
+        ('sales', 'Sales'),
+        ('pm', 'Project Manager'),
+        ('exec', 'Executive / Owner'),
+    ]
+
+    user_id = models.CharField(max_length=40, unique=True)
+    name = models.CharField(max_length=120)
+    initials = models.CharField(max_length=4)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    title = models.CharField(max_length=80, blank=True)
+    sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.role})"
 
 
 class FloorPlanModel(models.Model):
@@ -318,6 +341,29 @@ class Job(models.Model):
     This is the central entity — everything else references back here.
     """
     MODE_CHOICES = [('shell', 'Shell Only'), ('turnkey', 'Turnkey Interior')]
+    PHASE_CHOICES = [
+        ('estimate', 'Estimate'),
+        ('framing', 'Framing'),
+        ('interior', 'Interior'),
+        ('punch', 'Punch'),
+        ('final', 'Final'),
+        ('closed', 'Closed'),
+    ]
+    DRAW_STAGE_CHOICES = [
+        ('draw1', '1st - Deposit'),
+        ('draw2', '2nd - Slab'),
+        ('draw3', '3rd - Framing'),
+        ('draw4', '4th - Dry-In'),
+        ('draw5', '5th - Finishes'),
+        ('draw6', '6th - Final'),
+    ]
+    DRAW_STATUS_CHOICES = [
+        ('current', 'Current'),
+        ('invoiced', 'Invoiced'),
+        ('paid', 'Paid'),
+        ('hold', 'Hold'),
+        ('closed', 'Closed'),
+    ]
 
     # Step 1 — Customer & Model
     customer_name = models.CharField(max_length=200, blank=True)
@@ -411,6 +457,21 @@ class Job(models.Model):
     ext_labor_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     ext_labor_profit_pct = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     margin_div = models.DecimalField(max_digits=6, decimal_places=4, default=1)
+
+    # ── PROJECT TRACKING (Manager/Owner dashboards) ──
+    current_phase = models.CharField(max_length=12, choices=PHASE_CHOICES, default='estimate')
+    draw_stage = models.CharField(max_length=10, choices=DRAW_STAGE_CHOICES, default='draw1')
+    draw_status = models.CharField(max_length=10, choices=DRAW_STATUS_CHOICES, default='current')
+    progress_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    budget_total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    budget_spent_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    collected_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    current_draw_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

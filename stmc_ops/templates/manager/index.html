@@ -51,7 +51,7 @@
       pm:    "{% url 'manager' %}",
       exec:  "{% url 'owner' %}"
     };
-    window.STMC_DATA_URL = "{% static 'data.json' %}";
+    window.STMC_DATA_URL = "{% url 'app_seed_data' %}";
   </script>
   <script src="{% static 'script.js' %}"  defer></script>
   <script src="{% static 'manager.js' %}" defer></script>
