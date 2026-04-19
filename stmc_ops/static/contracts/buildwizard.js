@@ -234,26 +234,197 @@ function buildConcItems(S){
   return items;
 }
 
+/* Preset customer labor base by model. Exterior upgrades still add on top. */
+var PRESET_LABOR = {
+  "ARROWHEAD LODGE": 63500,
+  "THE BERKLEY": 49500,
+  "BLUEWATER": 19600,
+  "BROOKSIDE": 20528,
+  "BUFFALO RUN": 32000,
+  "CAJUN": 43315,
+  "CEDAR RIDGE": 87000,
+  "COTTONWOOD BEND": 44500,
+  "CREEKSIDE SPECIAL": 41380,
+  "DAUGHERTY": 83500,
+  "EAST FORK DELUXE": 33200,
+  "FOX RUN BARNDOMINIUM": 83000,
+  "FRANKS BARNDOMINIUM": 77500,
+  "THE HADLEY": 61500,
+  "HUNTLEY": 27000,
+  "HUNTLEY 2.0": 30724,
+  "JOHNSON": 44500,
+  "MAPLE GROVE": 69500,
+  "MARTIN LODGE": 49500,
+  "MEADOWS END": 46120,
+  "MINI PETTUS": 48700,
+  "NORTHVIEW LODGE": 37500,
+  "PETTUS": 59847,
+  "THE PETTUS": 59847,
+  "PINEY CREEK": 33260,
+  "RIDGECREST": 69200,
+  "RIVERVIEW COTTAGE": 31500,
+  "ROBERTSON": 46300,
+  "ROBERTSON DELUXE": 49500,
+  "ROCKY TOP": 55060,
+  "SHADY MEADOWS": 26980,
+  "SOUTHERN MONITOR": 38800,
+  "THE SOUTHERN MONITOR": 38800,
+  "SUMMER BREEZE": 78500,
+  "THOMPSON": 50800,
+  "TIMBER CREST": 28700,
+  "WESTVIEW MANOR": 82000,
+  "WHISPERING PINES": 44800,
+  "WILLOW CREEK": 25200,
+  "WOODSIDE SPECIAL": 44000,
+  "WOODSIDE SPECIAL DELUXE": 44000
+};
+
+/* Remote branch interior contract overrides + material freight/transit markup. */
+var INT_CONTRACT_REMOTE = {
+  "ARROWHEAD LODGE": {t: 221067},
+  "THE BERKLEY": {t: 163020},
+  "BLUEWATER": {t: 118580},
+  "BROOKSIDE": {t: 115500},
+  "BUFFALO RUN": {t: 161040},
+  "CAJUN": {t: 178200},
+  "CEDAR RIDGE": {t: 358710},
+  "COTTONWOOD BEND": {t: 205029},
+  "CREEKSIDE SPECIAL": {t: 190080},
+  "DAUGHERTY": {t: 302267},
+  "EAST FORK DELUXE": {t: 150150},
+  "FOX RUN BARNDOMINIUM": {t: 303600},
+  "FRANKS BARNDOMINIUM": {t: 331760},
+  "THE HADLEY": {t: 377190},
+  "HUNTLEY": {t: 166320},
+  "HUNTLEY 2.0": {t: 166320},
+  "JOHNSON": {t: 169290},
+  "MAPLE GROVE": {t: 331320},
+  "MARTIN LODGE": {t: 232848},
+  "MEADOWS END": {t: 242330},
+  "MINI PETTUS": {t: 225060},
+  "NORTHVIEW LODGE": {t: 190080},
+  "PETTUS": {t: 272026},
+  "THE PETTUS": {t: 272026},
+  "PINEY CREEK": {t: 165528},
+  "RIDGECREST": {t: 262636},
+  "RIVERVIEW COTTAGE": {t: 184437},
+  "ROBERTSON": {t: 222750},
+  "ROBERTSON DELUXE": {t: 247500},
+  "ROCKY TOP": {t: 250958},
+  "SHADY MEADOWS": {t: 115500},
+  "SOUTHERN MONITOR": {t: 233035},
+  "THE SOUTHERN MONITOR": {t: 233035},
+  "SUMMER BREEZE": {t: 402380},
+  "THOMPSON": {t: 250800},
+  "TIMBER CREST": {t: 123585},
+  "WESTVIEW MANOR": {t: 389158},
+  "WHISPERING PINES": {t: 198000},
+  "WILLOW CREEK": {t: 137445},
+  "WOODSIDE SPECIAL": {t: 190080},
+  "WOODSIDE SPECIAL DELUXE": {t: 179520}
+};
+
+var MFT_PCT = {
+  "ARROWHEAD LODGE": 0.15,
+  "THE BERKLEY": 0.15,
+  "BLUEWATER": 0.15,
+  "BROOKSIDE": 0.15,
+  "BUFFALO RUN": 0.15,
+  "CAJUN": 0.15,
+  "CEDAR RIDGE": 0.22,
+  "COTTONWOOD BEND": 0.15,
+  "CREEKSIDE SPECIAL": 0.15,
+  "DAUGHERTY": 0.22,
+  "EAST FORK DELUXE": 0.15,
+  "FOX RUN BARNDOMINIUM": 0.20,
+  "FRANKS BARNDOMINIUM": 0.22,
+  "THE HADLEY": 0.22,
+  "HUNTLEY": 0.15,
+  "HUNTLEY 2.0": 0.15,
+  "JOHNSON": 0.15,
+  "MAPLE GROVE": 0.22,
+  "MARTIN LODGE": 0.20,
+  "MEADOWS END": 0.20,
+  "MINI PETTUS": 0.20,
+  "NORTHVIEW LODGE": 0.15,
+  "PETTUS": 0.22,
+  "THE PETTUS": 0.22,
+  "PINEY CREEK": 0.15,
+  "RIDGECREST": 0.22,
+  "RIVERVIEW COTTAGE": 0.15,
+  "ROBERTSON": 0.20,
+  "ROBERTSON DELUXE": 0.20,
+  "ROCKY TOP": 0.20,
+  "SHADY MEADOWS": 0.15,
+  "SOUTHERN MONITOR": 0.20,
+  "THE SOUTHERN MONITOR": 0.20,
+  "SUMMER BREEZE": 0.22,
+  "THOMPSON": 0.20,
+  "TIMBER CREST": 0.15,
+  "WESTVIEW MANOR": 0.22,
+  "WHISPERING PINES": 0.20,
+  "WILLOW CREEK": 0.15,
+  "WOODSIDE SPECIAL": 0.15,
+  "WOODSIDE SPECIAL DELUXE": 0.15
+};
+
+function isRemoteBranch(){
+  return STATE.branch === "morristown" || STATE.branch === "hopkinsville";
+}
+
+function getIntContractForBranch(model){
+  var m = canonicalModel(model || STATE.model);
+  if(isRemoteBranch()){
+    var remote = INT_CONTRACT_REMOTE[m];
+    if(remote && typeof remote.t === "number") return remote.t;
+  }
+  var base = INT_CONTRACT[m];
+  return (base && typeof base.t === "number") ? base.t : 0;
+}
+
+function getMFTMarkup(model){
+  if(!isRemoteBranch()) return 0;
+  var m = canonicalModel(model || STATE.model);
+  var pct = MFT_PCT[m] || 0;
+  return Math.round(pn(STATE.customer.p10) * pct);
+}
+
 function buildSalesItems(S){
   S = S || STATE;
   var E = S.ext, s = P.sales, over100 = S.miles >= 1, items = [];
   function add(l,q,r,u,sec){ if(q<=0||r<=0) return; items.push({label:l,qty:q,rate:r,cost:q*r,unit:u,section:sec||"Labor"}); }
-  var bSF = baseSF(E);
-  add("Base labor ("+$(bSF)+" SF)", bSF, s.base, "SF");
-  if(E.foundType === "crawl") add("Framing over crawl/basement", cSF(E), s.crawl, "SF");
-  if(rfSteep(E) > 0) add("Roof 9/12+ pitch add", rfSteep(E), s.steepAdd, "SF");
-  if(rfSsSF(E) > 0) add("Standing seam roof add", rfSsSF(E), s.ssAdd, "SF");
-  if(E.wallType !== "Metal") add("Siding upgrade ("+E.wallType+")", pn(E.wallTuff), s.sidingAdd, "SF");
-  if(E.stoneUpg && pn(E.wallStone) > 0) add("Stone area", pn(E.wallStone), over100 ? s.stoneO : s.stoneW, "SF");
-  if(pn(E.chimQty) > 0) add("Stone chimney/roofline lifts", pn(E.chimQty), s.stoneLift, "ea");
-  if(tgSF(E) > 0) add("T&G porch ceilings", tgSF(E), s.tg, "SF");
-  if(pn(E.awnQty) > 0) add("Timber framed awnings", pn(E.awnQty), s.awning, "ea");
-  if(pn(E.cupQty) > 0) add("Cupola installation", pn(E.cupQty), s.cupola, "ea");
+  var m = canonicalModel(S.model);
+  var preset = PRESET_LABOR[m];
+
+  if(preset && m !== "CUSTOM FLOOR PLAN"){
+    items.push({label:"Base Customer Labor - "+m, qty:1, rate:preset, cost:preset, unit:"ea", section:"Labor"});
+    if(rfSsSF(E) > 0) add("Standing seam roof add", rfSsSF(E), s.ssAdd, "SF");
+    if(E.wallType !== "Metal") add("Siding upgrade ("+E.wallType+")", pn(E.wallTuff), s.sidingAdd, "SF");
+    if(E.stoneUpg && pn(E.wallStone) > 0) add("Stone area", pn(E.wallStone), over100 ? s.stoneO : s.stoneW, "SF");
+    if(pn(E.chimQty) > 0) add("Stone chimney/roofline lifts", pn(E.chimQty), s.stoneLift, "ea");
+    if(tgSF(E) > 0) add("T&G porch ceilings", tgSF(E), s.tg, "SF");
+    if(pn(E.awnQty) > 0) add("Timber framed awnings", pn(E.awnQty), s.awning, "ea");
+    if(pn(E.cupQty) > 0) add("Cupola installation", pn(E.cupQty), s.cupola, "ea");
+  } else {
+    var bSF = baseSF(E);
+    add("Base labor ("+$(bSF)+" SF)", bSF, s.base, "SF");
+    if(E.foundType === "crawl") add("Framing over crawl/basement", cSF(E), s.crawl, "SF");
+    if(rfSteep(E) > 0) add("Roof 9/12+ pitch add", rfSteep(E), s.steepAdd, "SF");
+    if(rfSsSF(E) > 0) add("Standing seam roof add", rfSsSF(E), s.ssAdd, "SF");
+    if(E.wallType !== "Metal") add("Siding upgrade ("+E.wallType+")", pn(E.wallTuff), s.sidingAdd, "SF");
+    if(E.stoneUpg && pn(E.wallStone) > 0) add("Stone area", pn(E.wallStone), over100 ? s.stoneO : s.stoneW, "SF");
+    if(pn(E.chimQty) > 0) add("Stone chimney/roofline lifts", pn(E.chimQty), s.stoneLift, "ea");
+    if(tgSF(E) > 0) add("T&G porch ceilings", tgSF(E), s.tg, "SF");
+    if(pn(E.awnQty) > 0) add("Timber framed awnings", pn(E.awnQty), s.awning, "ea");
+    if(pn(E.cupQty) > 0) add("Cupola installation", pn(E.cupQty), s.cupola, "ea");
+  }
   // Concrete pass-through
   buildConcItems(S).forEach(function(ci){ items.push(ci); });
-  // Punch (floor at P.punch = $2,500)
-  var pa = Math.max(P.punch, pn(E.punchAmt) || 0);
-  add("Punch", 1, pa, "ea", "Other");
+  // Punch is a separate line only in calculator-mode models.
+  if(!preset || m === "CUSTOM FLOOR PLAN"){
+    var pa = Math.max(P.punch, pn(E.punchAmt) || 0);
+    add("Punch", 1, pa, "ea", "Other");
+  }
   (E.customCharges || []).forEach(function(cc){
     if(pn(cc.qty) > 0 && pn(cc.rate) > 0)
       add(cc.desc || "Custom charge", pn(cc.qty), pn(cc.rate), cc.unit || "SF", "Custom");
@@ -517,11 +688,14 @@ function wizGoTo(idx){
    until Steps 2–4 wire in customer labor + concrete in Step 2 build.
    ═══════════════════════════════════════════════════════════════ */
 function computeShellTotal(){
-  // Shell = P10 Material + Customer Labor + Concrete (punch + concrete are rolled into sales items)
+  // Shell = P10 Material + MFT (remote only) + customer labor + optional detached-shop adders.
   var p10 = pn(STATE.customer.p10);
-  if(!STATE.model) return p10;  // no model = just whatever P10 is entered
+  var mft = getMFTMarkup();
+  var detP10 = pn(STATE.ext.detShopP10 || 0);
+  var detLabor = pn(STATE.ext.detShopLabor || 0);
+  if(!STATE.model) return p10 + mft + detP10 + detLabor;
   var labor = sumItems(buildSalesItems());
-  return p10 + labor;
+  return p10 + mft + labor + detP10 + detLabor;
 }
 function computeTurnkeyTotal(){
   // Shell + interior contract (preset INT_CONTRACT + CAD, or custom reverse-margin)
@@ -1576,7 +1750,8 @@ function renderStep5(){
     {k:"halfBaths", lbl:"Half Bathrooms",          hint:"From plan. Cascades to fixture points."},
     {k:"fixtures",  lbl:"Plumbing Fixture Points", hint:"Auto: fullBaths×2 + halfBaths×2 + 4 · override if needed"},
     {k:"closetQty", lbl:"Bedroom Closet Qty",      hint:"Defaults to bedroom count · drives closet rod budget"},
-    {k:"doors",     lbl:"Interior Door Count",      hint:"Interior door slabs (prehung)"}
+    {k:"doors",     lbl:"Interior Door Count",      hint:"Interior door slabs (prehung)"},
+    {k:"laundrySink", lbl:"Laundry Sink Qty",      hint:"0 = no sink · 1 = laundry sink present"}
   ];
   metricFields.forEach(function(f){
     h += '<div class="upg-row">';
@@ -1586,11 +1761,6 @@ function renderStep5(){
     h +=   stepperHTML('int.'+f.k, pi(I[f.k]), 'stepIntMetric');
     h += '</div>';
   });
-  // Laundry Sink Y/N
-  h += '<div class="upg-row">';
-  h +=   '<span class="upg-label"><strong>Laundry Sink</strong> <span style="font-size:11px;color:var(--g500);margin-left:6px">· Model-specific default</span></span>';
-  h +=   yesNoSelectHTML('int.laundrySink', I.laundrySink, 'updIntSelect');
-  h += '</div>';
   h +=   '</div>';
   h += '</div>';
 
@@ -1696,7 +1866,9 @@ function renderCadChargesInline(){
 function stepIntMetric(path, delta){
   var key = path.split('.')[1];
   var cur = pi(STATE.int[key]);
-  STATE.int[key] = Math.max(0, cur + delta);
+  var next = Math.max(0, cur + delta);
+  if(key === "laundrySink") next = Math.min(1, next);
+  STATE.int[key] = next;
   // Cascade: full/half baths → fixture points (unless user manually overrode fixtures)
   if(key === "fullBaths" || key === "halfBaths"){
     STATE.int.fixtures = STATE.int.fullBaths * 2 + STATE.int.halfBaths * 2 + 4;
@@ -1894,12 +2066,17 @@ function getEffectiveCredits(S){
 }
 
 function computeInteriorTrueCost(S){
-  // Base trade costs + CAD×0.80 + upgrades×0.80 - effectiveCredits (credits at full value).
+  // Base trade costs + CAD×0.80 + upgrades×0.80 - effectiveCredits.
+  // For custom floor plans, cabinet CAD charges are excluded from true cost.
   S = S || STATE;
   if(!S.int) return 0;
   var total = 0;
+  var custom = isCustomFloorPlan();
   INT_TRADE_GROUPS.forEach(function(tg){ total += calcIntTradeBase(tg, S); });
-  computeCadCharges(S).forEach(function(c){ total += c.cost * 0.80; });
+  computeCadCharges(S).forEach(function(c){
+    if(custom && c.trade === "cabinets") return;
+    total += c.cost * 0.80;
+  });
   total += getInteriorUpgradesTotal(S) * 0.80;
   total -= getEffectiveCredits(S);
   return Math.max(0, total);
@@ -1911,15 +2088,22 @@ function computeInteriorContractPrice(S){
   var upgrades = getInteriorUpgradesTotal(S);
   var effectiveCredits = getEffectiveCredits(S);
   if(isCustomFloorPlan()){
-    // Custom: derive contract from true cost WITHOUT credits, then subtract credits face-value.
+    // Custom: reverse-margin non-cabinet true cost, then add cabinet CAD flat customer charge.
     var trueCostNoCredit = 0;
-    INT_TRADE_GROUPS.forEach(function(tg){ trueCostNoCredit += calcIntTradeBase(tg, S); });
-    computeCadCharges(S).forEach(function(c){ trueCostNoCredit += c.cost * 0.80; });
+    var flatCabCharge = 0;
+    INT_TRADE_GROUPS.forEach(function(tg){
+      if(tg.key === "cabinets") return;
+      trueCostNoCredit += calcIntTradeBase(tg, S);
+    });
+    computeCadCharges(S).forEach(function(c){
+      if(c.trade === "cabinets") flatCabCharge += c.cost;
+      else trueCostNoCredit += c.cost * 0.80;
+    });
     trueCostNoCredit += upgrades * 0.80;
-    return Math.round(trueCostNoCredit / 0.70 - effectiveCredits);
+    return Math.round(trueCostNoCredit / 0.70 + flatCabCharge - effectiveCredits);
   }
   // Preset: base + CAD + upgrades - credits (capped so never below base).
-  var base = INT_CONTRACT[S.model] ? INT_CONTRACT[S.model].t : 0;
+  var base = getIntContractForBranch(S.model);
   var cadTotal = 0;
   computeCadCharges(S).forEach(function(c){ cadTotal += c.cost; });
   return base + cadTotal + upgrades - effectiveCredits;
@@ -3767,23 +3951,38 @@ function computeUpgradesByTrade(S){
 }
 
 function renderStep9(){
+  var isShell = STATE.jobMode === "shell";
+
+  // Turnkey needs interior state initialized; shell doesn't but it's harmless
   if(!STATE.int) initInteriorState();
   else applyIntMetrics();
-  initCabUpgradesState();
-  initSelState();
+  if(!isShell){ initCabUpgradesState(); initSelState(); }
 
   var h = '';
   var I = STATE.int || {};
+  var deckAudit = !!STATE.ext.deckShown;
+  var deckKeys = {deckRoof:1, deckNR:1, trex:1};
+  var milesKey = STATE.miles >= 1 ? "o" : "u";
+  var milesLabel = milesKey === "o" ? "Over 100 Miles" : "Under 100 Miles";
+  var stdRoofSF = rfMetalStd();
+  var stdRoofRate = STATE.ext.g26 ? 1.5 : (P.ctr.r612[milesKey] || 0);
+  var overrideCount = Object.keys(STATE.ext.ctrOverrides || {}).length;
 
-  // ── PART A: Exterior Contractor Calculator (editable) ──
+  // Deck audit banner (if flagged)
+  if(deckAudit){
+    h += '<div class="banner banner-amber" style="margin-bottom:10px"><strong>Deck Framing audit needed</strong> - deck-related line items are highlighted below in amber. Verify quantities before finalizing the contractor payout.</div>';
+  }
+
+  // PART A: Exterior Contractor Calculator (editable) - both modes
   var ctrItems = buildCtrItems();
   var ctrSections = getSections(ctrItems);
   var ctrTotal = sumItems(ctrItems);
 
   h += '<div class="card">';
-  h +=   '<div class="section-hdr section-hdr-red"><span>Part A · Contractor Labor Budget</span><span class="badge">'+fmt(ctrTotal)+'</span></div>';
+  h +=   '<div class="section-hdr section-hdr-red"><span>'+(isShell?'Contractor Labor Budget':'Part A · Contractor Labor Budget')+'</span><span class="badge">'+fmt(ctrTotal)+'</span></div>';
   h +=   '<div class="card-pad">';
   h +=     '<div class="banner banner-info">Auto-populated from Steps 2–3. <strong>All possible labor line items are shown</strong> — the PM can enter or adjust any quantity to match the actual contractor payout. Zero-qty rows are muted but remain editable.</div>';
+  h +=     '<div class="banner banner-amber" style="margin-top:8px">Calc fingerprint: <strong>'+esc(milesLabel)+'</strong> bucket · 26g roof <strong>'+(STATE.ext.g26?"Yes":"No")+'</strong> · Std metal roof <strong>'+$(stdRoofSF)+'</strong> SF @ <strong>'+fmtC(stdRoofRate)+'/SF</strong> · Manual overrides <strong>'+$(overrideCount)+'</strong></div>';
   ctrSections.forEach(function(sec){
     var secItems = ctrItems.filter(function(i){ return i.section === sec; });
     if(secItems.length === 0) return;
@@ -3793,8 +3992,9 @@ function renderStep9(){
     h +=     '<div class="row-hdr" style="grid-template-columns:2.2fr 100px 100px 120px"><div>Item</div><div style="text-align:right">Qty</div><div style="text-align:right">Rate</div><div style="text-align:right">Cost</div></div>';
     secItems.forEach(function(it){
       var zeroStyle = it.qty === 0 ? 'opacity:0.55' : '';
-      h +=   '<div class="row-line" style="grid-template-columns:2.2fr 100px 100px 120px;'+zeroStyle+'">';
-      h +=     '<div style="font-size:12px">'+esc(it.label)+'</div>';
+      var deckHL = deckAudit && deckKeys[it.key] ? 'background:#FFFBEB;border-left:3px solid #F59E0B;' : '';
+      h +=   '<div class="row-line" style="grid-template-columns:2.2fr 100px 100px 120px;'+zeroStyle+deckHL+'">';
+      h +=     '<div style="font-size:12px">'+esc(it.label)+(deckAudit && deckKeys[it.key] ? ' <span style="color:#B45309;font-size:10px">AUDIT</span>' : '')+'</div>';
       h +=     '<input class="inp mono num" type="number" step="0.25" min="0" value="'+(it.qty||"")+'" placeholder="0" style="max-width:90px" oninput="updCtrOverride(\''+it.key+'\', this.value)">';
       h +=     '<div class="num" style="font-size:12px;color:var(--g600)">'+fmtC(it.rate)+'/'+esc(it.unit)+'</div>';
       h +=     '<div class="row-cost" id="ctr-cost-'+it.key+'">'+(it.qty>0?fmt(it.cost):"—")+'</div>';
@@ -3807,14 +4007,14 @@ function renderStep9(){
   h +=   '</div>';
   h += '</div>';
 
-  // ── PART B: Contractor Summary ──
+  // PART B: Contractor Summary - both modes
   var salesItems = buildSalesItems();
   var concTotal = sumItems(buildConcItems());
   var custLabor = sumItems(salesItems) - concTotal;
   var laborProfit = custLabor - ctrTotal;
   var laborProfitPct = custLabor > 0 ? (laborProfit / custLabor * 100) : 0;
   h += '<div class="card">';
-  h +=   '<div class="section-hdr"><span>Part B · Contractor Summary</span></div>';
+  h +=   '<div class="section-hdr"><span>'+(isShell?'Contractor Summary':'Part B · Contractor Summary')+'</span></div>';
   h +=   '<div class="card-pad">';
   h +=     '<div class="field-row" style="gap:8px">';
   h +=       '<div class="kpi-box" style="flex:1"><div class="kpi-lbl">Customer Exterior Labor</div><div class="kpi-val red">'+fmt(custLabor)+'</div></div>';
@@ -3824,7 +4024,23 @@ function renderStep9(){
   h +=   '</div>';
   h += '</div>';
 
-  // ── PART D: Interior Base Budget Table (16 trades) ──
+  // SHELL MODE: just the contractor PDF button
+  if(isShell){
+    h += '<div class="card">';
+    h +=   '<div class="section-hdr"><span>Generate Budget PDF</span></div>';
+    h +=   '<div class="card-pad" style="display:flex;gap:10px;flex-wrap:wrap">';
+    h +=     '<button class="nav-btn nav-next" style="flex:1;min-width:220px" onclick="printContractorPDF()">Contractor Labor PDF</button>';
+    h +=   '</div>';
+    h +=   '<div style="padding:0 16px 14px;font-size:11px;color:var(--g500);line-height:1.5">Internal document — not customer-facing. Opens your browser\'s native print dialog.</div>';
+    h += '</div>';
+
+    document.getElementById("stepContainer").innerHTML = h;
+    return;
+  }
+
+  // TURNKEY ONLY: Parts D, F, G below
+
+  // PART D: Interior Base Budget Table (16 trades)
   var livingSF = livSF();
   var drivers = {
     livingSF: livingSF, cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
@@ -3848,7 +4064,6 @@ function renderStep9(){
   h += '<div class="card">';
   h +=   '<div class="section-hdr section-hdr-red"><span>Part D · Interior Budget</span><span class="badge">'+fmt(intBaseTotal+intUpgTotal)+'</span></div>';
   h +=   '<div class="card-pad">';
-  // Editable metrics summary
   h +=     '<div class="sum-grid" style="margin-bottom:14px">';
   h +=       '<div class="sum-box"><div class="sum-lbl">Living SF</div><div class="sum-val">'+$(livingSF)+'</div></div>';
   h +=       '<div class="sum-box"><div class="sum-lbl">Cabinet LF</div><div class="sum-val">'+$(pn(I.cabLF))+'</div></div>';
@@ -3863,7 +4078,6 @@ function renderStep9(){
   h +=       '<div class="sum-box"><div class="sum-lbl">Insulation SF</div><div class="sum-val">'+$(pn(I.insulationSF))+'</div></div>';
   h +=       '<div class="sum-box"><div class="sum-lbl">Flooring SF</div><div class="sum-val">'+$(pn(I.flooringSF))+'</div></div>';
   h +=     '</div>';
-  // Budget table
   h +=     '<table class="ps-table">';
   h +=       '<thead><tr><th>Trade</th><th style="text-align:right">Base Cost</th><th style="text-align:right">Upgrades</th><th style="text-align:right">Total</th></tr></thead>';
   h +=       '<tbody>';
@@ -3875,7 +4089,6 @@ function renderStep9(){
     h +=       '<td class="cost" style="'+upgStyle+'">'+upgText+'</td>';
     h +=       '<td class="cost" style="font-weight:600">'+fmt(row.total)+'</td>';
     h +=     '</tr>';
-    // Rate card detail sub-rows
     (row.rates || []).forEach(function(rk){
       var rc = INT_RC[rk];
       if(!rc) return;
@@ -3891,7 +4104,7 @@ function renderStep9(){
   h +=   '</div>';
   h += '</div>';
 
-  // ── PART F: Full Combined Budget ──
+  // PART F: Full Combined Budget
   var combinedTotal = ctrTotal + intBaseTotal + intUpgTotal;
   h += '<div class="card">';
   h +=   '<div class="section-hdr"><span>Part F · Combined Budget</span></div>';
@@ -3905,7 +4118,7 @@ function renderStep9(){
   h +=   '</div>';
   h += '</div>';
 
-  // ── PART G: Budget PDF Buttons ──
+  // PART G: Budget PDF Buttons
   h += '<div class="card">';
   h +=   '<div class="section-hdr"><span>Generate Budget PDFs</span></div>';
   h +=   '<div class="card-pad" style="display:flex;gap:10px;flex-wrap:wrap">';
