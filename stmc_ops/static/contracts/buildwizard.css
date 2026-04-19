@@ -161,6 +161,8 @@ body{min-height:100vh;padding-bottom:80px}
   font-size:12px;transition:all .15s;
 }
 .footer-btn:hover{background:var(--g50);border-color:var(--g500)}
+.footer-btn-danger{color:#b91c1c;border-color:#fca5a5}
+.footer-btn-danger:hover{background:#fff1f2;border-color:#b91c1c}
 .footer-right{color:var(--g500);font-family:var(--font-mono);font-size:11px}
 .footer-right.saved{color:var(--green)}
 

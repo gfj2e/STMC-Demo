@@ -1238,7 +1238,7 @@ function renderStep4(){
     ["SF","LF","Each"].forEach(function(u){ h += '<option value="'+u+'"'+((cc.unit||"SF")===u?' selected':'')+'>'+u+'</option>'; });
     h +=       '</select>';
     h +=       '<input class="inp mono num" type="number" min="0" value="'+(pn(cc.qty)||"")+'" placeholder="0" oninput="onConcCustomField('+i+', \'qty\', this.value)">';
-    h +=       '<div class="row-cost">'+(cost>0?fmt(cost):"—")+'</div>';
+    h +=       '<div class="row-cost" id="concCost_'+i+'">'+(cost>0?fmt(cost):"—")+'</div>';
     h +=       '<button class="row-del" onclick="onConcCustomDelete('+i+')">×</button>';
     h +=     '</div>';
   });
@@ -1248,24 +1248,31 @@ function renderStep4(){
   h += '</div>';
 
   // ── SUMMARY (read-only) ──
-  if(cItems.length > 0){
-    h += '<div class="card">';
-    h +=   '<div class="section-hdr"><span>Concrete Summary</span></div>';
-    h +=   '<div class="sec" style="padding:0">';
-    h +=     '<table class="ps-table">';
-    h +=       '<thead><tr><th>Description</th><th style="text-align:right">Details</th><th style="text-align:right">Amount</th></tr></thead>';
-    h +=       '<tbody>';
-    cItems.forEach(function(it){
-      h +=     '<tr><td>'+esc(it.label)+'</td><td class="num">'+$(it.qty)+' '+it.unit+' × '+fmtC(it.rate)+'</td><td class="cost">'+fmt(it.cost)+'</td></tr>';
-    });
-    h +=       '</tbody>';
-    h +=     '</table>';
-    h +=   '</div>';
-    h +=   '<div style="padding:0 16px 16px"><div class="total-bar"><span class="total-lbl">Concrete Total</span><span class="total-val">'+fmt(cTotal)+'</span></div></div>';
-    h += '</div>';
-  }
+  h += '<div id="concSummaryCard">';
+  h += buildConcSummaryHTML(cItems, cTotal);
+  h += '</div>';
 
   document.getElementById("stepContainer").innerHTML = h;
+}
+
+function buildConcSummaryHTML(cItems, cTotal){
+  if(!cItems || cItems.length === 0) return '';
+  var h = '';
+  h += '<div class="card">';
+  h +=   '<div class="section-hdr"><span>Concrete Summary</span></div>';
+  h +=   '<div class="sec" style="padding:0">';
+  h +=     '<table class="ps-table">';
+  h +=       '<thead><tr><th>Description</th><th style="text-align:right">Details</th><th style="text-align:right">Amount</th></tr></thead>';
+  h +=       '<tbody>';
+  cItems.forEach(function(it){
+    h +=     '<tr><td>'+esc(it.label)+'</td><td class="num">'+$(it.qty)+' '+it.unit+' × '+fmtC(it.rate)+'</td><td class="cost">'+fmt(it.cost)+'</td></tr>';
+  });
+  h +=       '</tbody>';
+  h +=     '</table>';
+  h +=   '</div>';
+  h +=   '<div style="padding:0 16px 16px"><div class="total-bar"><span class="total-lbl">Concrete Total</span><span class="total-val">'+fmt(cTotal)+'</span></div></div>';
+  h += '</div>';
+  return h;
 }
 
 function onConcUseSlab(){ STATE.conc.sqft = totSlab(); renderCurrentStep(); }
@@ -1285,7 +1292,27 @@ function onConcCustomField(i, field, val){
   var cc = STATE.conc.customCharges[i];
   if(field === "desc" || field === "unit") cc[field] = val;
   else cc[field] = pn(val);
-  if(field === "unit") renderCurrentStep(); else refreshLiveTotals();
+  if(field === "unit"){
+    renderCurrentStep();
+    return;
+  }
+  // Update cost cell in-place (no focus loss)
+  if(field === "rate" || field === "qty"){
+    var costEl = document.getElementById("concCost_"+i);
+    if(costEl){
+      var cost = pn(cc.rate) * pn(cc.qty);
+      costEl.textContent = cost > 0 ? fmt(cost) : "—";
+    }
+    // Re-render the summary card in-place
+    var summaryEl = document.getElementById("concSummaryCard");
+    if(summaryEl){
+      var cItems = buildConcItems();
+      var cTotal = sumItems(cItems);
+      summaryEl.innerHTML = buildConcSummaryHTML(cItems, cTotal);
+    }
+  }
+  renderRunningTotal();
+  scheduleSave();
 }
 function onConcCustomAdd(){
   STATE.conc.customCharges.push({desc:"", rate:0, unit:"SF", qty:0});
@@ -3383,7 +3410,15 @@ function renderStep8(){
   var tkTotal = isShell ? shellTotal : (shellTotal + (typeof intContract !== "undefined" ? intContract : 0));
   h += renderDrawScheduleHTML(isShell, p10, concTotal, custLabor, shellTotal, tkTotal);
 
-  // ── PDF action buttons ──
+  // ── Save & PDF action buttons ──
+  h += '<div class="card">';
+  h +=   '<div class="section-hdr"><span>Save Contract</span></div>';
+  h +=   '<div class="card-pad">';
+  h +=     '<button id="saveContractBtn" class="nav-btn nav-next" style="width:100%;font-size:15px;padding:12px 20px" onclick="saveContract()"> Save Contract to Dashboard</button>';
+  h +=     '<div style="margin-top:8px;font-size:11px;color:var(--g500)">Saves this contract to the server — it will immediately appear on the Manager and Owner dashboards.</div>';
+  h +=   '</div>';
+  h += '</div>';
+
   h += '<div class="card">';
   h +=   '<div class="section-hdr"><span>Generate PDFs</span></div>';
   h +=   '<div class="card-pad" style="display:flex;gap:10px;flex-wrap:wrap">';
@@ -4072,6 +4107,86 @@ function setSaveStatus(txt, saved){
   if(!el) return;
   el.textContent = txt;
   el.className = "footer-right"+(saved?" saved":"");
+}
+
+/* ── Reset all inputs for a new contract ── */
+function resetAll(){
+  if(!confirm("Clear all inputs and start a new contract? This cannot be undone.")) return;
+  // Cancel any pending autosave timer so it can't overwrite the cleared state
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+  localStorage.removeItem(LS_AUTOSAVE_KEY);
+  STATE = defaultState();
+  renderCurrentStep();
+  setSaveStatus("Ready", true);
+  showToast("Contract cleared — ready for new entry.");
+}
+
+/* ── Server-side contract save ── */
+function saveContract(){
+  var btn = document.getElementById("saveContractBtn");
+  if(btn){ btn.disabled = true; btn.textContent = "Saving…"; }
+
+  // Build draw rows from the same numbers renderStep8 uses
+  var items      = buildSalesItems();
+  var concItems  = buildConcItems();
+  var concTotal  = sumItems(concItems);
+  var custLabor  = sumItems(items) - concTotal;
+  var p10        = pn(STATE.customer.p10);
+  var shellTotal = p10 + custLabor + concTotal;
+  var isShell    = STATE.jobMode === "shell";
+  var deposit    = 2500;
+  var draw1      = Math.max(0, p10 - deposit);
+  var turnkeyTotal = 0;
+  if(!isShell){
+    var intContract = computeInteriorContractPrice ? computeInteriorContractPrice() : 0;
+    turnkeyTotal = shellTotal + intContract;
+  }
+  var total = isShell ? shellTotal : turnkeyTotal;
+  var draw4 = isShell ? 0 : Math.round(total * 0.20);
+  var draw5 = isShell ? 0 : Math.round(total * 0.20);
+  var draw6 = isShell ? 0 : Math.max(0, total - deposit - draw1 - concTotal - custLabor - draw4 - draw5);
+
+  var allDraws = [
+    {n:0, l:"Good Faith Deposit",                   a: deposit},
+    {n:1, l:"1st Home Draw (Loan Closing)",          a: draw1},
+    {n:3, l:"2nd Home Draw (Concrete Completion)",   a: concTotal},
+    {n:5, l:"3rd Home Draw (Framing Completion)",    a: custLabor},
+    {n:6, l:"4th Home Draw (Rough-In)",             a: draw4},
+    {n:7, l:"5th Home Draw (Drywall/Cabinets)",     a: draw5},
+    {n:8, l:"6th Home Draw (Final/CO)",             a: draw6}
+  ];
+  var draws = allDraws.filter(function(d){ return d.a > 0; });
+
+  var payload = {
+    customer:     STATE.customer,
+    model:        STATE.model,
+    branch:       STATE.branch,
+    jobMode:      STATE.jobMode,
+    p10:          p10,
+    shellTotal:   shellTotal,
+    turnkeyTotal: turnkeyTotal,
+    draws:        draws
+  };
+
+  fetch("/stmc_ops/app/save-contract/", {
+    method:  "POST",
+    headers: {"Content-Type": "application/json"},
+    body:    JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.ok){
+      if(btn){ btn.textContent = "✅ Contract Saved!"; btn.style.background = "#1a6e3c"; }
+      setSaveStatus("Contract saved to server", true);
+    } else {
+      if(btn){ btn.disabled = false; btn.textContent = "💾 Save Contract"; }
+      alert("Save failed: " + (data.error || "unknown error"));
+    }
+  })
+  .catch(function(err){
+    if(btn){ btn.disabled = false; btn.textContent = "💾 Save Contract"; }
+    alert("Network error saving contract: " + err);
+  });
 }
 
 function relTime(ts){

@@ -850,3 +850,98 @@ def owner_view(request):
 
 def sales_overview_view(request):
     return render(request, "sales/overview/index.html")
+
+
+@csrf_exempt
+def save_contract_view(request):
+    """
+    POST — creates or updates a Job + JobDraw rows from wizard STATE.
+
+    Expected JSON body:
+    {
+      "customer":  { "name", "addr", "rep", "order" },
+      "model":     "CAJUN",
+      "branch":    "summertown",
+      "jobMode":   "shell" | "turnkey",
+      "p10":       95000,
+      "shellTotal": 142000,
+      "turnkeyTotal": 195000,   // omit / 0 for shell
+      "draws": [
+        { "n": 0, "l": "Good Faith Deposit", "a": 2500 },
+        { "n": 1, "l": "1st Home Draw (Loan Closing)", "a": 92500 },
+        ...
+      ]
+    }
+
+    Returns: { "ok": true, "job_id": <int> }
+    """
+    import json as _json
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        body = _json.loads(request.body)
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    # ── Basic fields ──
+    customer = body.get("customer") or {}
+    customer_name = (customer.get("name") or "").strip()
+    customer_addr = (customer.get("addr") or "").strip()
+    sales_rep     = (customer.get("rep")  or "").strip()
+    order_number  = (customer.get("order") or "").strip()
+    model_name    = (body.get("model") or "").strip()
+    branch_key    = (body.get("branch") or "").strip()
+    job_mode      = body.get("jobMode") or "shell"
+    p10           = int(body.get("p10") or 0)
+    shell_total   = int(body.get("shellTotal") or 0)
+    turnkey_total = int(body.get("turnkeyTotal") or 0)
+    draws_payload = body.get("draws") or []
+
+    if not customer_name:
+        return JsonResponse({"error": "customer.name is required"}, status=400)
+
+    # ── Resolve FKs ──
+    branch_obj = Branch.objects.filter(key=branch_key).first()
+    plan_obj   = FloorPlanModel.objects.filter(name__iexact=model_name).first()
+
+    contract_total = turnkey_total if job_mode == "turnkey" and turnkey_total else shell_total
+
+    # ── Create or update Job (match on customer_name + order_number) ──
+    lookup = {"customer_name": customer_name}
+    if order_number:
+        lookup["order_number"] = order_number
+
+    job, created = Job.objects.update_or_create(
+        **lookup,
+        defaults={
+            "customer_addr": customer_addr,
+            "sales_rep":     sales_rep,
+            "order_number":  order_number,
+            "branch":        branch_obj,
+            "floor_plan":    plan_obj,
+            "job_mode":      job_mode if job_mode in ("shell", "turnkey") else "shell",
+            "p10_material":  p10,
+            "current_phase": "estimate",
+        },
+    )
+
+    # ── Rebuild draw schedule ──
+    if draws_payload:
+        job.demo_draws.all().delete()
+        for i, d in enumerate(draws_payload):
+            amount = int(d.get("a") or 0)
+            if amount <= 0:
+                continue
+            draw_num = int(d.get("n") or i)
+            status = JobDraw.STATUS_CURRENT if draw_num == 1 else JobDraw.STATUS_PENDING
+            JobDraw.objects.create(
+                job=job,
+                draw_number=draw_num,
+                label=str(d.get("l") or f"Draw {draw_num}"),
+                amount=amount,
+                status=status,
+            )
+
+    return JsonResponse({"ok": True, "job_id": job.id, "created": created})

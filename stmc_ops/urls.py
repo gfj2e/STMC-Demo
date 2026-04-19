@@ -11,6 +11,7 @@ urlpatterns = [
     path("sales/contracts/seed-data/", views.sales_contract_seed_data_view, name="sales_contract_seed_data"),
     path("app/seed-data/", views.app_seed_data_view, name="app_seed_data"),
     path("app/draw/complete/", views.mark_draw_complete_view, name="mark_draw_complete"),
+    path("app/save-contract/", views.save_contract_view, name="save_contract"),
     path("manager/", views.manager_view, name="manager"),
     path("owner/", views.owner_view, name="owner"),
 ]
