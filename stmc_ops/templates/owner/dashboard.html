@@ -1,0 +1,122 @@
+<div class="stl">Notifications <span class="stl-badge">{{ notif_count }}</span></div>
+<div id="notif-list">
+	{% for notif in notifications %}
+		<div class="notif {{ notif.tone_class }}">
+			<div class="notif-dot {{ notif.tone_class }}"></div>
+			<div style="font-size:12px;line-height:1.5">
+				<strong>{{ notif.title }}</strong> - {{ notif.message }}
+				{% if notif.time %}
+					<div style="font-size:10px;color:var(--g400);margin-top:2px">{{ notif.time }}</div>
+				{% endif %}
+			</div>
+		</div>
+	{% endfor %}
+</div>
+
+<div id="dash-projects">
+	<div class="stl">Active projects <span class="stl-badge">{{ dashboard_active_count }}</span></div>
+
+	{% if dashboard_active_projects %}
+		{% for project in dashboard_active_projects %}
+			<div class="proj-card">
+				<div class="proj-hdr">
+					<div class="proj-hdr-top">
+						<div>
+							<p class="proj-name">{{ project.name }}</p>
+							<p class="proj-sub">{{ project.subtitle }}</p>
+						</div>
+						<div style="display:flex;align-items:center;gap:8px">
+							{% if project.current_draw and project.current_draw.step_label %}
+								<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
+							{% else %}
+								<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+							{% endif %}
+							<span class="chevron">⌄</span>
+						</div>
+					</div>
+					<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
+					</div>
+					<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
+				</div>
+
+				<div class="proj-body">
+					{% for draw in project.timeline_draws %}
+						<div class="ph">
+							<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+							<div style="flex:1">
+								<div style="font-weight:500">{{ draw.label }}</div>
+								{% if draw.paid_date %}
+									<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+								{% endif %}
+							</div>
+							<div style="text-align:right;min-width:55px">
+								<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+								<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+							</div>
+						</div>
+					{% endfor %}
+
+					{% if project.current_draw and project.phase != 'closed' %}
+						<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+							<div>
+								<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+								<div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
+							</div>
+							<form method="post" data-complete-form="1" hx-post="{% url 'owner_panel_complete' %}" hx-target="#tab-dashboard-panel" hx-swap="innerHTML" style="margin:0">
+								{% csrf_token %}
+								<input type="hidden" name="panel" value="dashboard">
+								<input type="hidden" name="job_id" value="{{ project.id }}">
+								<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
+								<button class="btn-complete" type="submit">Mark complete</button>
+							</form>
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		{% endfor %}
+	{% else %}
+		<div class="banner banner-empty">No active projects.</div>
+	{% endif %}
+
+	{% if dashboard_closed_projects %}
+		<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed <span style="font-weight:400">({{ dashboard_closed_projects|length }})</span></div>
+		{% for project in dashboard_closed_projects %}
+			<div class="proj-card">
+				<div class="proj-hdr">
+					<div class="proj-hdr-top">
+						<div>
+							<p class="proj-name">{{ project.name }}</p>
+							<p class="proj-sub">{{ project.subtitle }}</p>
+						</div>
+						<div style="display:flex;align-items:center;gap:8px">
+							<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+							<span class="chevron">⌄</span>
+						</div>
+					</div>
+					<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+						<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
+					</div>
+					<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
+				</div>
+				<div class="proj-body">
+					{% for draw in project.timeline_draws %}
+						<div class="ph">
+							<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+							<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+							<div style="text-align:right;min-width:55px">
+								<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+							</div>
+						</div>
+					{% endfor %}
+				</div>
+			</div>
+		{% endfor %}
+	{% endif %}
+</div>

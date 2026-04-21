@@ -19,41 +19,63 @@
 <div class="header">
   <div class="header-sub">Sales</div>
   <div class="header-title">My Projects</div>
-  <div class="header-total" id="sales-total">&mdash;</div>
+  <div class="header-total" id="sales-total">{{ sales_total }}</div>
   <div class="header-subtotal-note">Total Contract Value</div>
 </div>
 
 <!-- KPI strip -->
-<div class="kpi-strip" id="sales-kpis"></div>
+<div class="kpi-strip" id="sales-kpis">
+  {% for kpi in kpis %}
+    <div class="kpi-tile">
+      <div class="{{ kpi.value_class }}">{{ kpi.value }}</div>
+      <div class="kpi-lbl">{{ kpi.label }}</div>
+    </div>
+  {% endfor %}
+</div>
 
 <!-- Tab panels -->
 <div class="container">
 
   <!-- My Projects -->
   <div id="tab-projects" class="tab-panel">
-    <div id="projects-list"></div>
+    <div
+      id="tab-projects-panel"
+      hx-get="{% url 'sales_projects_panel' %}"
+      hx-trigger="load, sales-projects-refresh from:body, sales-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading projects...</div>
+    </div>
   </div>
 
   <!-- Models -->
   <div id="tab-models" class="tab-panel" style="display:none">
-    <div id="models-list"></div>
+    <div
+      id="tab-models-panel"
+      hx-get="{% url 'sales_models_panel' %}"
+      hx-trigger="load, sales-models-refresh from:body, sales-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading models...</div>
+    </div>
   </div>
 
   <!-- Rate Card -->
   <div id="tab-rates" class="tab-panel" style="display:none">
-    <div class="card">
-      <div class="section-hdr section-hdr-red">Exterior Rates</div>
-      <table class="rate-table" id="ext-rates"></table>
-    </div>
-    <div class="card">
-      <div class="section-hdr section-hdr-red">Interior Rates</div>
-      <table class="rate-table" id="int-rates"></table>
+    <div
+      id="tab-rates-panel"
+      hx-get="{% url 'sales_rates_panel' %}"
+      hx-trigger="load, sales-rates-refresh from:body, sales-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading rate card...</div>
     </div>
   </div>
 
 </div>
 
 <script>window.LOGIN_URL='{% url "login" %}';</script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="{% static 'sales.js' %}"></script>
 </body>
 </html>

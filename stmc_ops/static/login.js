@@ -5,30 +5,48 @@
   var S = window.STMC;
   if (!S) return;
 
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function toText(value) {
+    return value == null ? "" : String(value);
+  }
+
   function renderOptions(selectEl, items, mapLabel) {
     if (!selectEl) return;
-    if (!items.length) {
-      selectEl.innerHTML = "";
-      return;
-    }
-    selectEl.innerHTML = items.map(function (item) {
-      return '<option value="' + S.escapeHtml(item.id) + '">' +
-        S.escapeHtml(mapLabel(item)) +
-        '</option>';
-    }).join("");
+
+    selectEl.replaceChildren();
+
+    var list = asArray(items);
+    if (!list.length) return;
+
+    var frag = document.createDocumentFragment();
+
+    list.forEach(function (item) {
+      var opt = document.createElement("option");
+      var id = item && item.id != null ? item.id : "";
+      opt.value = toText(id);
+      opt.textContent = toText(mapLabel(item));
+      frag.appendChild(opt);
+    });
+
+    selectEl.appendChild(frag);
   }
 
   function initLogin() {
-    var users = S.getCollection("users");
-    var regions = S.getCollection("regions");
+    var users = asArray(S.getCollection("users"));
+    var regions = asArray(S.getCollection("regions"));
     var userSel = S.$id("lU");
     var regSel = S.$id("lR");
 
     renderOptions(userSel, users, function (u) {
-      return u.name + " - " + u.title;
+      var name = u && u.name ? u.name : "";
+      var title = u && u.title ? u.title : "";
+      return name + " - " + title;
     });
     renderOptions(regSel, regions, function (r) {
-      return r.name;
+      return r && r.name ? r.name : "";
     });
 
     var signInBtn = S.$id("signInBtn");

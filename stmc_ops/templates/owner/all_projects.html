@@ -1,0 +1,87 @@
+{% if all_projects_active %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active Projects <span style="font-weight:400">({{ all_projects_active|length }})</span></div>
+	{% for project in all_projects_active %}
+		<div class="card" style="margin-bottom:16px;padding:14px 16px">
+			<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+				<div>
+					<div style="font-size:15px;font-weight:600;color:var(--g900)">{{ project.name }}</div>
+					<div style="font-size:11px;color:var(--g500);margin-top:2px">{{ project.subtitle }}</div>
+				</div>
+				<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+			</div>
+
+			<div class="proj-kpis">
+				<div class="proj-kpi"><div class="proj-kl">Contract</div><div class="proj-kv">{{ project.total_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">Collected</div><div class="proj-kv" style="color:var(--green)">{{ project.paid_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">{{ project.total_bg_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:{{ project.margin_color }}">{{ project.margin_pct }}%</div></div>
+			</div>
+
+			<div class="ybanner">COLLECTED - {{ project.pct }}% of contract</div>
+			<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
+				<div style="height:100%;border-radius:3px;background:var(--green);width:{{ project.pct }}%"></div>
+			</div>
+
+			{% for trade in project.trades %}
+				<div class="rw">
+					<span class="rl">{{ trade.trade }}</span>
+					<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }}/{{ trade.budget_display }}</span>
+					<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+				</div>
+			{% endfor %}
+
+			{% if project.current_draw %}
+				<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+					<div>
+						<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+						<div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
+					</div>
+					<form method="post" data-complete-form="1" hx-post="{% url 'owner_panel_complete' %}" hx-target="#tab-projects-panel" hx-swap="innerHTML" style="margin:0">
+						{% csrf_token %}
+						<input type="hidden" name="panel" value="projects">
+						<input type="hidden" name="job_id" value="{{ project.id }}">
+						<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
+						<button class="btn-complete" type="submit">Mark complete</button>
+					</form>
+				</div>
+			{% endif %}
+		</div>
+	{% endfor %}
+{% else %}
+	<div class="banner banner-empty">No active projects.</div>
+{% endif %}
+
+{% if all_projects_closed %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed Projects <span style="font-weight:400">({{ all_projects_closed|length }})</span></div>
+	{% for project in all_projects_closed %}
+		<div class="card" style="margin-bottom:16px;padding:14px 16px">
+			<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+				<div>
+					<div style="font-size:15px;font-weight:600;color:var(--g900)">{{ project.name }}</div>
+					<div style="font-size:11px;color:var(--g500);margin-top:2px">{{ project.subtitle }}</div>
+				</div>
+				<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+			</div>
+
+			<div class="proj-kpis">
+				<div class="proj-kpi"><div class="proj-kl">Contract</div><div class="proj-kv">{{ project.total_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">Collected</div><div class="proj-kv" style="color:var(--green)">{{ project.paid_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">{{ project.total_bg_display }}</div></div>
+				<div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:{{ project.margin_color }}">{{ project.margin_pct }}%</div></div>
+			</div>
+
+			<div class="ybanner">COLLECTED - {{ project.pct }}% of contract</div>
+			<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
+				<div style="height:100%;border-radius:3px;background:var(--green);width:{{ project.pct }}%"></div>
+			</div>
+
+			{% for trade in project.trades %}
+				<div class="rw">
+					<span class="rl">{{ trade.trade }}</span>
+					<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }}/{{ trade.budget_display }}</span>
+					<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+				</div>
+			{% endfor %}
+		</div>
+	{% endfor %}
+{% endif %}

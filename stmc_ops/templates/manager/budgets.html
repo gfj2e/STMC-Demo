@@ -1,1 +1,72 @@
-{% comment %}Manager – Budgets tab{% endcomment %}
+{% if budgets_active %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active <span style="font-weight:400">({{ budgets_active|length }})</span></div>
+	{% for project in budgets_active %}
+		<div class="card" style="margin-bottom:12px">
+			<div style="padding:14px 16px 12px">
+				<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+					<div>
+						<div style="font-size:14px;font-weight:600">{{ project.name }}</div>
+						<div style="font-size:11px;color:var(--g500)">{{ project.subtitle }}</div>
+					</div>
+					<span class="pill {% if project.pct >= 100 %}pill-brand{% elif project.pct >= 50 %}pill-success{% else %}pill-warning{% endif %}">{{ project.pct }}% collected</span>
+				</div>
+
+				<div class="budget-bar-track" style="margin-bottom:4px">
+					<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
+				</div>
+
+				<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin-bottom:10px">
+					<span>{{ project.paid_display }} collected</span>
+					<span>{{ project.remaining_display }} remaining</span>
+				</div>
+
+				{% for trade in project.trades %}
+					<div class="rw">
+						<span class="rl">{{ trade.trade }}</span>
+						<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }} / {{ trade.budget_display }}</span>
+						<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+					</div>
+				{% endfor %}
+
+				<div class="rw rt">
+					<span class="rl">Total</span>
+					<span class="rd">{{ project.total_ac_display }} / {{ project.total_bg_display }}</span>
+					<span class="rv" style="color:{% if project.total_rem_negative %}#DC2626{% else %}var(--green){% endif %}">{{ project.total_rem_display }}</span>
+				</div>
+			</div>
+		</div>
+	{% endfor %}
+{% else %}
+	<div class="banner banner-empty">No active budgets.</div>
+{% endif %}
+
+{% if budgets_closed %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed <span style="font-weight:400">({{ budgets_closed|length }})</span></div>
+	{% for project in budgets_closed %}
+		<div class="card" style="margin-bottom:12px;opacity:.8">
+			<div style="padding:14px 16px 12px">
+				<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+					<div>
+						<div style="font-size:14px;font-weight:600">{{ project.name }}</div>
+						<div style="font-size:11px;color:var(--g500)">{{ project.subtitle }}</div>
+					</div>
+					<span class="pill pill-muted">Closed</span>
+				</div>
+
+				{% for trade in project.trades %}
+					<div class="rw">
+						<span class="rl">{{ trade.trade }}</span>
+						<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }} / {{ trade.budget_display }}</span>
+						<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+					</div>
+				{% endfor %}
+
+				<div class="rw rt">
+					<span class="rl">Total</span>
+					<span class="rd">{{ project.total_ac_display }} / {{ project.total_bg_display }}</span>
+					<span class="rv" style="color:{% if project.total_rem_negative %}#DC2626{% else %}var(--green){% endif %}">{{ project.total_rem_display }}</span>
+				</div>
+			</div>
+		</div>
+	{% endfor %}
+{% endif %}

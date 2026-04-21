@@ -1,0 +1,64 @@
+{% if draws_active %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active <span style="font-weight:400">({{ draws_active|length }})</span></div>
+	{% for project in draws_active %}
+		<div class="card" style="margin-bottom:16px">
+			<div style="padding:14px 16px 12px">
+				<div style="font-size:14px;font-weight:600;margin-bottom:2px">{{ project.name }}</div>
+				<div style="font-size:11px;color:var(--g500);margin-bottom:10px">{{ project.subtitle }} · {{ project.total_display }}</div>
+
+				{% for draw in project.timeline_draws %}
+					<div class="ph">
+						<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+						<div style="flex:1">
+							<div style="font-weight:500">{{ draw.label }}</div>
+							{% if draw.paid_date %}
+								<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+							{% endif %}
+						</div>
+						<div style="text-align:right;min-width:55px">
+							<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+							<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+						</div>
+					</div>
+				{% endfor %}
+
+				{% if project.current_draw %}
+					<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+						<div>
+							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+							<div style="font-size:10px;color:#3B82F6;opacity:.8">Creates QB invoice</div>
+						</div>
+						<form method="post" data-complete-form="1" hx-post="{% url 'manager_panel_complete' %}" hx-target="#tab-draws-panel" hx-swap="innerHTML" style="margin:0">
+							{% csrf_token %}
+							<input type="hidden" name="panel" value="draws">
+							<input type="hidden" name="job_id" value="{{ project.id }}">
+							<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
+							<button class="btn-complete" type="submit">Mark complete</button>
+						</form>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+	{% endfor %}
+{% else %}
+	<div class="banner banner-empty">No active draws.</div>
+{% endif %}
+
+{% if draws_closed %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed <span style="font-weight:400">({{ draws_closed|length }})</span></div>
+	{% for project in draws_closed %}
+		<div class="card" style="margin-bottom:16px;opacity:.8">
+			<div style="padding:14px 16px 12px">
+				<div style="font-size:14px;font-weight:600;margin-bottom:2px">{{ project.name }}</div>
+				<div style="font-size:11px;color:var(--g500);margin-bottom:10px">{{ project.subtitle }} · {{ project.total_display }}</div>
+				{% for draw in project.timeline_draws %}
+					<div class="ph">
+						<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+						<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+						<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+					</div>
+				{% endfor %}
+			</div>
+		</div>
+	{% endfor %}
+{% endif %}

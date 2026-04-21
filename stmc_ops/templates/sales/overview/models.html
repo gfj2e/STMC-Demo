@@ -1,0 +1,23 @@
+{% if models %}
+  <div class="stl">Models <span class="stl-badge">{{ models|length }}</span></div>
+  <div style="font-size:11px;color:var(--g500);margin-bottom:10px">Summertown / Hayden</div>
+
+  {% for model in models %}
+    <div class="card" style="padding:10px 14px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--g900)">{{ model.name }}</div>
+          {% if model.living_sf %}
+            <div style="font-size:10px;color:var(--g500)">{{ model.living_sf|floatformat:0 }} SF</div>
+          {% endif %}
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--g900)">{{ model.total_display }}</div>
+          <div style="font-size:9px;color:var(--g500)">{{ model.per_sf_display }}</div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="banner banner-empty">No models available.</div>
+{% endif %}

@@ -17,6 +17,17 @@
     if (el) el.textContent = value;
   }
 
+  function clearChildren(node) {
+    if (node) node.replaceChildren();
+  }
+
+  function createElement(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
   // ── String / number helpers ───────────────────────────────────────────────
   function escapeHtml(value) {
     return String(value)
@@ -173,16 +184,20 @@
   function renderKpis(containerId, kpis) {
     var container = $id(containerId);
     if (!container) return;
-    container.innerHTML = (kpis || []).map(function (kpi) {
+
+    clearChildren(container);
+
+    (kpis || []).forEach(function (kpi) {
       var cls = ["kpi-value"];
       if (kpi.mono) cls.push("mono");
       var tone = getToneClass(kpi.tone, "value");
       if (tone) cls.push(tone);
-      return "<article class=\"kpi\">" +
-        "<div class=\"kpi-label\">" + escapeHtml(kpi.label) + "</div>" +
-        "<div class=\"" + cls.join(" ") + "\">" + escapeHtml(kpi.value) + "</div>" +
-        "</article>";
-    }).join("");
+
+      var card = createElement("article", "kpi");
+      card.appendChild(createElement("div", "kpi-label", kpi.label));
+      card.appendChild(createElement("div", cls.join(" "), kpi.value));
+      container.appendChild(card);
+    });
   }
 
   // ── Public API ────────────────────────────────────────────────────────────

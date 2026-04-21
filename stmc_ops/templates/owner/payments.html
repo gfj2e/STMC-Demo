@@ -1,0 +1,90 @@
+{% if active_projects %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active Projects <span style="font-weight:400">({{ active_projects|length }})</span></div>
+	{% for project in active_projects %}
+		<div class="card" style="margin-bottom:16px">
+			<div class="section-hdr section-hdr-red">
+				{{ project.name }}
+				<span class="badge">{{ project.paid_display }} of {{ project.total_display }}</span>
+			</div>
+			<div style="padding:12px 16px;border-bottom:1px solid var(--g200)">
+				<div class="pay-labels"><span>Collected - {{ project.pct }}%</span><span>Remaining: {{ project.remaining_display }}</span></div>
+				<div class="pay-track" style="margin-top:6px"><div class="pay-fill" style="width:{{ project.pct }}%"></div></div>
+			</div>
+			<div style="padding:8px 16px 12px">
+				{% for draw in project.draws %}
+					<div class="draw-row">
+						<div class="draw-num {{ draw.draw_num_class }}">{{ draw.draw_number_display }}</div>
+						<div class="draw-info">
+							<div class="draw-label">{{ draw.label }}</div>
+							{% if draw.is_placeholder_date %}
+								<div class="draw-date" style="color:var(--g400)">-</div>
+							{% else %}
+								<div class="draw-date">{{ draw.date }}</div>
+							{% endif %}
+						</div>
+						<span class="pill {{ draw.pill_class }}">{{ draw.status_label }}</span>
+						<div class="draw-amt">{{ draw.amount_display }}</div>
+					</div>
+				{% endfor %}
+
+				{% if project.current_draw %}
+					<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+						<div>
+							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+							<div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
+						</div>
+						<form
+							method="post"
+							data-complete-form="1"
+							hx-post="{% url 'owner_panel_complete' %}"
+							hx-target="#tab-payments-panel"
+							hx-swap="innerHTML"
+							style="margin:0"
+						>
+							{% csrf_token %}
+							<input type="hidden" name="panel" value="payments">
+							<input type="hidden" name="job_id" value="{{ project.id }}">
+							<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
+							<button class="btn-complete" type="submit">Mark complete</button>
+						</form>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+	{% endfor %}
+{% else %}
+	<div class="banner banner-empty">No active payments.</div>
+{% endif %}
+
+{% if closed_projects %}
+	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed Projects <span style="font-weight:400">({{ closed_projects|length }})</span></div>
+	{% for project in closed_projects %}
+		<div class="card" style="margin-bottom:16px">
+			<div class="section-hdr section-hdr-red">
+				{{ project.name }}
+				<span class="badge">{{ project.paid_display }} of {{ project.total_display }}</span>
+			</div>
+			<div style="padding:12px 16px;border-bottom:1px solid var(--g200)">
+				<div class="pay-labels"><span>Collected - {{ project.pct }}%</span><span>Remaining: {{ project.remaining_display }}</span></div>
+				<div class="pay-track" style="margin-top:6px"><div class="pay-fill" style="width:{{ project.pct }}%"></div></div>
+			</div>
+			<div style="padding:8px 16px 12px">
+				{% for draw in project.draws %}
+					<div class="draw-row">
+						<div class="draw-num {{ draw.draw_num_class }}">{{ draw.draw_number_display }}</div>
+						<div class="draw-info">
+							<div class="draw-label">{{ draw.label }}</div>
+							{% if draw.is_placeholder_date %}
+								<div class="draw-date" style="color:var(--g400)">-</div>
+							{% else %}
+								<div class="draw-date">{{ draw.date }}</div>
+							{% endif %}
+						</div>
+						<span class="pill {{ draw.pill_class }}">{{ draw.status_label }}</span>
+						<div class="draw-amt">{{ draw.amount_display }}</div>
+					</div>
+				{% endfor %}
+			</div>
+		</div>
+	{% endfor %}
+{% endif %}

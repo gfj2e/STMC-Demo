@@ -15,9 +15,9 @@
 <!-- Nav -->
 <nav class="app-nav">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
-    <button class="app-nav-link active" onclick="switchTab(this,'builds')">My Builds</button>
-    <button class="app-nav-link" onclick="switchTab(this,'budgets')">Budgets</button>
-    <button class="app-nav-link" onclick="switchTab(this,'draws')">Draws</button>
+    <button class="app-nav-link active" data-tab="builds" type="button">My Builds</button>
+    <button class="app-nav-link" data-tab="budgets" type="button">Budgets</button>
+    <button class="app-nav-link" data-tab="draws" type="button">Draws</button>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
     <button class="logout-link" type="button">Logout</button>
@@ -33,7 +33,14 @@
 </div>
 
 <!-- KPI strip -->
-<div class="kpi-strip" id="pm-kpis"></div>
+<div class="kpi-strip" id="pm-kpis">
+  {% for kpi in kpis %}
+    <div class="kpi-tile">
+      <div class="{{ kpi.value_class }}">{{ kpi.value }}</div>
+      <div class="kpi-lbl">{{ kpi.label }}</div>
+    </div>
+  {% endfor %}
+</div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -43,22 +50,44 @@
 
   <!-- My Builds -->
   <div id="tab-builds" class="tab-panel">
-    <div id="builds-list"></div>
+    <div
+      id="tab-builds-panel"
+      hx-get="{% url 'manager_builds_panel' %}"
+      hx-trigger="load, manager-builds-refresh from:body, manager-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading builds...</div>
+    </div>
   </div>
 
   <!-- Budgets -->
   <div id="tab-budgets" class="tab-panel" style="display:none">
-    <div id="budgets-list"></div>
+    <div
+      id="tab-budgets-panel"
+      hx-get="{% url 'manager_budgets_panel' %}"
+      hx-trigger="load, manager-budgets-refresh from:body, manager-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading budgets...</div>
+    </div>
   </div>
 
   <!-- Draws -->
   <div id="tab-draws" class="tab-panel" style="display:none">
-    <div id="draws-list"></div>
+    <div
+      id="tab-draws-panel"
+      hx-get="{% url 'manager_draws_panel' %}"
+      hx-trigger="load, manager-draws-refresh from:body, manager-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading draws...</div>
+    </div>
   </div>
 
 </div>
 
 <script>window.LOGIN_URL='{% url "login" %}';</script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="{% static 'manager.js' %}"></script>
 </body>
 </html>

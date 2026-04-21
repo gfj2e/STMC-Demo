@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from .models import (
     ApplianceConfig,
@@ -495,23 +496,325 @@ def _build_app_seed_data():
     }
 
 
-@csrf_exempt
-def mark_draw_complete_view(request):
-    """POST {job_id, draw_number} — marks the draw paid, advances next pending draw to current."""
-    if request.method != "POST":
-        return JsonResponse({"error": "POST required"}, status=405)
-    import json as _json
-    try:
-        body = _json.loads(request.body)
-        job_id = int(body["job_id"])
-        draw_number = int(body["draw_number"])
-    except (KeyError, ValueError, TypeError):
-        return JsonResponse({"error": "Invalid payload"}, status=400)
+def _draw_status_pill_class(status_code):
+    if status_code == JobDraw.STATUS_PAID:
+        return "pill-success"
+    if status_code == JobDraw.STATUS_CURRENT:
+        return "pill-brand"
+    return "pill-muted"
 
-    try:
-        draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
-    except JobDraw.DoesNotExist:
-        return JsonResponse({"error": "Draw not found"}, status=404)
+
+def _draw_status_label(status_code):
+    if status_code == JobDraw.STATUS_PAID:
+        return "Paid"
+    if status_code == JobDraw.STATUS_CURRENT:
+        return "Due"
+    return "Pending"
+
+
+def _draw_num_class(status_code):
+    if status_code == JobDraw.STATUS_PAID:
+        return "paid"
+    if status_code == JobDraw.STATUS_CURRENT:
+        return "current"
+    return ""
+
+
+def _phase_pill_class(phase_code):
+    phase = (phase_code or "").lower()
+    if phase in {"framing", "roughin", "roofing", "siding", "punch", "complete", "final", "closed"}:
+        return "pill-success"
+    if phase in {"interior", "paint"}:
+        return "pill-warning"
+    return "pill-muted"
+
+
+def _phase_label(phase_code):
+    labels = {
+        "estimate": "Estimate",
+        "framing": "Framing",
+        "roughin": "Rough-In",
+        "interior": "Interior",
+        "punch": "Punch",
+        "final": "Final",
+        "closed": "Closed",
+        "roofing": "Roofing",
+        "siding": "Siding",
+        "paint": "Paint",
+        "complete": "Complete",
+    }
+    return labels.get((phase_code or "").lower(), phase_code or "Estimate")
+
+
+def _draw_timeline_row(draw):
+    status = draw.get("s")
+    icon = "✓" if status == JobDraw.STATUS_PAID else ("►" if status == JobDraw.STATUS_CURRENT else ("D" if draw.get("n") == 0 else str(draw.get("n") or "")))
+    dot_class = "pdg" if status == JobDraw.STATUS_PAID else ("pdb" if status == JobDraw.STATUS_CURRENT else "pdx")
+    status_color = "var(--green)" if status == JobDraw.STATUS_PAID else ("#1D4ED8" if status == JobDraw.STATUS_CURRENT else "var(--g400)")
+    status_label = "Paid" + (f" {draw.get('t')}" if draw.get("t") else "") if status == JobDraw.STATUS_PAID else ("Current" if status == JobDraw.STATUS_CURRENT else "Pending")
+    return {
+        "icon": icon,
+        "dot_class": dot_class,
+        "label": draw.get("l", ""),
+        "paid_date": draw.get("t") if status == JobDraw.STATUS_PAID else "",
+        "amount_display": _format_money(draw.get("a", 0)),
+        "status_color": status_color,
+        "status_label": status_label,
+    }
+
+
+def _kpi_value_class(kpi):
+    tone = kpi.get("tone")
+    value_class = "kpi-val"
+    if kpi.get("sm"):
+        value_class += " kpi-val-sm"
+    if tone:
+        value_class += f" tone-{tone}"
+    return value_class
+
+
+def _build_project_ui_rows(projects):
+    rows = []
+    for project in projects:
+        draws = project.get("dr", [])
+        total = int(project.get("ct") or 0)
+        paid = int(sum(d.get("a", 0) for d in draws if d.get("s") == JobDraw.STATUS_PAID))
+        remaining = max(0, total - paid)
+        pct = int(round((paid / total) * 100)) if total > 0 else 0
+        current_draw = next((d for d in draws if d.get("s") == JobDraw.STATUS_CURRENT), None)
+
+        draw_rows = []
+        timeline_rows = []
+        for draw in draws:
+            status = draw.get("s")
+            timeline_rows.append(_draw_timeline_row(draw))
+            draw_rows.append(
+                {
+                    "draw_number": draw.get("n"),
+                    "draw_number_display": "D" if draw.get("n") == 0 else draw.get("n"),
+                    "label": draw.get("l", ""),
+                    "date": draw.get("t") or "-",
+                    "amount_display": _format_money(draw.get("a", 0)),
+                    "status": status,
+                    "draw_num_class": _draw_num_class(status),
+                    "pill_class": _draw_status_pill_class(status),
+                    "status_label": _draw_status_label(status),
+                    "is_placeholder_date": not bool(draw.get("t")),
+                }
+            )
+
+        trades = list((project.get("bg") or {}).keys())
+        trade_rows = []
+        total_bg = 0
+        total_ac = 0
+        for trade in trades:
+            budget = int((project.get("bg") or {}).get(trade, 0) or 0)
+            actual = int((project.get("ac") or {}).get(trade, 0) or 0)
+            variance = budget - actual
+            total_bg += budget
+            total_ac += actual
+            trade_rows.append(
+                {
+                    "trade": trade,
+                    "budget_display": _format_money(budget),
+                    "actual_display": _format_money(actual),
+                    "variance_display": _format_money(variance),
+                    "is_over": actual > budget,
+                }
+            )
+
+        margin_pct = int(round(((total - total_bg) / total) * 100, 0)) if total > 0 and total_bg > 0 else 0
+        margin_color = "var(--green)" if margin_pct >= 30 else ("var(--amber)" if margin_pct >= 15 else "#DC2626")
+
+        current_draw_label = ""
+        if current_draw and current_draw.get("l"):
+            current_draw_label = re.sub(r"^\d+\w*\s*[\u2014\-]\s*", "", current_draw.get("l") or "")
+
+        subtitle = f"{project.get('md', '')} · {project.get('cu', '')} · PM: {project.get('pm', '')}"
+
+        rows.append(
+            {
+                "id": project.get("id"),
+                "name": project.get("nm", ""),
+                "phase": project.get("ph", "estimate"),
+                "phase_label": _phase_label(project.get("ph", "estimate")),
+                "phase_pill_class": _phase_pill_class(project.get("ph", "estimate")),
+                "subtitle": subtitle,
+                "total_amount": total,
+                "total_display": _format_money(total),
+                "paid_display": _format_money(paid),
+                "remaining_display": _format_money(remaining),
+                "pct": max(0, min(100, pct)),
+                "draws": draw_rows,
+                "timeline_draws": timeline_rows,
+                "trades": trade_rows,
+                "total_bg": total_bg,
+                "total_ac": total_ac,
+                "total_bg_display": _format_money(total_bg),
+                "total_ac_display": _format_money(total_ac),
+                "total_rem_display": _format_money(total_bg - total_ac),
+                "total_rem_negative": (total_bg - total_ac) < 0,
+                "margin_pct": margin_pct,
+                "margin_color": margin_color,
+                "current_draw": {
+                    "label": current_draw.get("l") if current_draw else "",
+                    "step_label": current_draw_label,
+                    "number": current_draw.get("n") if current_draw else None,
+                }
+                if current_draw
+                else None,
+            }
+        )
+    return rows
+
+
+def _build_owner_ui_context():
+    _, owner = _build_manager_owner_data()
+    projects = owner.get("projects", [])
+    rows = _build_project_ui_rows(projects)
+
+    active_projects = [p for p in rows if p["phase"] != "closed"]
+    closed_projects = [p for p in rows if p["phase"] == "closed"]
+
+    notif_tone_class = {"brand": "", "success": "tone-success", "warning": "tone-warning"}
+    notifications = []
+    for notif in owner.get("notifications", []):
+        tone = notif.get("tone", "brand")
+        tone_class = notif_tone_class.get(tone, "")
+        notifications.append(
+            {
+                "title": notif.get("title", ""),
+                "message": notif.get("message", ""),
+                "time": notif.get("time", ""),
+                "tone_class": tone_class,
+            }
+        )
+
+    kpis = []
+    owner_total = "—"
+    for kpi in owner.get("kpis", []):
+        kpis.append({
+            "label": kpi.get("label", ""),
+            "value": kpi.get("value", ""),
+            "value_class": _kpi_value_class(kpi),
+        })
+        if kpi.get("label") == "Contract value":
+            owner_total = kpi.get("value", "—")
+
+    return {
+        "kpis": kpis,
+        "owner_total": owner_total,
+        "notifications": notifications,
+        "notif_count": len(notifications),
+        "dashboard_active_projects": active_projects,
+        "dashboard_closed_projects": closed_projects,
+        "dashboard_active_count": len(active_projects),
+        "all_projects_active": active_projects,
+        "all_projects_closed": closed_projects,
+        "active_projects": active_projects,
+        "closed_projects": closed_projects,
+    }
+
+
+def _build_manager_ui_context():
+    manager, _ = _build_manager_owner_data()
+    rows = _build_project_ui_rows(manager.get("projects", []))
+    active_projects = [p for p in rows if p["phase"] != "closed"]
+    closed_projects = [p for p in rows if p["phase"] == "closed"]
+
+    kpis = []
+    for kpi in manager.get("kpis", []):
+        kpis.append(
+            {
+                "label": kpi.get("label", ""),
+                "value": kpi.get("value", ""),
+                "value_class": _kpi_value_class(kpi),
+            }
+        )
+
+    return {
+        "kpis": kpis,
+        "builds_active": active_projects,
+        "builds_closed": closed_projects,
+        "budgets_active": active_projects,
+        "budgets_closed": closed_projects,
+        "draws_active": active_projects,
+        "draws_closed": closed_projects,
+    }
+
+
+def _build_sales_ui_context():
+    manager, _ = _build_manager_owner_data()
+    project_rows = _build_project_ui_rows(manager.get("projects", []))
+    active_projects = [p for p in project_rows if p["phase"] != "closed"]
+    closed_projects = [p for p in project_rows if p["phase"] == "closed"]
+
+    models = []
+    for model in _build_sales_model_list():
+        material_total = int(_to_number(model.get("materialTotal", 0)))
+        labor_budget = int(_to_number(model.get("laborBudget", 0)))
+        concrete_budget = int(_to_number(model.get("concreteBudget", 0)))
+        living_sf = int(_to_number(model.get("livingSf", 0)))
+        total = material_total + labor_budget + concrete_budget
+        per_sf = int(round(total / living_sf, 0)) if living_sf > 0 else 0
+        models.append(
+            {
+                "name": model.get("name", ""),
+                "living_sf": living_sf,
+                "total_display": _format_money(total),
+                "per_sf_display": f"${per_sf}/SF",
+            }
+        )
+    models.sort(key=lambda row: row["living_sf"])
+
+    rate_card = _build_simple_rate_card()
+    exterior_rates = []
+    for rate in rate_card.get("exterior", []):
+        exterior_rates.append(
+            {
+                "group": rate.get("g", ""),
+                "label": rate.get("l", ""),
+                "rate_display": "--"
+                if not rate.get("r")
+                else f"${float(rate.get('r', 0)):,.2f}",
+                "unit": rate.get("u", "--"),
+            }
+        )
+
+    interior_rates = []
+    for rate in rate_card.get("interior", []):
+        interior_rates.append(
+            {
+                "group": rate.get("g", ""),
+                "label": rate.get("l", ""),
+                "rate_display": "--"
+                if not rate.get("r")
+                else f"${float(rate.get('r', 0)):,.2f}",
+                "unit": rate.get("u", "--"),
+            }
+        )
+
+    active_contract_total = sum(project.get("total_amount", 0) for project in active_projects)
+
+    return {
+        "sales_total": _format_money(active_contract_total),
+        "kpis": [
+            {
+                "label": "Active builds",
+                "value": str(len(active_projects)),
+                "value_class": "kpi-val",
+            }
+        ],
+        "projects_active": active_projects,
+        "projects_closed": closed_projects,
+        "models": models,
+        "exterior_rates": exterior_rates,
+        "interior_rates": interior_rates,
+    }
+
+
+def _mark_draw_complete(job_id, draw_number):
+    draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
 
     dt = timezone.now()
     today = dt.strftime("%b ") + str(dt.day)
@@ -520,12 +823,10 @@ def mark_draw_complete_view(request):
     draw.paid_date = today
     draw.save(update_fields=["status", "paid_date"])
 
-    # Advance the next pending draw to current
     next_draw = JobDraw.objects.filter(
         job_id=job_id, status=JobDraw.STATUS_PENDING
     ).order_by("draw_number").first()
 
-    # Map draw_number → phase that should be active while that draw is current
     DRAW_PHASE_MAP = {
         1: "framing",
         2: "framing",
@@ -545,7 +846,122 @@ def mark_draw_complete_view(request):
     if new_phase:
         Job.objects.filter(pk=job_id).update(current_phase=new_phase)
 
+    return today
+
+
+@csrf_exempt
+def mark_draw_complete_view(request):
+    """POST {job_id, draw_number} — marks the draw paid, advances next pending draw to current."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+        job_id = int(body["job_id"])
+        draw_number = int(body["draw_number"])
+    except (KeyError, ValueError, TypeError):
+        return JsonResponse({"error": "Invalid payload"}, status=400)
+
+    try:
+        draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
+    except JobDraw.DoesNotExist:
+        return JsonResponse({"error": "Draw not found"}, status=404)
+
+    today = _mark_draw_complete(job_id, draw_number)
+
     return JsonResponse({"ok": True, "paid_date": today})
+
+
+def owner_dashboard_panel_view(request):
+    if not request.htmx:
+        return redirect("owner")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/dashboard.html",
+        {
+            "notifications": context["notifications"],
+            "notif_count": context["notif_count"],
+            "dashboard_active_projects": context["dashboard_active_projects"],
+            "dashboard_closed_projects": context["dashboard_closed_projects"],
+            "dashboard_active_count": context["dashboard_active_count"],
+        },
+    )
+
+
+def owner_all_projects_panel_view(request):
+    if not request.htmx:
+        return redirect("owner")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/all_projects.html",
+        {
+            "all_projects_active": context["all_projects_active"],
+            "all_projects_closed": context["all_projects_closed"],
+        },
+    )
+
+
+def owner_payments_panel_view(request):
+    if not request.htmx:
+        return redirect("owner")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/payments.html",
+        {
+            "active_projects": context["active_projects"],
+            "closed_projects": context["closed_projects"],
+        },
+    )
+
+
+@require_POST
+def owner_panel_mark_complete_view(request):
+    job_id = request.POST.get("job_id")
+    draw_number = request.POST.get("draw_number")
+    panel = (request.POST.get("panel") or "payments").strip().lower()
+    try:
+        job_id = int(job_id)
+        draw_number = int(draw_number)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid draw payload"}, status=400)
+
+    try:
+        _mark_draw_complete(job_id, draw_number)
+    except JobDraw.DoesNotExist:
+        return JsonResponse({"error": "Draw not found"}, status=404)
+
+    if request.htmx:
+        context = _build_owner_ui_context()
+        template_map = {
+            "dashboard": "owner/dashboard.html",
+            "projects": "owner/all_projects.html",
+            "payments": "owner/payments.html",
+        }
+        template_name = template_map.get(panel, "owner/payments.html")
+        partial_context = {
+            "owner/dashboard.html": {
+                "notifications": context["notifications"],
+                "notif_count": context["notif_count"],
+                "dashboard_active_projects": context["dashboard_active_projects"],
+                "dashboard_closed_projects": context["dashboard_closed_projects"],
+                "dashboard_active_count": context["dashboard_active_count"],
+            },
+            "owner/all_projects.html": {
+                "all_projects_active": context["all_projects_active"],
+                "all_projects_closed": context["all_projects_closed"],
+            },
+            "owner/payments.html": {
+                "active_projects": context["active_projects"],
+                "closed_projects": context["closed_projects"],
+            },
+        }
+        response = render(request, template_name, partial_context[template_name])
+        response["HX-Trigger"] = "owner-refresh"
+        return response
+    return redirect("owner")
 
 
 def _build_seed_rates():
@@ -841,15 +1257,165 @@ def app_seed_data_view(request):
 
 
 def manager_view(request):
-    return render(request, "manager/index.html")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/index.html",
+        {
+            "kpis": context["kpis"],
+        },
+    )
+
+
+def manager_builds_panel_view(request):
+    if not request.htmx:
+        return redirect("manager")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/my_builds.html",
+        {
+            "builds_active": context["builds_active"],
+            "builds_closed": context["builds_closed"],
+        },
+    )
+
+
+def manager_budgets_panel_view(request):
+    if not request.htmx:
+        return redirect("manager")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/budgets.html",
+        {
+            "budgets_active": context["budgets_active"],
+            "budgets_closed": context["budgets_closed"],
+        },
+    )
+
+
+def manager_draws_panel_view(request):
+    if not request.htmx:
+        return redirect("manager")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/draws.html",
+        {
+            "draws_active": context["draws_active"],
+            "draws_closed": context["draws_closed"],
+        },
+    )
+
+
+@require_POST
+def manager_panel_mark_complete_view(request):
+    job_id = request.POST.get("job_id")
+    draw_number = request.POST.get("draw_number")
+    panel = (request.POST.get("panel") or "draws").strip().lower()
+    try:
+        job_id = int(job_id)
+        draw_number = int(draw_number)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid draw payload"}, status=400)
+
+    try:
+        _mark_draw_complete(job_id, draw_number)
+    except JobDraw.DoesNotExist:
+        return JsonResponse({"error": "Draw not found"}, status=404)
+
+    if request.htmx:
+        context = _build_manager_ui_context()
+        template_map = {
+            "builds": "manager/my_builds.html",
+            "budgets": "manager/budgets.html",
+            "draws": "manager/draws.html",
+        }
+        template_name = template_map.get(panel, "manager/draws.html")
+        partial_context = {
+            "manager/my_builds.html": {
+                "builds_active": context["builds_active"],
+                "builds_closed": context["builds_closed"],
+            },
+            "manager/budgets.html": {
+                "budgets_active": context["budgets_active"],
+                "budgets_closed": context["budgets_closed"],
+            },
+            "manager/draws.html": {
+                "draws_active": context["draws_active"],
+                "draws_closed": context["draws_closed"],
+            },
+        }
+        response = render(request, template_name, partial_context[template_name])
+        response["HX-Trigger"] = "manager-refresh"
+        return response
+    return redirect("manager")
 
 
 def owner_view(request):
-    return render(request, "owner/index.html")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/index.html",
+        {
+            "kpis": context["kpis"],
+            "owner_total": context["owner_total"],
+        },
+    )
 
 
 def sales_overview_view(request):
-    return render(request, "sales/overview/index.html")
+    context = _build_sales_ui_context()
+    return render(
+        request,
+        "sales/overview/index.html",
+        {
+            "kpis": context["kpis"],
+            "sales_total": context["sales_total"],
+        },
+    )
+
+
+def sales_projects_panel_view(request):
+    if not request.htmx:
+        return redirect("sales_overview")
+    context = _build_sales_ui_context()
+    return render(
+        request,
+        "sales/overview/projects.html",
+        {
+            "projects_active": context["projects_active"],
+            "projects_closed": context["projects_closed"],
+        },
+    )
+
+
+def sales_models_panel_view(request):
+    if not request.htmx:
+        return redirect("sales_overview")
+    context = _build_sales_ui_context()
+    return render(
+        request,
+        "sales/overview/models.html",
+        {
+            "models": context["models"],
+        },
+    )
+
+
+def sales_rates_panel_view(request):
+    if not request.htmx:
+        return redirect("sales_overview")
+    context = _build_sales_ui_context()
+    return render(
+        request,
+        "sales/overview/rates.html",
+        {
+            "exterior_rates": context["exterior_rates"],
+            "interior_rates": context["interior_rates"],
+        },
+    )
 
 
 @csrf_exempt

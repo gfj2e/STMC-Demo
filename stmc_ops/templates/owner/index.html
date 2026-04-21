@@ -15,9 +15,9 @@
 <!-- Nav -->
 <nav class="app-nav">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
-    <button class="app-nav-link active" onclick="switchTab(this,'dashboard')">Dashboard</button>
-    <button class="app-nav-link" onclick="switchTab(this,'projects')">All Projects</button>
-    <button class="app-nav-link" onclick="switchTab(this,'payments')">Payments</button>
+    <button class="app-nav-link active" data-tab="dashboard" type="button">Dashboard</button>
+    <button class="app-nav-link" data-tab="projects" type="button">All Projects</button>
+    <button class="app-nav-link" data-tab="payments" type="button">Payments</button>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
     <button class="logout-link" type="button">Logout</button>
@@ -30,31 +30,57 @@
 <div class="header">
   <div class="header-sub">Summertown Metals</div>
   <div class="header-title">Owner Dashboard</div>
-  <div class="header-total" id="owner-total">—</div>
+  <div class="header-total" id="owner-total">{{ owner_total }}</div>
   <div class="header-subtotal-note">Contract Value</div>
 </div>
 
 <!-- KPI strip -->
-<div class="kpi-strip" id="owner-kpis"></div>
+<div class="kpi-strip" id="owner-kpis">
+  {% for kpi in kpis %}
+    <div class="kpi-tile">
+      <div class="{{ kpi.value_class }}">{{ kpi.value }}</div>
+      <div class="kpi-lbl">{{ kpi.label }}</div>
+    </div>
+  {% endfor %}
+</div>
 
 <!-- Tab panels -->
 <div class="container">
 
   <!-- Dashboard -->
   <div id="tab-dashboard" class="tab-panel">
-    <div class="stl">Notifications <span class="stl-badge" id="notif-count"></span></div>
-    <div id="notif-list"></div>
-    <div id="dash-projects"></div>
+    <div
+      id="tab-dashboard-panel"
+      hx-get="{% url 'owner_dashboard_panel' %}"
+      hx-trigger="load, owner-dashboard-refresh from:body, owner-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading dashboard...</div>
+    </div>
   </div>
 
   <!-- All Projects -->
   <div id="tab-projects" class="tab-panel" style="display:none">
-    <div id="all-projects-list"></div>
+    <div
+      id="tab-projects-panel"
+      hx-get="{% url 'owner_all_projects_panel' %}"
+      hx-trigger="load, owner-projects-refresh from:body, owner-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading projects...</div>
+    </div>
   </div>
 
   <!-- Payments -->
   <div id="tab-payments" class="tab-panel" style="display:none">
-    <div id="payments-list"></div>
+    <div
+      id="tab-payments-panel"
+      hx-get="{% url 'owner_payments_panel' %}"
+      hx-trigger="load, owner-payments-refresh from:body, owner-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading payments...</div>
+    </div>
   </div>
 
 </div>
@@ -63,6 +89,7 @@
 <div class="toast" id="toast"></div>
 
 <script>window.LOGIN_URL='{% url "login" %}';</script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="{% static 'owner.js' %}"></script>
 </body>
 </html>

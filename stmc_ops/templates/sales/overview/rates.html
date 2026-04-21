@@ -1,0 +1,57 @@
+<div class="card">
+  <div class="section-hdr section-hdr-red">Exterior Rates</div>
+  <table class="rate-table">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="r">Rate</th>
+        <th class="r">Unit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% with last_group='' %}
+        {% for rate in exterior_rates %}
+          {% ifchanged rate.group %}
+            <tr class="rate-group-hdr"><td colspan="3">{{ rate.group }}</td></tr>
+          {% endifchanged %}
+          <tr>
+            <td>{{ rate.label }}</td>
+            <td class="r">{{ rate.rate_display }}</td>
+            <td class="u">{{ rate.unit }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="banner banner-empty">No rate data.</td></tr>
+        {% endfor %}
+      {% endwith %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="section-hdr section-hdr-red">Interior Rates</div>
+  <table class="rate-table">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="r">Rate</th>
+        <th class="r">Unit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% with last_group='' %}
+        {% for rate in interior_rates %}
+          {% ifchanged rate.group %}
+            <tr class="rate-group-hdr"><td colspan="3">{{ rate.group }}</td></tr>
+          {% endifchanged %}
+          <tr>
+            <td>{{ rate.label }}</td>
+            <td class="r">{{ rate.rate_display }}</td>
+            <td class="u">{{ rate.unit }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="banner banner-empty">No rate data.</td></tr>
+        {% endfor %}
+      {% endwith %}
+    </tbody>
+  </table>
+</div>
