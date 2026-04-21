@@ -76,14 +76,76 @@
 
 <div class="footer">
   <span class="footer-left">
+    <button class="footer-btn" onclick="manualSave()">Save Draft</button>
+    <button class="footer-btn" onclick="openLoadDraft()">Load Draft</button>
     <button class="footer-btn" onclick="exportStateJSON()">Export</button>
     <button class="footer-btn" onclick="importStateJSON()">Import</button>
+    <button class="footer-btn" onclick="cloudSaveJob()">Cloud Save</button>
+    <button class="footer-btn" onclick="cloudLoadJob()">Cloud Load</button>
+    <button class="footer-btn" onclick="openBackendSettings()">Backend</button>
+    <button class="footer-btn" onclick="resetAll()">Reset</button>
   </span>
   <span class="footer-right" id="footerSaveStatus">Ready</span>
 </div>
 
 <div class="toast" id="toast"></div>
 <div id="printSheet" style="display:none"></div>
+
+<div class="modal-overlay" id="loadDraftModal" style="display:none" onclick="closeLoadDraftIfOverlay(event)">
+  <div class="modal">
+    <div class="modal-hdr">Load Saved Draft</div>
+    <div class="modal-body" id="loadDraftList"></div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeLoadDraft()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="backendSettingsModal" style="display:none" onclick="closeBackendSettingsIfOverlay(event)">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr">Backend Connection Settings</div>
+    <div class="modal-body" style="padding:16px;max-height:60vh;overflow-y:auto">
+      <div class="banner banner-info" style="margin-bottom:14px">
+        Configure the connection to your STMC backend database. When enabled, the tool uses backend rate cards and cloud jobs.
+      </div>
+      <div class="field">
+        <label class="field-lbl">Backend Status</label>
+        <div class="radio-pills" id="backendEnabledPills"></div>
+      </div>
+      <div class="field">
+        <label class="field-lbl">API Base URL</label>
+        <input class="inp mono" type="text" id="backendBaseUrl" placeholder="https://api.stmc.example.com/v1" oninput="BACKEND.config.set('baseUrl', this.value)">
+      </div>
+      <div class="field">
+        <label class="field-lbl">Auth Token (Bearer)</label>
+        <input class="inp mono" type="password" id="backendAuthToken" placeholder="paste your API token here" oninput="BACKEND.config.set('authToken', this.value)">
+      </div>
+      <div class="field">
+        <label class="field-lbl">Rate Card Version</label>
+        <input class="inp mono" type="text" id="backendRateVersion" readonly>
+      </div>
+      <div id="backendStatusBox" style="margin-top:14px;padding:10px 12px;border-radius:6px;background:var(--g100);font-size:12px;line-height:1.5"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="footer-btn" onclick="BACKEND.testConnection()">Test Connection</button>
+        <button class="footer-btn" onclick="BACKEND.data.fetchAll()">Refresh Rate Cards</button>
+        <button class="footer-btn" onclick="BACKEND.auth.logout(); refreshBackendSettingsUI(); showToast('Logged out')">Logout</button>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeBackendSettings()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cloudJobsModal" style="display:none" onclick="closeCloudJobsIfOverlay(event)">
+  <div class="modal">
+    <div class="modal-hdr">Cloud Jobs</div>
+    <div class="modal-body" id="cloudJobsList" style="padding:12px;max-height:50vh;overflow-y:auto"></div>
+    <div class="modal-ftr">
+      <button class="modal-btn" onclick="closeCloudJobs()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 {{ wizard_seed_data|json_script:"stmc-wizard-seed-data" }}
 <script>

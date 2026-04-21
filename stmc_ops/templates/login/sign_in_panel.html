@@ -1,0 +1,25 @@
+{% if users and regions %}
+  <div class="field">
+    <label for="lU">Sign in as</label>
+    <select id="lU" name="user">
+      <option value="" disabled selected>Select user...</option>
+      {% for user in users %}
+        <option value="{{ user.id }}" data-role="{{ user.role }}">{{ user.name }} - {{ user.title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="lR">Region</label>
+    <select id="lR" name="region">
+      <option value="" disabled selected>Select region...</option>
+      {% for region in regions %}
+        <option value="{{ region.id }}">{{ region.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button id="signInBtn" class="btn btn-primary btn-full" type="button">Sign in</button>
+{% else %}
+  <div class="error-banner">No active users or regions are available. Run seed data and refresh.</div>
+{% endif %}

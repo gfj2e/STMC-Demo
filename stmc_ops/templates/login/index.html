@@ -118,21 +118,14 @@
       <h1 class="brand-title">SUMMERTOWN METALS</h1>
       <p class="brand-subtitle">Sign in to continue</p>
 
-      <div class="field">
-        <label for="lU">Sign in as</label>
-        <select id="lU" name="user">
-          <option value="" disabled selected>Loading users…</option>
-        </select>
+      <div
+        id="login-panel"
+        hx-get="{% url 'login_panel' %}"
+        hx-trigger="load, login-refresh from:body"
+        hx-swap="innerHTML"
+      >
+        {% include "login/sign_in_panel.html" %}
       </div>
-
-      <div class="field">
-        <label for="lR">Region</label>
-        <select id="lR" name="region">
-          <option value="" disabled selected>Loading regions…</option>
-        </select>
-      </div>
-
-      <button id="signInBtn" class="btn btn-primary btn-full" type="button">Sign in</button>
     </section>
   </main>
 
@@ -148,9 +141,8 @@
       pm:    "{% url 'manager' %}",
       exec:  "{% url 'owner' %}"
     };
-    window.STMC_DATA_URL = "{% url 'app_seed_data' %}";
   </script>
-  <script src="{% static 'script.js' %}" defer></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="{% static 'login.js' %}" defer></script>
 </body>
 </html>

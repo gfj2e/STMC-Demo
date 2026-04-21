@@ -39,8 +39,21 @@ def index(request):
     return redirect("login")
 
 
+def _build_login_ui_context():
+    return {
+        "users": _build_users_data(),
+        "regions": _build_regions_data(),
+    }
+
+
 def login_view(request):
-    return render(request, "login/index.html")
+    return render(request, "login/index.html", _build_login_ui_context())
+
+
+def login_panel_view(request):
+    if not request.htmx:
+        return redirect("login")
+    return render(request, "login/sign_in_panel.html", _build_login_ui_context())
 
 
 def sales_view(request):

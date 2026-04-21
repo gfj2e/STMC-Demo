@@ -1,4 +1,5 @@
-/* App nav */
+/* ── App nav ── */
+
 .logout-link {
   border: none;
   background: transparent;
@@ -42,7 +43,8 @@
   background: #fef2f2;
 }
 
-/* KPI strip */
+/* ── KPI strip ── */
+
 .kpi-strip {
   display: flex;
   gap: 12px;
@@ -90,7 +92,8 @@
   margin-top: 4px;
 }
 
-/* Notifications */
+/* ── Notifications ── */
+
 .notif {
   display: flex;
   align-items: flex-start;
@@ -128,7 +131,8 @@
   background: var(--amber);
 }
 
-/* Section title */
+/* ── Section title ── */
+
 .stl {
   font-size: 14px;
   font-weight: 600;
@@ -148,7 +152,8 @@
   font-weight: 600;
 }
 
-/* Project cards */
+/* ── Project cards ── */
+
 .proj-card {
   background: #fff;
   border: 1px solid var(--g200);
@@ -210,7 +215,8 @@
   transform: rotate(180deg);
 }
 
-/* Pills */
+/* ── Pills ── */
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -240,7 +246,8 @@
   color: var(--g600);
 }
 
-/* Meta row */
+/* ── Meta row ── */
+
 .meta-row {
   display: flex;
   gap: 16px;
@@ -269,7 +276,8 @@
   font-family: var(--font-mono);
 }
 
-/* Draw rows */
+/* ── Draw rows ── */
+
 .ph {
   display: flex;
   align-items: center;
@@ -311,7 +319,8 @@
   color: var(--g500);
 }
 
-/* Payment progress */
+/* ── Payment progress ── */
+
 .pay-track {
   height: 8px;
   background: var(--g200);
@@ -365,7 +374,8 @@
   color: var(--g900);
 }
 
-/* Yellow budget banner */
+/* ── Yellow budget banner ── */
+
 .ybanner {
   background: #fef3c7;
   color: #92400e;
@@ -377,7 +387,8 @@
   margin: 8px 0 4px;
 }
 
-/* Trade rows */
+/* ── Trade rows ── */
+
 .rw {
   display: flex;
   justify-content: space-between;
@@ -412,7 +423,8 @@
   font-size: 11px;
 }
 
-/* Draw rows (payments tab) */
+/* ── Draw rows (payments tab) ── */
+
 .draw-row {
   display: flex;
   align-items: center;
@@ -476,7 +488,8 @@
   white-space: nowrap;
 }
 
-/* Mark complete button */
+/* ── Mark complete button ── */
+
 .btn-complete {
   padding: 7px 14px;
   font-size: 12px;
@@ -493,7 +506,8 @@
   opacity: 0.85;
 }
 
-/* Toast */
+/* ── Toast ── */
+
 .toast {
   position: fixed;
   bottom: 28px;

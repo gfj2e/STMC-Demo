@@ -1,80 +1,74 @@
 // STMC Ops - Login page behavior
-// Requires script.js (window.STMC) to be loaded first.
+// Sign-in options are server-rendered via HTMX.
 
 (function () {
-  var S = window.STMC;
-  if (!S) return;
+  var ROUTES = window.STMC_ROUTES || {};
+  var LOGIN_URL = ROUTES.login || "/stmc_ops/login/";
 
-  function asArray(value) {
-    return Array.isArray(value) ? value : [];
+  function getRoleUrl(role) {
+    var map = {
+      sales: ROUTES.sales,
+      pm: ROUTES.pm,
+      exec: ROUTES.exec,
+    };
+    return map[role] || LOGIN_URL;
   }
 
-  function toText(value) {
-    return value == null ? "" : String(value);
+  function showToast(message) {
+    var toast = document.getElementById("app-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "app-toast";
+      toast.className = "toast-message";
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(function () {
+      toast.classList.remove("show");
+    }, 2200);
   }
 
-  function renderOptions(selectEl, items, mapLabel) {
-    if (!selectEl) return;
+  function signIn() {
+    var userSel = document.getElementById("lU");
+    var regSel = document.getElementById("lR");
 
-    selectEl.replaceChildren();
+    var userId = userSel ? userSel.value : "";
+    var regionId = regSel ? regSel.value : "";
+    var userOpt = userSel && userSel.selectedOptions ? userSel.selectedOptions[0] : null;
+    var role = userOpt ? userOpt.getAttribute("data-role") : "";
 
-    var list = asArray(items);
-    if (!list.length) return;
+    if (!userId || !role) {
+      showToast("Select a valid user to continue.");
+      return;
+    }
+    if (!regionId) {
+      showToast("Select a region to continue.");
+      return;
+    }
 
-    var frag = document.createDocumentFragment();
-
-    list.forEach(function (item) {
-      var opt = document.createElement("option");
-      var id = item && item.id != null ? item.id : "";
-      opt.value = toText(id);
-      opt.textContent = toText(mapLabel(item));
-      frag.appendChild(opt);
-    });
-
-    selectEl.appendChild(frag);
+    localStorage.setItem("stmc_user", userId);
+    localStorage.setItem("stmc_region", regionId);
+    window.location.href = getRoleUrl(role);
   }
 
-  function initLogin() {
-    var users = asArray(S.getCollection("users"));
-    var regions = asArray(S.getCollection("regions"));
-    var userSel = S.$id("lU");
-    var regSel = S.$id("lR");
+  function bindSignInButton() {
+    var button = document.getElementById("signInBtn");
+    if (!button || button.dataset.bound === "1") return;
 
-    renderOptions(userSel, users, function (u) {
-      var name = u && u.name ? u.name : "";
-      var title = u && u.title ? u.title : "";
-      return name + " - " + title;
-    });
-    renderOptions(regSel, regions, function (r) {
-      return r && r.name ? r.name : "";
-    });
-
-    var signInBtn = S.$id("signInBtn");
-    if (!signInBtn) return;
-
-    signInBtn.addEventListener("click", function () {
-      var userId = userSel ? userSel.value : "";
-      var regionId = regSel ? regSel.value : "";
-      var user = S.findById(users, userId);
-      if (!user) {
-        S.showToast("Select a valid user to continue.");
-        return;
-      }
-      S.setSession(userId, regionId);
-      window.location.href = S.getRoleUrl(user.role) || S.getLoginUrl();
-    });
+    button.dataset.bound = "1";
+    button.addEventListener("click", signIn);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     if (document.body.getAttribute("data-page") !== "login") return;
+    bindSignInButton();
+  });
 
-    S.loadData()
-      .then(function () {
-        initLogin();
-      })
-      .catch(function (err) {
-        console.error(err);
-        S.showLoadError("Unable to load app data. Refresh and try again.");
-      });
+  document.body.addEventListener("htmx:afterSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || target.id !== "login-panel") return;
+    bindSignInButton();
   });
 })();

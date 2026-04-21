@@ -833,9 +833,14 @@ function onP10Blur(inp){
 function onBranchChange(k){
   STATE.branch = k;
   var b = BRANCHES[k];
-  // Only auto-set concrete zone per branch. Miles is PURELY user-controlled
-  // via the "> 100 Miles" checkbox — branch no longer touches it.
-  if(b) STATE.conc.zone = b.zone || 1;
+  if(b){
+    // Auto-set miles from branch default (matches HTML V9: remote branches like
+    // Morristown/Hopkinsville flip to "over 100 miles" contractor rates so the
+    // ctr labor budget in Step 9 Part A comes out right). User can still
+    // override via the "> 100 Miles" checkbox on Step 1.
+    STATE.miles = b.miles || 0;
+    STATE.conc.zone = b.zone || 1;
+  }
   renderCurrentStep();
 }
 
