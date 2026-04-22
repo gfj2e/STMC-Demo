@@ -42,10 +42,12 @@ class AppUser(AbstractUser):
     ROLE_SALES = 'sales'
     ROLE_PM = 'pm'
     ROLE_EXEC = 'exec'
+    ROLE_ADMIN = 'admin'
     ROLE_CHOICES = [
         (ROLE_SALES, 'Sales'),
         (ROLE_PM, 'Project Manager'),
         (ROLE_EXEC, 'Executive / Owner'),
+        (ROLE_ADMIN, 'System Administrator'),
     ]
 
     email = models.EmailField(max_length=255, unique=True)

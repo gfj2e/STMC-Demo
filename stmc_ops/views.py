@@ -50,6 +50,7 @@ ROLE_DASHBOARDS = {
     AppUser.ROLE_SALES: "sales_overview",
     AppUser.ROLE_PM: "manager",
     AppUser.ROLE_EXEC: "owner",
+    AppUser.ROLE_ADMIN: "admin:index",
 }
 
 
