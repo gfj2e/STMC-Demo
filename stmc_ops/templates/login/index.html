@@ -52,14 +52,32 @@
       letter-spacing: .3px;
     }
 
+    .za-wizard {
+      margin-left: auto;
+    }
+
+    .za-wizard img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+
     /* ── Main content ── */
     .login-wrap {
       flex: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 20px;
       padding: 40px 20px;
       background: #f5f4f0;
+    }
+
+    .motto {
+      max-height: 80px;
+      width: auto;
+      display: block;
     }
 
     .login-card {
@@ -100,6 +118,7 @@
       color: rgba(255,255,255,.85);
       font-weight: 600;
     }
+
   </style>
 </head>
 <body data-page="login">
@@ -109,13 +128,17 @@
     <div>
       <div class="login-header-name">Summertown Metals</div>
       <div class="login-header-tag">Operations Platform</div>
-      <div class="login-header-image">
-      </img class="motto" src="../assets/images/">
     </div>
+    <div class="za-wizard">
+      <img class="motto" src="{% static 'images/wizard.png' %}" alt="Summertown Metals motto">
+  </div>
   </header>
 
   <!-- Login card -->
   <main class="login-wrap">
+    <div class="login-header-image">
+      <img class="motto" src="{% static 'images/motto.png' %}" alt="Summertown Metals motto">
+    </div>
     <section class="login-card">
       <h1 class="brand-title">SUMMERTOWN METALS</h1>
       <p class="brand-subtitle">Sign in to continue</p>

@@ -94,18 +94,6 @@ class Command(BaseCommand):
     def seed_users(self):
         data = [
             {
-                "email": "admin@stmc.com",
-                "username": "admin@stmc.com",
-                "name": "STMC Admin",
-                "initials": "AD",
-                "role": "admin",
-                "title": "System Administrator",
-                "sort_order": 0,
-                "is_staff": True,
-                "is_superuser": True,
-                "password": "stmadmin",
-            },
-            {
                 "email": "d.robinson@stmc.com",
                 "username": "d.robinson@stmc.com",
                 "name": "Derek Robinson",
@@ -138,16 +126,12 @@ class Command(BaseCommand):
         ]
         for row in data:
             password = row.pop("password")
-            is_staff = row.pop("is_staff", False)
-            is_superuser = row.pop("is_superuser", False)
             user, _ = AppUser.objects.update_or_create(
                 email=row["email"], defaults=row
             )
             user.set_password(password)
             user.is_active = True
-            user.is_staff = is_staff
-            user.is_superuser = is_superuser
-            user.save()
+            user.save(update_fields=["password", "is_active"])
         self.stdout.write(f'  App Users: {len(data)}')
 
     # ─────────────────────────────────────────
