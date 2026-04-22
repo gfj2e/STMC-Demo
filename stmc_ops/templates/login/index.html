@@ -118,12 +118,7 @@
       <h1 class="brand-title">SUMMERTOWN METALS</h1>
       <p class="brand-subtitle">Sign in to continue</p>
 
-      <div
-        id="login-panel"
-        hx-get="{% url 'login_panel' %}"
-        hx-trigger="load, login-refresh from:body"
-        hx-swap="innerHTML"
-      >
+      <div id="login-panel">
         {% include "login/sign_in_panel.html" %}
       </div>
     </section>
@@ -134,15 +129,15 @@
     &copy; 2026 <strong>Summertown Metals</strong>. All rights reserved.
   </footer>
 
-  <script>
-    window.STMC_ROUTES = {
-      login: "{% url 'login' %}",
-      sales: "{% url 'sales' %}",
-      pm:    "{% url 'manager' %}",
-      exec:  "{% url 'owner' %}"
-    };
-  </script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <script src="{% static 'login.js' %}" defer></script>
+  <script>
+    document.body.addEventListener('htmx:beforeSwap', function (evt) {
+      var status = evt.detail.xhr.status;
+      if (status === 401 || status === 429) {
+        evt.detail.shouldSwap = true;
+        evt.detail.isError = false;
+      }
+    });
+  </script>
 </body>
 </html>

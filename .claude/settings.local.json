@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py check)",
+      "Bash(python manage.py makemigrations stmc_ops)",
+      "Bash(python manage.py migrate)",
+      "Bash(python manage.py seed_data)",
+      "Bash(python manage.py runserver 127.0.0.1:8765)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8765/stmc_ops/login/)",
+      "Bash(rm -f /tmp/cookies.txt)",
+      "Bash(curl -s -c /tmp/cookies.txt http://127.0.0.1:8765/stmc_ops/login/)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -b /tmp/cookies.txt -c /tmp/cookies.txt -X POST http://127.0.0.1:8765/stmc_ops/login/submit/ -H 'Referer: http://127.0.0.1:8765/stmc_ops/login/' -H 'HX-Request: true' -d 'csrfmiddlewaretoken=QL7JnN6D5ffv2hw1kjIX0YmpSRRnlBHsoLtiNrc4kAJMMhVHgUcsBUWbL70DEMvR&login=m.stoll@stmc.com&password=stmexecutive' -D /tmp/headers.txt -o /tmp/body.txt -w '%{http_code}\\\\n')",
+      "Bash(curl -s -b /tmp/cookies.txt -o /dev/null -w \"owner page: %{http_code}\\\\n\" http://127.0.0.1:8765/stmc_ops/owner/)",
+      "Bash(rm -f /tmp/c2.txt)",
+      "Bash(curl -s -c /tmp/c2.txt http://127.0.0.1:8765/stmc_ops/login/)",
+      "Bash(rm -f /tmp/c3.txt)",
+      "Bash(curl -s -c /tmp/c3.txt http://127.0.0.1:8765/stmc_ops/login/)",
+      "Bash(curl -s -X POST http://127.0.0.1:8765/stmc_ops/login/submit/ -H \"Referer: http://127.0.0.1:8765/stmc_ops/login/\" -d \"login=m.stoll@stmc.com&password=stmexecutive\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"manage.py runserver 127.0.0.1:8765\")"
+    ]
+  }
+}

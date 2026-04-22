@@ -1,25 +1,45 @@
-{% if users and regions %}
+<form
+  id="login-form"
+  hx-post="{% url 'login_submit' %}"
+  hx-target="#login-panel"
+  hx-swap="innerHTML"
+  hx-disabled-elt="#signInBtn"
+  autocomplete="on"
+  novalidate
+>
+  {% csrf_token %}
+
+  {% if error %}
+    <div class="form-error" role="alert" aria-live="assertive">{{ error }}</div>
+  {% endif %}
+
   <div class="field">
-    <label for="lU">Sign in as</label>
-    <select id="lU" name="user">
-      <option value="" disabled selected>Select user...</option>
-      {% for user in users %}
-        <option value="{{ user.id }}" data-role="{{ user.role }}">{{ user.name }} - {{ user.title }}</option>
-      {% endfor %}
-    </select>
+    <label for="loginEmail">Email</label>
+    <input
+      id="loginEmail"
+      name="login"
+      type="email"
+      inputmode="email"
+      autocomplete="username"
+      autocapitalize="off"
+      spellcheck="false"
+      required
+      placeholder="Enter email"
+      value="{{ login_value|default:'' }}"
+    >
   </div>
 
   <div class="field">
-    <label for="lR">Region</label>
-    <select id="lR" name="region">
-      <option value="" disabled selected>Select region...</option>
-      {% for region in regions %}
-        <option value="{{ region.id }}">{{ region.name }}</option>
-      {% endfor %}
-    </select>
+    <label for="loginPassword">Password</label>
+    <input
+      id="loginPassword"
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      required
+      placeholder="Enter password"
+    >
   </div>
 
-  <button id="signInBtn" class="btn btn-primary btn-full" type="button">Sign in</button>
-{% else %}
-  <div class="error-banner">No active users or regions are available. Run seed data and refresh.</div>
-{% endif %}
+  <button id="signInBtn" class="btn btn-primary btn-full" type="submit">Sign in</button>
+</form>

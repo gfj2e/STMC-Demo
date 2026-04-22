@@ -4388,10 +4388,21 @@ function saveContract(){
 
   fetch("/stmc_ops/app/save-contract/", {
     method:  "POST",
-    headers: {"Content-Type": "application/json"},
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": window.CSRF_TOKEN || ""
+    },
     body:    JSON.stringify(payload)
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (!r.ok) {
+      return r.text().then(function(t){
+        throw new Error("HTTP " + r.status + " — " + (t.slice(0, 120) || "request failed"));
+      });
+    }
+    return r.json();
+  })
   .then(function(data){
     if(data.ok){
       if(btn){ btn.textContent = "✅ Contract Saved!"; btn.style.background = "#1a6e3c"; }

@@ -90,6 +90,14 @@
 <script>
   window.STMC_WIZARD_DATA = JSON.parse(document.getElementById("stmc-wizard-seed-data").textContent);
   window.STMC_WIZARD_DEFAULT_MODE = "{{ wizard_mode }}";
+  window.LOGIN_URL = "{% url 'login' %}";
+  window.LOGOUT_URL = "{% url 'logout' %}";
+  window.CSRF_TOKEN = "{{ csrf_token }}";
+  window.STMC_USER = {
+    name: "{{ user.name|default:user.email|escapejs }}",
+    initials: "{{ user.initials|default:''|escapejs }}",
+    role: "{{ user.role|escapejs }}"
+  };
 </script>
 <script src="{% static 'contracts/buildwizard.js' %}" defer></script>
 <script>
@@ -103,56 +111,26 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-      var loginUrl = "{% url 'login' %}";
-      var userId = localStorage.getItem("stmc_user");
-      var regionId = localStorage.getItem("stmc_region");
-      if (!userId) {
-        window.location.href = loginUrl;
-        return;
-      }
+      var user = window.STMC_USER || {};
+      var displayName = user.name || "Sales";
+      var displayInitials = user.initials || initials(displayName);
 
       var nameEl = document.getElementById("appUserName");
-      var regionEl = document.getElementById("appUserRegion");
       var badgeEl = document.getElementById("appUserBadge");
       var navNameEl = document.getElementById("hN");
       var navBadgeEl = document.getElementById("hA");
-
-      function setUser(name, region) {
-        if (nameEl) nameEl.textContent = name || "Sales";
-        if (regionEl) regionEl.textContent = region || "Region";
-        if (badgeEl) badgeEl.textContent = initials(name || userId);
-        if (navNameEl) navNameEl.textContent = name || "Sales";
-        if (navBadgeEl) navBadgeEl.textContent = initials(name || userId);
-      }
-
-      setUser(userId, regionId || "Region");
-
-      fetch("{% url 'app_seed_data' %}", { cache: "no-store" })
-        .then(function (response) {
-          if (!response.ok) return null;
-          return response.json();
-        })
-        .then(function (data) {
-          if (!data) return;
-          var users = data.users || [];
-          var regions = data.regions || [];
-          var user = users.find(function (item) { return item.id === userId; });
-          if (!user) {
-            window.location.href = loginUrl;
-            return;
-          }
-          var region = regions.find(function (item) { return item.id === regionId; });
-          setUser(user.name, region ? region.name : (regionId || "Region"));
-        })
-        .catch(function () {
-          setUser(userId, regionId || "Region");
-        });
+      if (nameEl) nameEl.textContent = displayName;
+      if (badgeEl) badgeEl.textContent = displayInitials;
+      if (navNameEl) navNameEl.textContent = displayName;
+      if (navBadgeEl) navBadgeEl.textContent = displayInitials;
 
       document.querySelectorAll(".logout-link").forEach(function (button) {
         button.addEventListener("click", function () {
-          localStorage.removeItem("stmc_user");
-          localStorage.removeItem("stmc_region");
-          window.location.href = loginUrl;
+          fetch(window.LOGOUT_URL, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "X-CSRFToken": window.CSRF_TOKEN }
+          }).finally(function () { window.location.href = window.LOGIN_URL; });
         });
       });
     });

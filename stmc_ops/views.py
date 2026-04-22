@@ -1,11 +1,18 @@
 import re
+import time
 from decimal import Decimal
+from functools import wraps
 
-from django.http import JsonResponse
+from django.conf import settings
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import (
     ApplianceConfig,
@@ -35,28 +42,160 @@ from .management.commands.seed_data import (
 from .management.commands.seed_models import MODEL_ALIASES
 
 
+# ─────────────────────────────────────────────────────────────
+# AUTHENTICATION
+# ─────────────────────────────────────────────────────────────
+
+ROLE_DASHBOARDS = {
+    AppUser.ROLE_SALES: "sales_overview",
+    AppUser.ROLE_PM: "manager",
+    AppUser.ROLE_EXEC: "owner",
+}
+
+
+def _dashboard_for(user):
+    return ROLE_DASHBOARDS.get(getattr(user, "role", None), "login")
+
+
+def role_required(*allowed_roles):
+    """Allow the listed roles. Execs always pass. Unauthenticated users go to login."""
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                if request.htmx:
+                    response = HttpResponse(status=401)
+                    response["HX-Redirect"] = reverse("login")
+                    return response
+                return redirect("login")
+            if request.user.role == AppUser.ROLE_EXEC or request.user.role in allowed_roles:
+                return view_func(request, *args, **kwargs)
+            # Authenticated but wrong role — bounce to their own dashboard.
+            return redirect(_dashboard_for(request.user))
+        return _wrapped
+    return decorator
+
+
+def _throttle_key(request):
+    # Bucket attempts by client IP so one attacker can't lock out a user from elsewhere.
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    ip = (xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "unknown"))
+    return f"login_throttle::{ip}"
+
+
+def _throttle_check(request):
+    """Returns (locked, seconds_remaining). Tracks attempts in the session."""
+    max_attempts = getattr(settings, "LOGIN_MAX_ATTEMPTS", 5)
+    lockout = getattr(settings, "LOGIN_LOCKOUT_SECONDS", 900)
+    key = _throttle_key(request)
+    bucket = request.session.get(key) or {"count": 0, "until": 0}
+    now = int(time.time())
+    if bucket["until"] > now:
+        return True, bucket["until"] - now
+    if bucket["count"] >= max_attempts:
+        bucket = {"count": 0, "until": 0}
+        request.session[key] = bucket
+    return False, 0
+
+
+def _throttle_record_failure(request):
+    max_attempts = getattr(settings, "LOGIN_MAX_ATTEMPTS", 5)
+    lockout = getattr(settings, "LOGIN_LOCKOUT_SECONDS", 900)
+    key = _throttle_key(request)
+    bucket = request.session.get(key) or {"count": 0, "until": 0}
+    bucket["count"] = int(bucket.get("count", 0)) + 1
+    if bucket["count"] >= max_attempts:
+        bucket["until"] = int(time.time()) + lockout
+    request.session[key] = bucket
+    request.session.modified = True
+
+
+def _throttle_reset(request):
+    key = _throttle_key(request)
+    if key in request.session:
+        del request.session[key]
+        request.session.modified = True
+
+
+@never_cache
 def index(request):
+    if request.user.is_authenticated:
+        return redirect(_dashboard_for(request.user))
     return redirect("login")
 
 
-def _build_login_ui_context():
-    return {
-        "users": _build_users_data(),
-        "regions": _build_regions_data(),
-    }
-
-
+@never_cache
 def login_view(request):
-    return render(request, "login/index.html", _build_login_ui_context())
+    if request.user.is_authenticated:
+        return redirect(_dashboard_for(request.user))
+    return render(request, "login/index.html", {})
 
 
 def login_panel_view(request):
     if not request.htmx:
         return redirect("login")
-    return render(request, "login/sign_in_panel.html", _build_login_ui_context())
+    return render(request, "login/sign_in_panel.html", {})
 
 
+@require_POST
+@csrf_protect
+@never_cache
+def login_submit_view(request):
+    locked, retry_in = _throttle_check(request)
+    if locked:
+        minutes = max(1, retry_in // 60)
+        return render(
+            request,
+            "login/sign_in_panel.html",
+            {"error": f"Too many attempts. Try again in {minutes} minute(s)."},
+            status=429,
+        )
+
+    email = (request.POST.get("login") or "").strip().lower()
+    password = request.POST.get("password") or ""
+
+    user = None
+    if email and password:
+        user = authenticate(request, username=email, password=password)
+
+    if user is None or not user.is_active:
+        _throttle_record_failure(request)
+        return render(
+            request,
+            "login/sign_in_panel.html",
+            {
+                "error": "Invalid email or password.",
+                "login_value": email,
+            },
+            status=401,
+        )
+
+    _throttle_reset(request)
+    auth_login(request, user)
+    request.session.cycle_key()  # Prevent session fixation
+
+    target = reverse(_dashboard_for(user))
+    if request.htmx:
+        response = HttpResponse(status=204)
+        response["HX-Redirect"] = target
+        return response
+    return redirect(target)
+
+
+@require_http_methods(["GET", "POST"])
+def logout_view(request):
+    auth_logout(request)
+    if request.htmx:
+        response = HttpResponse(status=204)
+        response["HX-Redirect"] = reverse("login")
+        return response
+    return redirect("login")
+
+
+@login_required
 def sales_view(request):
+    if request.user.role not in (AppUser.ROLE_SALES, AppUser.ROLE_EXEC):
+        return redirect(_dashboard_for(request.user))
     return redirect("sales_shell")
 
 
@@ -189,38 +328,14 @@ def _build_users_data():
     for user in AppUser.objects.filter(is_active=True).order_by("sort_order", "name"):
         users.append(
             {
-                "id": user.user_id,
+                "id": user.email,
                 "name": user.name,
                 "initials": user.initials,
                 "role": user.role,
                 "title": user.title,
             }
         )
-    if users:
-        return users
-    return [
-        {
-            "id": "derek",
-            "name": "Derek Stoll",
-            "initials": "DS",
-            "role": "sales",
-            "title": "Sales Rep",
-        },
-        {
-            "id": "phillip",
-            "name": "Phillip Olson",
-            "initials": "PO",
-            "role": "pm",
-            "title": "Project Manager",
-        },
-        {
-            "id": "matt",
-            "name": "Matt Stoll",
-            "initials": "MS",
-            "role": "exec",
-            "title": "Executive / Owner",
-        },
-    ]
+    return users
 
 
 def _build_regions_data():
@@ -862,7 +977,9 @@ def _mark_draw_complete(job_id, draw_number):
     return today
 
 
-@csrf_exempt
+@login_required
+@require_POST
+@csrf_protect
 def mark_draw_complete_view(request):
     """POST {job_id, draw_number} — marks the draw paid, advances next pending draw to current."""
     if request.method != "POST":
@@ -885,6 +1002,7 @@ def mark_draw_complete_view(request):
     return JsonResponse({"ok": True, "paid_date": today})
 
 
+@role_required(AppUser.ROLE_EXEC)
 def owner_dashboard_panel_view(request):
     if not request.htmx:
         return redirect("owner")
@@ -902,6 +1020,7 @@ def owner_dashboard_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_EXEC)
 def owner_all_projects_panel_view(request):
     if not request.htmx:
         return redirect("owner")
@@ -916,6 +1035,7 @@ def owner_all_projects_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_EXEC)
 def owner_payments_panel_view(request):
     if not request.htmx:
         return redirect("owner")
@@ -930,7 +1050,9 @@ def owner_payments_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_EXEC)
 @require_POST
+@csrf_protect
 def owner_panel_mark_complete_view(request):
     job_id = request.POST.get("job_id")
     draw_number = request.POST.get("draw_number")
@@ -1239,6 +1361,7 @@ def _build_contract_seed_data():
     }
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_shell_view(request):
     return render(
         request,
@@ -1250,6 +1373,7 @@ def sales_shell_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_turnkey_view(request):
     return render(
         request,
@@ -1261,14 +1385,17 @@ def sales_turnkey_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_contract_seed_data_view(request):
     return JsonResponse(_build_contract_seed_data())
 
 
+@login_required
 def app_seed_data_view(request):
     return JsonResponse(_build_app_seed_data())
 
 
+@role_required(AppUser.ROLE_PM)
 def manager_view(request):
     context = _build_manager_ui_context()
     return render(
@@ -1280,6 +1407,7 @@ def manager_view(request):
     )
 
 
+@role_required(AppUser.ROLE_PM)
 def manager_builds_panel_view(request):
     if not request.htmx:
         return redirect("manager")
@@ -1294,6 +1422,7 @@ def manager_builds_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_PM)
 def manager_budgets_panel_view(request):
     if not request.htmx:
         return redirect("manager")
@@ -1308,6 +1437,7 @@ def manager_budgets_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_PM)
 def manager_draws_panel_view(request):
     if not request.htmx:
         return redirect("manager")
@@ -1322,7 +1452,9 @@ def manager_draws_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_PM)
 @require_POST
+@csrf_protect
 def manager_panel_mark_complete_view(request):
     job_id = request.POST.get("job_id")
     draw_number = request.POST.get("draw_number")
@@ -1366,6 +1498,7 @@ def manager_panel_mark_complete_view(request):
     return redirect("manager")
 
 
+@role_required(AppUser.ROLE_EXEC)
 def owner_view(request):
     context = _build_owner_ui_context()
     return render(
@@ -1378,6 +1511,7 @@ def owner_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_overview_view(request):
     context = _build_sales_ui_context()
     return render(
@@ -1390,6 +1524,7 @@ def sales_overview_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_projects_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
@@ -1404,6 +1539,7 @@ def sales_projects_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_models_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
@@ -1417,6 +1553,7 @@ def sales_models_panel_view(request):
     )
 
 
+@role_required(AppUser.ROLE_SALES)
 def sales_rates_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
@@ -1431,7 +1568,9 @@ def sales_rates_panel_view(request):
     )
 
 
-@csrf_exempt
+@role_required(AppUser.ROLE_SALES)
+@require_POST
+@csrf_protect
 def save_contract_view(request):
     """
     POST — creates or updates a Job + JobDraw rows from wizard STATE.

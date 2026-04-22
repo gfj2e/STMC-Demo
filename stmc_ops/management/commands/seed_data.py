@@ -93,12 +93,45 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────
     def seed_users(self):
         data = [
-            {"user_id": "derek", "name": "Derek Stoll", "initials": "DS", "role": "sales", "title": "Sales Rep", "sort_order": 1},
-            {"user_id": "phillip", "name": "Phillip Olson", "initials": "PO", "role": "pm", "title": "Project Manager", "sort_order": 2},
-            {"user_id": "matt", "name": "Matt Stoll", "initials": "MS", "role": "exec", "title": "Executive / Owner", "sort_order": 3},
+            {
+                "email": "d.robinson@stmc.com",
+                "username": "d.robinson@stmc.com",
+                "name": "Derek Robinson",
+                "initials": "DR",
+                "role": "sales",
+                "title": "Sales Rep",
+                "sort_order": 1,
+                "password": "stmsales",
+            },
+            {
+                "email": "p.olson@stmc.com",
+                "username": "p.olson@stmc.com",
+                "name": "Phillip Olson",
+                "initials": "PO",
+                "role": "pm",
+                "title": "Project Manager",
+                "sort_order": 2,
+                "password": "stmpm",
+            },
+            {
+                "email": "m.stoll@stmc.com",
+                "username": "m.stoll@stmc.com",
+                "name": "Matt Stoll",
+                "initials": "MS",
+                "role": "exec",
+                "title": "Executive / Owner",
+                "sort_order": 3,
+                "password": "stmexecutive",
+            },
         ]
-        for d in data:
-            AppUser.objects.update_or_create(user_id=d["user_id"], defaults=d)
+        for row in data:
+            password = row.pop("password")
+            user, _ = AppUser.objects.update_or_create(
+                email=row["email"], defaults=row
+            )
+            user.set_password(password)
+            user.is_active = True
+            user.save(update_fields=["password", "is_active"])
         self.stdout.write(f'  App Users: {len(data)}')
 
     # ─────────────────────────────────────────

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from .models import (
     AppUser, Branch,
     FloorPlanModel, SlabAreaPreset, RoofAreaPreset, CraftsmanPreset, PlanMetric,
@@ -26,10 +27,23 @@ class BranchAdmin(admin.ModelAdmin):
 
 
 @admin.register(AppUser)
-class AppUserAdmin(admin.ModelAdmin):
-    list_display = ("name", "user_id", "role", "title", "sort_order", "is_active")
-    list_filter = ("role", "is_active")
-    search_fields = ("name", "user_id")
+class AppUserAdmin(DjangoUserAdmin):
+    list_display = ("email", "name", "role", "title", "sort_order", "is_active", "is_staff")
+    list_filter = ("role", "is_active", "is_staff", "is_superuser")
+    search_fields = ("email", "name", "username")
+    ordering = ("sort_order", "name")
+    fieldsets = (
+        (None, {"fields": ("email", "username", "password")}),
+        ("Profile", {"fields": ("name", "initials", "role", "title", "sort_order")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
+    add_fieldsets = (
+        (None, {
+            "classes": ("wide",),
+            "fields": ("email", "username", "name", "initials", "role", "password1", "password2"),
+        }),
+    )
 
 
 @admin.register(ExteriorRateCard)

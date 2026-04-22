@@ -422,9 +422,10 @@ select {
   color: var(--danger);
 }
 
-.error-banner {
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-text);
+.error-banner,
+.form-error {
+  background: white;
+  border: 1px solid red;
   color: var(--danger-text);
   border-radius: var(--radius);
   padding: 10px 12px;

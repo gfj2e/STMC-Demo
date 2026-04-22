@@ -1,13 +1,9 @@
 // STMC Ops - Owner role JavaScript
-// window.LOGIN_URL must be set by the HTML template before this script runs.
+// Auth is handled server-side (Django session + @role_required).
+// Template injects window.STMC_USER / LOGIN_URL / LOGOUT_URL / CSRF_TOKEN.
 
-const SEED = '/stmc_ops/app/seed-data/';
 const LOGIN_URL = window.LOGIN_URL;
-
-// Redirect immediately if no session
-if (!localStorage.getItem('stmc_user')) {
-  window.location.href = LOGIN_URL;
-}
+const LOGOUT_URL = window.LOGOUT_URL;
 
 function _initials(name) {
   return (name || '').split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
@@ -49,9 +45,11 @@ function bindTabNavigation() {
 function bindLogout() {
   document.querySelectorAll('.logout-link').forEach(btn => {
     btn.addEventListener('click', () => {
-      localStorage.removeItem('stmc_user');
-      localStorage.removeItem('stmc_region');
-      window.location.href = LOGIN_URL;
+      fetch(LOGOUT_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+      }).finally(() => { window.location.href = LOGIN_URL; });
     });
   });
 }
@@ -83,31 +81,12 @@ function bindHtmxFeedback() {
   });
 }
 
-async function initAuthHeader() {
-  const userId = localStorage.getItem('stmc_user');
+function initAuthHeader() {
+  const user = window.STMC_USER || {};
   const nameEl = document.getElementById('hN');
   const badgeEl = document.getElementById('hA');
-
-  let name = userId;
-  let initials = _initials(userId);
-
-  try {
-    const res = await fetch(SEED);
-    if (res.ok) {
-      const data = await res.json();
-      const users = (data && data.users) || [];
-      const user = users.find(u => u.id === userId);
-      if (user) {
-        name = user.name || name;
-        initials = user.initials || _initials(name);
-      }
-    }
-  } catch (err) {
-    console.error(err);
-  }
-
-  if (nameEl) nameEl.textContent = name || '';
-  if (badgeEl) badgeEl.textContent = initials || '?';
+  if (nameEl) nameEl.textContent = user.name || '';
+  if (badgeEl) badgeEl.textContent = user.initials || _initials(user.name);
 }
 
 function init() {

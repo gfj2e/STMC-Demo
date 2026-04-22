@@ -14,6 +14,7 @@ Design principles:
 
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.auth.models import AbstractUser
 import json
 
 
@@ -36,21 +37,26 @@ class Branch(models.Model):
         return self.label
 
 
-class AppUser(models.Model):
-    """Simple app user directory for login role routing."""
+class AppUser(AbstractUser):
+    """STMC app user — authenticates by email, routes by role."""
+    ROLE_SALES = 'sales'
+    ROLE_PM = 'pm'
+    ROLE_EXEC = 'exec'
     ROLE_CHOICES = [
-        ('sales', 'Sales'),
-        ('pm', 'Project Manager'),
-        ('exec', 'Executive / Owner'),
+        (ROLE_SALES, 'Sales'),
+        (ROLE_PM, 'Project Manager'),
+        (ROLE_EXEC, 'Executive / Owner'),
     ]
 
-    user_id = models.CharField(max_length=40, unique=True)
+    email = models.EmailField(max_length=255, unique=True)
     name = models.CharField(max_length=120)
     initials = models.CharField(max_length=4)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     title = models.CharField(max_length=80, blank=True)
     sort_order = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'name', 'role']
 
     class Meta:
         ordering = ['sort_order', 'name']

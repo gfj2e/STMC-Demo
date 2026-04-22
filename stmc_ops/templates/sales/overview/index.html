@@ -74,7 +74,16 @@
 
 </div>
 
-<script>window.LOGIN_URL='{% url "login" %}';</script>
+<script>
+  window.LOGIN_URL = '{% url "login" %}';
+  window.LOGOUT_URL = '{% url "logout" %}';
+  window.CSRF_TOKEN = '{{ csrf_token }}';
+  window.STMC_USER = {
+    name: '{{ user.name|default:user.email|escapejs }}',
+    initials: '{{ user.initials|default:""|escapejs }}',
+    role: '{{ user.role|escapejs }}'
+  };
+</script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="{% static 'sales.js' %}"></script>
 </body>

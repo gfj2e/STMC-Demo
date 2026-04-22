@@ -1,12 +1,9 @@
 // STMC Ops - Sales role JavaScript
-// window.LOGIN_URL must be set by the HTML template before this script runs.
+// Auth is handled server-side (Django session + @role_required).
+// Template injects window.STMC_USER / LOGIN_URL / LOGOUT_URL / CSRF_TOKEN.
 
-const SEED = '/stmc_ops/app/seed-data/';
 const LOGIN_URL = window.LOGIN_URL;
-
-if (!localStorage.getItem('stmc_user')) {
-  window.location.href = LOGIN_URL;
-}
+const LOGOUT_URL = window.LOGOUT_URL;
 
 function initials(name) {
   return (name || '')
@@ -86,9 +83,11 @@ function bindTabs() {
 function bindLogout() {
   document.querySelectorAll('.logout-link').forEach(function (button) {
     button.addEventListener('click', function () {
-      localStorage.removeItem('stmc_user');
-      localStorage.removeItem('stmc_region');
-      window.location.href = LOGIN_URL;
+      fetch(LOGOUT_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+      }).finally(function () { window.location.href = LOGIN_URL; });
     });
   });
 }
@@ -106,36 +105,11 @@ function bindProjectToggles() {
 }
 
 function initAuthHeader() {
-  var userId = localStorage.getItem('stmc_user');
+  var user = window.STMC_USER || {};
   var nameEl = document.getElementById('hN');
   var badgeEl = document.getElementById('hA');
-
-  var displayName = userId;
-  var displayInitials = initials(userId);
-
-  fetch(SEED)
-    .then(function (response) {
-      if (!response.ok) return null;
-      return response.json();
-    })
-    .then(function (data) {
-      if (!data) return;
-      var users = data.users || [];
-      var user = users.find(function (item) {
-        return item.id === userId;
-      });
-      if (!user) return;
-
-      displayName = user.name || displayName;
-      displayInitials = user.initials || initials(displayName);
-    })
-    .catch(function () {
-      // Keep localStorage fallback values.
-    })
-    .finally(function () {
-      if (nameEl) nameEl.textContent = displayName || '';
-      if (badgeEl) badgeEl.textContent = displayInitials || '?';
-    });
+  if (nameEl) nameEl.textContent = user.name || '';
+  if (badgeEl) badgeEl.textContent = user.initials || initials(user.name);
 }
 
 function init() {
