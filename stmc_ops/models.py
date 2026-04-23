@@ -480,6 +480,19 @@ class Job(models.Model):
     collected_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     current_draw_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    # ── SALES-SIDE STATE ──
+    wizard_state = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Raw BuildWizard STATE payload, used to rehydrate the wizard on Edit.",
+    )
+    sales_closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when sales rep clicks DocuSign or Interior Contracts handoff. "
+                  "Null = In Progress; set = Closed on the sales side.",
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

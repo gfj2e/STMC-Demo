@@ -4364,6 +4364,24 @@ function saveContract(){
   var draw5 = isShell ? 0 : Math.round(total * 0.20);
   var draw6 = isShell ? 0 : Math.max(0, total - deposit - draw1 - concTotal - custLabor - draw4 - draw5);
 
+  var tradeBudgets = [];
+  var contractorBudget = Math.round(sumItems(buildCtrItems()));
+  if(contractorBudget > 0){
+    tradeBudgets.push({ trade: "Contractor Labor", budgeted: contractorBudget, actual: 0 });
+  }
+
+  if(!isShell){
+    var upgradesByTrade = computeUpgradesByTrade();
+    INT_TRADE_GROUPS.forEach(function(tg){
+      var tradeBudget = Math.round(calcIntTradeBase(tg) + (upgradesByTrade[tg.key] || 0));
+      if(tradeBudget > 0){
+        tradeBudgets.push({ trade: tg.name, budgeted: tradeBudget, actual: 0 });
+      }
+    });
+  }
+
+  var budgetTotal = tradeBudgets.reduce(function(sum, row){ return sum + pn(row.budgeted); }, 0);
+
   var allDraws = [
     {n:0, l:"Good Faith Deposit",                   a: deposit},
     {n:1, l:"1st Home Draw (Loan Closing)",          a: draw1},
@@ -4383,7 +4401,12 @@ function saveContract(){
     p10:          p10,
     shellTotal:   shellTotal,
     turnkeyTotal: turnkeyTotal,
-    draws:        draws
+    budgetTotal:  budgetTotal,
+    tradeBudgets: tradeBudgets,
+    draws:        draws,
+    // Full wizard STATE snapshot — server stores on Job.wizard_state
+    // so Edit Contract can rehydrate the wizard with every field intact.
+    rawState:     STATE
   };
 
   fetch("/stmc_ops/app/save-contract/", {
@@ -4515,12 +4538,33 @@ function importStateJSON(){
     renderWizardConfigError();
     return;
   }
-  // Try to restore from autosave on load
-  var restored = loadAutosave();
+  // Edit-from-server hydration: if the page embedded an existing STATE
+  // payload (sales_shell_edit / sales_turnkey_edit), deep-merge it over
+  // defaults BEFORE any autosave restore so the stored contract wins.
+  var editSeeded = false;
+  try {
+    if (window.STMC_EDIT_STATE && typeof window.STMC_EDIT_STATE === "object" && Object.keys(window.STMC_EDIT_STATE).length) {
+      STATE = mergeDeep(defaultState(), window.STMC_EDIT_STATE);
+      var ids = activeStepIds();
+      if (STATE._stepIdx >= ids.length) STATE._stepIdx = 0;
+      editSeeded = true;
+    }
+  } catch (e) { /* fall through to autosave */ }
+
+  // Fall back to autosave only when not editing an existing contract.
+  var restored = false;
+  if (!editSeeded) {
+    restored = loadAutosave();
+  }
+
   if(__WIZ_DEFAULT_MODE === "shell" || __WIZ_DEFAULT_MODE === "turnkey"){
-    STATE.jobMode = __WIZ_DEFAULT_MODE;
+    if (!editSeeded) STATE.jobMode = __WIZ_DEFAULT_MODE;
     if(STATE._stepIdx >= activeStepIds().length) STATE._stepIdx = 0;
   }
   renderCurrentStep();
-  if(restored) showToast("Session restored from autosave.");
+  if (editSeeded) {
+    showToast("Editing contract — "+(STATE.customer.name || STATE.model || "saved draft"));
+  } else if (restored) {
+    showToast("Session restored from autosave.");
+  }
 })();

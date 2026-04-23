@@ -1,0 +1,19 @@
+<!-- Header -->
+<div class="header">
+  <div class="header-sub">Sales</div>
+  <div class="header-title">P10 Material — {{ p10_month_label }}</div>
+  <div class="header-total" id="sales-total">{{ p10_total_display }}</div>
+  <div class="header-subtotal-note">In Progress + Closed this month</div>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-strip" id="sales-kpis">
+  <div class="kpi-tile">
+    <div class="kpi-val">{{ in_progress_count }}</div>
+    <div class="kpi-lbl">In Progress</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="kpi-val">{{ closed_count }}</div>
+    <div class="kpi-lbl">Closed (this month)</div>
+  </div>
+</div>

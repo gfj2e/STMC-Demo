@@ -1,0 +1,26 @@
+{% if projects_closed %}
+  <div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">
+    Closed — {{ p10_month_label }} <span style="font-weight:400">({{ projects_closed|length }})</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    {% for project in projects_closed %}
+      <div class="proj-card" style="opacity:.9">
+        <div class="proj-hdr" style="padding:10px 14px">
+          <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr;gap:12px;align-items:center">
+            <div>
+              <p class="proj-name" style="margin:0">{{ project.name }}</p>
+              {% if project.order_number %}
+                <p class="proj-sub" style="margin:0">#{{ project.order_number }}</p>
+              {% endif %}
+            </div>
+            <div style="font-size:12px;color:var(--g600)">{{ project.model_name }}</div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--green)">{{ project.p10_display }}</div>
+            <div style="text-align:right;font-size:11px;color:var(--g500)">Closed {{ project.closed_display }}</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="banner banner-empty">No contracts closed this month.</div>
+{% endif %}

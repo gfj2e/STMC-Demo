@@ -15,48 +15,40 @@
 <!-- Nav (shared with shell/turnkey wizard) -->
 {% include "sales/_nav.html" %}
 
-<!-- Header -->
-<div class="header">
-  <div class="header-sub">Sales</div>
-  <div class="header-title">My Projects</div>
-  <div class="header-total" id="sales-total">{{ sales_total }}</div>
-  <div class="header-subtotal-note">Total Contract Value</div>
-</div>
-
-<!-- KPI strip -->
-<div class="kpi-strip" id="sales-kpis">
-  {% for kpi in kpis %}
-    <div class="kpi-tile">
-      <div class="{{ kpi.value_class }}">{{ kpi.value }}</div>
-      <div class="kpi-lbl">{{ kpi.label }}</div>
-    </div>
-  {% endfor %}
+<!-- Header + KPI (auto-refreshes on sales-refresh event) -->
+<div
+  id="sales-header-wrap"
+  hx-get="{% url 'sales_header_panel' %}"
+  hx-trigger="sales-refresh from:body"
+  hx-swap="innerHTML"
+>
+  {% include "sales/overview/_header.html" %}
 </div>
 
 <!-- Tab panels -->
 <div class="container">
 
-  <!-- My Projects -->
-  <div id="tab-projects" class="tab-panel">
+  <!-- In Progress -->
+  <div id="tab-in-progress" class="tab-panel">
     <div
-      id="tab-projects-panel"
-      hx-get="{% url 'sales_projects_panel' %}"
-      hx-trigger="load, sales-projects-refresh from:body, sales-refresh from:body"
+      id="tab-in-progress-panel"
+      hx-get="{% url 'sales_in_progress_panel' %}"
+      hx-trigger="load, sales-in-progress-refresh from:body, sales-refresh from:body"
       hx-swap="innerHTML"
     >
-      <div class="banner banner-empty">Loading projects...</div>
+      <div class="banner banner-empty">Loading in-progress contracts...</div>
     </div>
   </div>
 
-  <!-- Models -->
-  <div id="tab-models" class="tab-panel" style="display:none">
+  <!-- Closed -->
+  <div id="tab-closed" class="tab-panel" style="display:none">
     <div
-      id="tab-models-panel"
-      hx-get="{% url 'sales_models_panel' %}"
-      hx-trigger="load, sales-models-refresh from:body, sales-refresh from:body"
+      id="tab-closed-panel"
+      hx-get="{% url 'sales_closed_panel' %}"
+      hx-trigger="load, sales-closed-refresh from:body, sales-refresh from:body"
       hx-swap="innerHTML"
     >
-      <div class="banner banner-empty">Loading models...</div>
+      <div class="banner banner-empty">Loading closed contracts...</div>
     </div>
   </div>
 
@@ -85,6 +77,6 @@
   };
 </script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="{% static 'sales.js' %}"></script>
+<script src="{% static 'sales.js' %}?v=2"></script>
 </body>
 </html>

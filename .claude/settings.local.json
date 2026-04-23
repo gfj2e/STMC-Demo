@@ -18,7 +18,11 @@
       "Bash(curl -s -c /tmp/c3.txt http://127.0.0.1:8765/stmc_ops/login/)",
       "Bash(curl -s -X POST http://127.0.0.1:8765/stmc_ops/login/submit/ -H \"Referer: http://127.0.0.1:8765/stmc_ops/login/\" -d \"login=m.stoll@stmc.com&password=stmexecutive\" -o /dev/null -w \"%{http_code}\\\\n\")",
       "Bash(kill %1)",
-      "Bash(pkill -f \"manage.py runserver 127.0.0.1:8765\")"
+      "Bash(pkill -f \"manage.py runserver 127.0.0.1:8765\")",
+      "Bash(python -c \"from django.urls import reverse; import django; import os; os.environ['DJANGO_SETTINGS_MODULE']='stmc_demo.settings'; django.setup\\(\\); print\\(reverse\\('sales_shell_edit', args=[1]\\)\\); print\\(reverse\\('sales_turnkey_edit', args=[1]\\)\\); print\\(reverse\\('sales_in_progress_panel'\\)\\); print\\(reverse\\('sales_closed_panel'\\)\\); print\\(reverse\\('sales_finalize_contract', args=[1]\\)\\)\")",
+      "Bash(python manage.py shell -c \"from django.urls import reverse; print\\(reverse\\('sales_shell_edit', args=[1]\\)\\); print\\(reverse\\('sales_turnkey_edit', args=[1]\\)\\); print\\(reverse\\('sales_in_progress_panel'\\)\\); print\\(reverse\\('sales_closed_panel'\\)\\); print\\(reverse\\('sales_finalize_contract', args=[1]\\)\\)\")",
+      "Bash(python manage.py shell -c \"from stmc_ops.models import Job; print\\('Total jobs:', Job.objects.count\\(\\)\\); print\\('In progress:', Job.objects.filter\\(sales_closed_at__isnull=True\\).count\\(\\)\\); print\\('Closed:', Job.objects.filter\\(sales_closed_at__isnull=False\\).count\\(\\)\\); j = Job.objects.first\\(\\); print\\('Sample:', j.customer_name if j else None, '| sales_closed_at:', j.sales_closed_at if j else None, '| wizard_state keys:', list\\(\\(j.wizard_state or {}\\).keys\\(\\)\\) if j else None\\)\")",
+      "Bash(python manage.py shell -c \"from stmc_ops.models import Job, AppUser; print\\('Sales users:'\\); [print\\(' ', u.email, '|', repr\\(u.name\\)\\) for u in AppUser.objects.filter\\(role='sales'\\)]; print\\('Job sales_reps:'\\); [print\\(' ', repr\\(j.sales_rep\\), '|', j.customer_name\\) for j in Job.objects.all\\(\\)]\")"
     ]
   }
 }

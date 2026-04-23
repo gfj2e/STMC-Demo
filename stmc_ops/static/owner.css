@@ -531,3 +531,706 @@
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* ── Executive dashboard demo mirror ── */
+
+.exec-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 8px;
+}
+
+.exec-stitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--g500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 18px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exec-flag {
+  font-size: 9px;
+  background: var(--blue-light);
+  color: var(--blue);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.exec-qb-card {
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+
+.exec-qb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.exec-qb-logo {
+  width: 28px;
+  height: 28px;
+  background: #2ca01c;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.exec-qb-title-wrap {
+  min-width: 0;
+}
+
+.exec-qb-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.exec-qb-sub {
+  font-size: 10px;
+  color: var(--g500);
+}
+
+.exec-qb-status {
+  margin-left: auto;
+  font-size: 10px;
+  background: var(--green-light);
+  color: var(--green);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.exec-qb-status.is-offline {
+  background: var(--amber-light);
+  color: var(--amber-dark);
+}
+
+.exec-qb-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--g100);
+  font-size: 12px;
+}
+
+.exec-qb-row:last-child {
+  border-bottom: 0;
+}
+
+.exec-qb-row > span:first-child {
+  color: var(--g500);
+}
+
+.exec-qb-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.exec-qb-val.is-green {
+  color: var(--green);
+}
+
+.exec-qb-val.is-red {
+  color: #ef4444;
+}
+
+.exec-profit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.exec-profit-box {
+  text-align: center;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--g200);
+  background: #fff;
+}
+
+.exec-profit-box.is-highlight {
+  background: var(--green-light);
+  border-color: #10b981;
+}
+
+.exec-profit-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.exec-profit-label {
+  font-size: 9px;
+  color: var(--g500);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.exec-job-card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--g200);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.exec-job-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.exec-job-head {
+  width: 100%;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.exec-job-head:hover {
+  background: var(--g50);
+}
+
+.exec-job-info h3 {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exec-job-sub {
+  font-size: 11px;
+  color: var(--g500);
+}
+
+.exec-branch-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  background: var(--red);
+  color: #fff;
+}
+
+.exec-job-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.exec-job-totals {
+  text-align: right;
+}
+
+.exec-job-amount {
+  font-size: 17px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.exec-job-pct {
+  font-size: 10px;
+  color: var(--g500);
+}
+
+.exec-status-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.exec-status-chip.act {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.exec-status-chip.od {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+.exec-arrow {
+  font-size: 13px;
+  color: var(--g500);
+  transition: transform 0.2s;
+}
+
+.exec-arrow.open {
+  transform: rotate(180deg);
+}
+
+.exec-draw-bar {
+  height: 7px;
+  background: var(--g200);
+  border-radius: 4px;
+  margin: 0 20px 10px;
+  display: flex;
+  overflow: hidden;
+}
+
+.exec-draw-segment {
+  width: 0;
+  transition: width 0.45s;
+}
+
+.exec-draw-segment.paid {
+  background: #10b981;
+}
+
+.exec-draw-segment.overdue {
+  background: #ef4444;
+}
+
+.exec-draw-segment.pending {
+  background: var(--g200);
+}
+
+.exec-detail {
+  display: none;
+  border-top: 1px solid var(--g200);
+}
+
+.exec-detail.open {
+  display: block;
+}
+
+.exec-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--g200);
+  background: var(--g50);
+  flex-wrap: wrap;
+}
+
+.exec-tab {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g500);
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+}
+
+.exec-tab:hover {
+  color: var(--g900);
+}
+
+.exec-tab.is-active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.exec-tab-panel {
+  overflow-x: auto;
+}
+
+.exec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.exec-table th {
+  background: var(--g100);
+  padding: 7px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--g700);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.exec-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--g100);
+}
+
+.exec-table tr.is-paid td {
+  background: var(--green-light);
+}
+
+.exec-table tr.is-overdue td {
+  background: var(--red-light);
+}
+
+.exec-table tr.is-total td {
+  border-top: 2px solid var(--g300);
+  font-weight: 700;
+  background: var(--g100);
+}
+
+.exec-total-pct {
+  text-align: right;
+  color: var(--g500);
+}
+
+.exec-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.exec-dot.paid {
+  background: #10b981;
+}
+
+.exec-dot.pending {
+  background: var(--g300);
+}
+
+.exec-dot.overdue {
+  background: #ef4444;
+}
+
+.exec-source {
+  color: var(--blue);
+  font-weight: 500;
+  font-size: 10px;
+}
+
+.exec-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  background: var(--g100);
+  color: var(--g700);
+}
+
+.exec-mute {
+  color: var(--g300);
+}
+
+.exec-invoice-id,
+.is-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.is-right {
+  text-align: right;
+}
+
+.is-small {
+  font-size: 10px;
+  color: var(--g700);
+}
+
+.is-medium {
+  font-weight: 500;
+}
+
+.is-blue {
+  color: var(--blue);
+}
+
+.is-red {
+  color: #ef4444;
+}
+
+.exec-cost-code {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  background: var(--g100);
+  color: var(--g700);
+}
+
+.exec-branch-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid var(--g200);
+}
+
+.exec-branch-tag.summertown {
+  background: #fef2f2;
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.exec-branch-tag.morristown {
+  background: #eff6ff;
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+.exec-branch-tag.hopkinsville {
+  background: #f0fdf4;
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.exec-branch-tag.hayden {
+  background: #fffbeb;
+  color: var(--amber-dark);
+  border-color: var(--amber);
+}
+
+.exec-bill-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.exec-bill-status.paid {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.exec-bill-status.pending {
+  background: var(--amber-light);
+  color: var(--amber-dark);
+}
+
+.exec-bill-status.review {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.exec-bill-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--g200);
+}
+
+.exec-bill-box {
+  text-align: center;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--g200);
+}
+
+.exec-bill-val {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.exec-bill-val.is-green {
+  color: var(--green);
+}
+
+.exec-bill-val.is-amber {
+  color: var(--amber-dark);
+}
+
+.exec-bill-lbl {
+  font-size: 9px;
+  color: var(--g500);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.exec-budget-note {
+  padding: 10px 14px 4px;
+  font-size: 10px;
+  color: var(--g500);
+}
+
+.exec-budget-head,
+.exec-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--g100);
+  font-size: 11px;
+}
+
+.exec-budget-head {
+  background: var(--g100);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--g700);
+  text-transform: uppercase;
+}
+
+.exec-budget-row:hover {
+  background: var(--g50);
+}
+
+.exec-budget-row.is-total {
+  font-weight: 700;
+  background: var(--g100);
+  border-top: 2px solid var(--g300);
+}
+
+.exec-budget-col.trade {
+  flex: 1;
+  min-width: 160px;
+}
+
+.exec-budget-col.amt {
+  width: 110px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.exec-budget-col.bar {
+  width: 140px;
+}
+
+.exec-cost-sub {
+  font-size: 9px;
+  color: var(--g500);
+}
+
+.exec-budget-bar {
+  height: 6px;
+  background: var(--g200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.exec-budget-fill {
+  height: 100%;
+  display: block;
+  width: 0;
+}
+
+.exec-budget-fill.is-blue {
+  background: var(--blue);
+}
+
+.exec-budget-fill.is-amber {
+  background: var(--amber);
+}
+
+.exec-budget-fill.is-green {
+  background: #10b981;
+}
+
+.exec-profit-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.exec-metric-box {
+  text-align: center;
+  padding: 12px;
+  border: 1px solid var(--g200);
+  border-radius: 6px;
+}
+
+.exec-metric-box.is-highlight {
+  border-color: #10b981;
+  background: var(--green-light);
+}
+
+.exec-metric-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.exec-metric-val.is-green {
+  color: var(--green);
+}
+
+.exec-metric-lbl {
+  font-size: 9px;
+  color: var(--g500);
+  text-transform: uppercase;
+}
+
+.exec-mark-paid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 14px 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+}
+
+.exec-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--g500);
+}
+
+@media (max-width: 1024px) {
+  .exec-profit-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .exec-wrap {
+    padding: 14px 0;
+  }
+
+  .exec-profit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exec-job-head {
+    padding: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .exec-job-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .exec-bill-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .exec-profit-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .exec-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .exec-tab {
+    white-space: nowrap;
+  }
+
+  .exec-budget-col.amt {
+    width: 90px;
+  }
+}

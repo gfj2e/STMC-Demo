@@ -87,8 +87,19 @@
 <div id="printSheet" style="display:none"></div>
 
 {{ wizard_seed_data|json_script:"stmc-wizard-seed-data" }}
+{% if existing_state is not None %}{{ existing_state|json_script:"stmc-wizard-edit-state" }}{% endif %}
 <script>
   window.STMC_WIZARD_DATA = JSON.parse(document.getElementById("stmc-wizard-seed-data").textContent);
+  (function () {
+    var editEl = document.getElementById("stmc-wizard-edit-state");
+    if (editEl) {
+      try { window.STMC_EDIT_STATE = JSON.parse(editEl.textContent); }
+      catch (e) { window.STMC_EDIT_STATE = null; }
+    } else {
+      window.STMC_EDIT_STATE = null;
+    }
+  })();
+  window.STMC_EDIT_JOB_ID = {% if existing_job_id %}{{ existing_job_id }}{% else %}null{% endif %};
   window.STMC_WIZARD_DEFAULT_MODE = "{{ wizard_mode }}";
   window.LOGIN_URL = "{% url 'login' %}";
   window.LOGOUT_URL = "{% url 'logout' %}";
@@ -99,7 +110,7 @@
     role: "{{ user.role|escapejs }}"
   };
 </script>
-<script src="{% static 'contracts/buildwizard.js' %}" defer></script>
+<script src="{% static 'contracts/buildwizard.js' %}?v=2" defer></script>
 <script>
   (function initSalesNavbar() {
     function initials(value) {

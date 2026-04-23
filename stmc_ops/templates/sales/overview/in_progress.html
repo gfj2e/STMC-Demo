@@ -1,0 +1,79 @@
+{% if projects_in_progress %}
+  <div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">
+    In Progress <span style="font-weight:400">({{ projects_in_progress|length }})</span>
+  </div>
+  {% for project in projects_in_progress %}
+    <div class="proj-card">
+      <div class="proj-hdr">
+        <div class="proj-hdr-top">
+          <div>
+            <p class="proj-name">{{ project.name }}</p>
+            <p class="proj-sub">
+              {{ project.model_name }}
+              {% if project.address %} &middot; {{ project.address }}{% endif %}
+              {% if project.order_number %} &middot; #{{ project.order_number }}{% endif %}
+            </p>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="pill pill-muted">{% if project.job_mode == 'turnkey' %}Turnkey{% else %}Shell{% endif %}</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+          <div>
+            <div style="font-size:9px;color:var(--g400);text-transform:uppercase">P10 Material</div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;margin-top:1px;color:var(--green)">{{ project.p10_display }}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--g400);text-transform:uppercase">Good-Faith Deposit</div>
+            <div style="margin-top:1px">
+              {% if project.deposit_paid %}
+                <span class="pill pill-success">&#10003; Paid</span>
+              {% else %}
+                <span class="pill pill-muted">&#8987; Pending</span>
+              {% endif %}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--g400);text-transform:uppercase">Loan Closing</div>
+            <div style="margin-top:1px">
+              {% if project.loan_closed %}
+                <span class="pill pill-success">&#10003; Closed</span>
+              {% else %}
+                <span class="pill pill-muted">&#8987; Pending</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="proj-body" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px">
+        <a href="{{ project.edit_url }}"
+           class="btn btn-sm btn-secondary"
+           style="display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border:1px solid var(--g300);border-radius:6px;background:#fff;color:var(--g700);text-decoration:none;font-weight:500;font-size:12px">
+          Edit Contract
+        </a>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-post="{{ project.finalize_url }}"
+                hx-target="#tab-in-progress-panel"
+                hx-swap="innerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-confirm="Send this contract to DocuSign? This marks the deposit paid and loan closed, then moves the contract to Closed."
+                style="display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border:1px solid var(--brand,#a31a1a);border-radius:6px;background:var(--brand,#a31a1a);color:#fff;font-weight:500;font-size:12px;cursor:pointer">
+          Send to DocuSign
+        </button>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-post="{{ project.finalize_url }}"
+                hx-target="#tab-in-progress-panel"
+                hx-swap="innerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-confirm="Send this contract to Interior Contracts for selections? This marks the deposit paid and loan closed, then moves the contract to Closed."
+                style="display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border:1px solid var(--g700,#374151);border-radius:6px;background:var(--g700,#374151);color:#fff;font-weight:500;font-size:12px;cursor:pointer">
+          Send to Interior Contracts
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="banner banner-empty">No contracts in progress. Click <strong>New Contract</strong> to build one.</div>
+{% endif %}

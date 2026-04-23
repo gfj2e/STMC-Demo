@@ -16,12 +16,15 @@ function initials(name) {
 
 function updateHeaderTitle(tab) {
   var titles = {
-    projects: 'My Projects',
-    models: 'Models',
+    'in-progress': 'In Progress',
+    closed: 'Closed',
     rates: 'Rate Card'
   };
   var titleEl = document.querySelector('.header-title');
-  if (titleEl) titleEl.textContent = titles[tab] || 'Sales';
+  // Don't overwrite the P10 header — leave the default Django-rendered label alone.
+  if (titleEl && titleEl.dataset.tabTitle !== undefined) {
+    titleEl.textContent = titles[tab] || 'Sales';
+  }
 }
 
 function activateTab(tab) {
@@ -37,8 +40,8 @@ function activateTab(tab) {
   });
 
   var navMap = {
-    projects: 'my-projects',
-    models: 'models',
+    'in-progress': 'in-progress',
+    closed: 'closed',
     rates: 'rates'
   };
   var navLink = document.querySelector('.app-nav-link[data-mv-tab="' + navMap[tab] + '"]');
@@ -48,7 +51,7 @@ function activateTab(tab) {
   document.body.dispatchEvent(new CustomEvent('sales-' + tab + '-refresh'));
 
   var url = new URL(window.location.href);
-  if (tab === 'projects') {
+  if (tab === 'in-progress') {
     url.searchParams.delete('tab');
   } else {
     url.searchParams.set('tab', tab);
@@ -58,8 +61,8 @@ function activateTab(tab) {
 
 function bindTabs() {
   var tabByNav = {
-    'my-projects': 'projects',
-    models: 'models',
+    'in-progress': 'in-progress',
+    closed: 'closed',
     rates: 'rates'
   };
 
@@ -73,9 +76,9 @@ function bindTabs() {
     });
   });
 
-  var defaultTab = new URLSearchParams(window.location.search).get('tab') || 'projects';
+  var defaultTab = new URLSearchParams(window.location.search).get('tab') || 'in-progress';
   if (!document.getElementById('tab-' + defaultTab)) {
-    defaultTab = 'projects';
+    defaultTab = 'in-progress';
   }
   activateTab(defaultTab);
 }

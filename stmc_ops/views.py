@@ -418,8 +418,8 @@ def _progress_from_fields(job, budget_total, budget_spent):
 
 def _build_manager_owner_data():
     jobs = list(
-        Job.objects.select_related("floor_plan")
-        .prefetch_related("demo_trade_budgets", "demo_draws")
+        Job.objects.select_related("floor_plan", "branch")
+        .prefetch_related("demo_trade_budgets", "demo_draws", "budget_lines__trade")
         .order_by("order_number")[:12]
     )
 
@@ -442,6 +442,25 @@ def _build_manager_owner_data():
         for tb in job.demo_trade_budgets.all():
             bg[tb.trade_name] = int(tb.budgeted)
             ac[tb.trade_name] = int(tb.actual)
+
+        # Fallback for contracts saved without demo trade rows:
+        # use computed budget lines when present, then a single total budget row.
+        if not bg:
+            for line in job.budget_lines.all():
+                trade_name = line.trade.name if line.trade else "Budget"
+                bg[trade_name] = int(_to_number(line.total_budgeted))
+                ac[trade_name] = 0
+
+        if not bg:
+            fallback_budget = int(_to_number(job.budget_total_amount))
+            fallback_spent = int(_to_number(job.budget_spent_amount))
+            if fallback_budget <= 0:
+                fallback_budget = int(
+                    sum(int(_to_number(draw.amount)) for draw in job.demo_draws.all())
+                )
+            if fallback_budget > 0 or fallback_spent > 0:
+                bg["Total Budget"] = fallback_budget
+                ac["Total Budget"] = fallback_spent
 
         budget_total = sum(bg.values()) if bg else _to_number(job.budget_total_amount)
         budget_spent = sum(ac.values()) if ac else _to_number(job.budget_spent_amount)
@@ -475,6 +494,8 @@ def _build_manager_owner_data():
             "nm": name,
             "md": model_name,
             "cu": customer_display,
+            "br": job.branch.label if job.branch else "Summertown",
+            "ord": job.order_number or "",
             "ph": phase,
             "pm": pm_name,
             "ct": contract,
@@ -701,33 +722,80 @@ def _kpi_value_class(kpi):
     return value_class
 
 
+def _branch_badge_class(branch_label):
+    label = (branch_label or "").lower()
+    if "morristown" in label:
+        return "morristown"
+    if "hopkinsville" in label:
+        return "hopkinsville"
+    if "hayden" in label:
+        return "hayden"
+    return "summertown"
+
+
+def _bill_status_label(status):
+    if status == "paid":
+        return "Paid"
+    if status == "review":
+        return "Review"
+    return "Pending"
+
+
 def _build_project_ui_rows(projects):
     rows = []
     for project in projects:
         draws = project.get("dr", [])
         total = int(project.get("ct") or 0)
         paid = int(sum(d.get("a", 0) for d in draws if d.get("s") == JobDraw.STATUS_PAID))
+        total_due = int(sum(d.get("a", 0) for d in draws))
         remaining = max(0, total - paid)
         pct = int(round((paid / total) * 100)) if total > 0 else 0
         current_draw = next((d for d in draws if d.get("s") == JobDraw.STATUS_CURRENT), None)
+        branch_label = project.get("br") or "Summertown"
+        raw_order_number = str(project.get("ord") or "").strip()
+        if raw_order_number:
+            order_number = raw_order_number
+        else:
+            order_number = str(project.get("id") or "")
+        if order_number.isdigit():
+            order_number_display = order_number.zfill(4)
+        else:
+            order_number_display = order_number
 
         draw_rows = []
         timeline_rows = []
+        draw_segments = []
         for draw in draws:
             status = draw.get("s")
+            amount = int(draw.get("a") or 0)
+            paid_amount = amount if status == JobDraw.STATUS_PAID else 0
+            date_text = draw.get("t") or ""
+            status_demo = "paid" if status == JobDraw.STATUS_PAID else ("overdue" if status == JobDraw.STATUS_CURRENT else "pending")
             timeline_rows.append(_draw_timeline_row(draw))
             draw_rows.append(
                 {
                     "draw_number": draw.get("n"),
                     "draw_number_display": "D" if draw.get("n") == 0 else draw.get("n"),
                     "label": draw.get("l", ""),
-                    "date": draw.get("t") or "-",
-                    "amount_display": _format_money(draw.get("a", 0)),
+                    "date": date_text or "-",
+                    "amount_display": _format_money(amount),
+                    "due_display": _format_money(amount),
+                    "paid_display": _format_money(paid_amount) if paid_amount else "-",
+                    "method": "Wire" if paid_amount else "",
+                    "source": f"{branch_label} draw account" if paid_amount else "",
+                    "status_demo": status_demo,
+                    "status_demo_label": "Paid" if status_demo == "paid" else ("Due" if status_demo == "overdue" else "Pending"),
                     "status": status,
                     "draw_num_class": _draw_num_class(status),
                     "pill_class": _draw_status_pill_class(status),
                     "status_label": _draw_status_label(status),
-                    "is_placeholder_date": not bool(draw.get("t")),
+                    "is_placeholder_date": not bool(date_text),
+                }
+            )
+            draw_segments.append(
+                {
+                    "width_pct": (amount / total_due) * 100 if total_due else 0,
+                    "status_class": status_demo,
                 }
             )
 
@@ -744,38 +812,107 @@ def _build_project_ui_rows(projects):
             trade_rows.append(
                 {
                     "trade": trade,
+                    "cost_code": trade,
+                    "budget_amount": budget,
+                    "actual_amount": actual,
+                    "remaining_amount": variance,
                     "budget_display": _format_money(budget),
                     "actual_display": _format_money(actual),
                     "variance_display": _format_money(variance),
+                    "progress_pct": int(round((actual / budget) * 100)) if budget > 0 else 0,
                     "is_over": actual > budget,
                 }
             )
 
+        bills = []
+        bill_seq = 1
+        for trade in trade_rows:
+            trade_name = trade["trade"]
+            budget = trade["budget_amount"]
+            actual = trade["actual_amount"]
+            remaining_budget = max(0, budget - actual)
+            invoice_id = f"INV-{timezone.now().year}-{project.get('id', 0):04d}-{bill_seq:03d}"
+
+            if actual > 0:
+                actual_status = "review" if actual > budget else "paid"
+                bills.append(
+                    {
+                        "invoice_id": invoice_id,
+                        "vendor": f"{trade_name} Vendor",
+                        "description": f"{trade_name} actual cost entry",
+                        "cost_code": trade["cost_code"],
+                        "qb_account": trade_name,
+                        "amount": actual,
+                        "amount_display": _format_money(actual),
+                        "date": current_draw.get("t") if current_draw and current_draw.get("t") else "",
+                        "branch": branch_label,
+                        "branch_class": _branch_badge_class(branch_label),
+                        "status": actual_status,
+                        "status_label": _bill_status_label(actual_status),
+                    }
+                )
+                bill_seq += 1
+
+            if remaining_budget > 0:
+                bills.append(
+                    {
+                        "invoice_id": f"INV-{timezone.now().year}-{project.get('id', 0):04d}-{bill_seq:03d}",
+                        "vendor": f"{trade_name} Vendor",
+                        "description": f"{trade_name} budgeted remaining",
+                        "cost_code": trade["cost_code"],
+                        "qb_account": trade_name,
+                        "amount": remaining_budget,
+                        "amount_display": _format_money(remaining_budget),
+                        "date": "",
+                        "branch": branch_label,
+                        "branch_class": _branch_badge_class(branch_label),
+                        "status": "pending",
+                        "status_label": _bill_status_label("pending"),
+                    }
+                )
+                bill_seq += 1
+
+        bills_total = sum(row["amount"] for row in bills)
+        bills_paid = sum(row["amount"] for row in bills if row["status"] == "paid")
+        bills_pending = sum(row["amount"] for row in bills if row["status"] != "paid")
+
         margin_pct = int(round(((total - total_bg) / total) * 100, 0)) if total > 0 and total_bg > 0 else 0
         margin_color = "var(--green)" if margin_pct >= 30 else ("var(--amber)" if margin_pct >= 15 else "#DC2626")
+        live_margin_pct = round(((total - total_ac) / total) * 100, 1) if total > 0 else 0
 
         current_draw_label = ""
         if current_draw and current_draw.get("l"):
             current_draw_label = re.sub(r"^\d+\w*\s*[\u2014\-]\s*", "", current_draw.get("l") or "")
 
         subtitle = f"{project.get('md', '')} · {project.get('cu', '')} · PM: {project.get('pm', '')}"
+        overdue_draw = any(draw.get("s") == JobDraw.STATUS_CURRENT for draw in draws)
 
         rows.append(
             {
                 "id": project.get("id"),
                 "name": project.get("nm", ""),
+                "model_name": project.get("md", ""),
+                "branch_label": branch_label,
+                "order_number": order_number_display,
                 "phase": project.get("ph", "estimate"),
                 "phase_label": _phase_label(project.get("ph", "estimate")),
                 "phase_pill_class": _phase_pill_class(project.get("ph", "estimate")),
                 "subtitle": subtitle,
                 "total_amount": total,
+                "paid_amount": paid,
                 "total_display": _format_money(total),
                 "paid_display": _format_money(paid),
                 "remaining_display": _format_money(remaining),
                 "pct": max(0, min(100, pct)),
                 "draws": draw_rows,
+                "draw_segments": draw_segments,
                 "timeline_draws": timeline_rows,
                 "trades": trade_rows,
+                "bills": bills,
+                "bills_count": len(bills),
+                "bills_total_display": _format_money(bills_total),
+                "bills_paid_display": _format_money(bills_paid),
+                "bills_pending_display": _format_money(bills_pending),
                 "total_bg": total_bg,
                 "total_ac": total_ac,
                 "total_bg_display": _format_money(total_bg),
@@ -784,6 +921,10 @@ def _build_project_ui_rows(projects):
                 "total_rem_negative": (total_bg - total_ac) < 0,
                 "margin_pct": margin_pct,
                 "margin_color": margin_color,
+                "live_margin_pct": live_margin_pct,
+                "is_overdue": overdue_draw,
+                "status_chip_class": "od" if overdue_draw else "act",
+                "status_chip_label": "Payment Due" if overdue_draw else "Active",
                 "current_draw": {
                     "label": current_draw.get("l") if current_draw else "",
                     "step_label": current_draw_label,
@@ -829,9 +970,39 @@ def _build_owner_ui_context():
         if kpi.get("label") == "Contract value":
             owner_total = kpi.get("value", "—")
 
+    dashboard_jobs = active_projects
+    contract_total = sum(job.get("total_amount", 0) for job in dashboard_jobs)
+    collected_total = sum(job.get("paid_amount", 0) for job in dashboard_jobs)
+    outstanding_total = max(0, contract_total - collected_total)
+    actual_total = sum(job.get("total_ac", 0) for job in dashboard_jobs)
+    budget_total = sum(job.get("total_bg", 0) for job in dashboard_jobs)
+    live_margin_pct = round(((contract_total - actual_total) / contract_total) * 100, 1) if contract_total > 0 else 0
+
+    bill_rows = [bill for job in dashboard_jobs for bill in job.get("bills", [])]
+    matched_count = sum(1 for bill in bill_rows if bill.get("status") in {"paid", "review"})
+    unmatched_count = sum(1 for bill in bill_rows if bill.get("status") == "review")
+
+    dashboard_metrics = {
+        "active_jobs": len(dashboard_jobs),
+        "under_contract": _format_money(contract_total),
+        "collected": _format_money(collected_total),
+        "outstanding": _format_money(outstanding_total),
+        "qb_payments": _format_money(collected_total),
+        "qb_matched": f"{matched_count} / {len(bill_rows)}" if bill_rows else "0 / 0",
+        "qb_unmatched": unmatched_count,
+        "contract_revenue": _format_money(contract_total),
+        "actual_cost": _format_money(actual_total),
+        "live_margin_pct": f"{live_margin_pct:.1f}%",
+        "last_pull": timezone.localtime().strftime("%b %d, %Y %I:%M %p").replace(" 0", " "),
+        "is_connected": bool(dashboard_jobs),
+        "budget_total": _format_money(budget_total),
+    }
+
     return {
         "kpis": kpis,
         "owner_total": owner_total,
+        "dashboard_metrics": dashboard_metrics,
+        "dashboard_jobs": dashboard_jobs,
         "notifications": notifications,
         "notif_count": len(notifications),
         "dashboard_active_projects": active_projects,
@@ -871,29 +1042,95 @@ def _build_manager_ui_context():
     }
 
 
-def _build_sales_ui_context():
-    manager, _ = _build_manager_owner_data()
-    project_rows = _build_project_ui_rows(manager.get("projects", []))
-    active_projects = [p for p in project_rows if p["phase"] != "closed"]
-    closed_projects = [p for p in project_rows if p["phase"] == "closed"]
+def _job_deposit_paid(job):
+    """Deposit = JobDraw with draw_number=0 in paid status."""
+    for draw in job.demo_draws.all():
+        if draw.draw_number == 0:
+            return draw.status == JobDraw.STATUS_PAID
+    return False
 
-    models = []
-    for model in _build_sales_model_list():
-        material_total = int(_to_number(model.get("materialTotal", 0)))
-        labor_budget = int(_to_number(model.get("laborBudget", 0)))
-        concrete_budget = int(_to_number(model.get("concreteBudget", 0)))
-        living_sf = int(_to_number(model.get("livingSf", 0)))
-        total = material_total + labor_budget + concrete_budget
-        per_sf = int(round(total / living_sf, 0)) if living_sf > 0 else 0
-        models.append(
-            {
-                "name": model.get("name", ""),
-                "living_sf": living_sf,
-                "total_display": _format_money(total),
-                "per_sf_display": f"${per_sf}/SF",
-            }
-        )
-    models.sort(key=lambda row: row["living_sf"])
+
+def _job_loan_closed(job):
+    """Loan closing = JobDraw with draw_number=1 in paid status."""
+    for draw in job.demo_draws.all():
+        if draw.draw_number == 1:
+            return draw.status == JobDraw.STATUS_PAID
+    return False
+
+
+def _build_sales_in_progress_row(job):
+    plan_name = job.floor_plan.name if job.floor_plan else "Custom"
+    p10_amount = int(_to_number(job.p10_material))
+    edit_url_name = "sales_turnkey_edit" if job.job_mode == "turnkey" else "sales_shell_edit"
+    return {
+        "id": job.id,
+        "name": job.customer_name or f"Build #{job.id}",
+        "model_name": plan_name,
+        "address": job.customer_addr or "",
+        "order_number": job.order_number or "",
+        "p10_amount": p10_amount,
+        "p10_display": _format_money(p10_amount),
+        "deposit_paid": _job_deposit_paid(job),
+        "loan_closed": _job_loan_closed(job),
+        "edit_url": reverse(edit_url_name, args=[job.id]),
+        "finalize_url": reverse("sales_finalize_contract", args=[job.id]),
+        "job_mode": job.job_mode,
+    }
+
+
+def _build_sales_closed_row(job):
+    plan_name = job.floor_plan.name if job.floor_plan else "Custom"
+    p10_amount = int(_to_number(job.p10_material))
+    closed_at = job.sales_closed_at
+    closed_display = ""
+    if closed_at:
+        local_closed = timezone.localtime(closed_at) if timezone.is_aware(closed_at) else closed_at
+        closed_display = local_closed.strftime("%b %d, %Y")
+    return {
+        "id": job.id,
+        "name": job.customer_name or f"Build #{job.id}",
+        "model_name": plan_name,
+        "order_number": job.order_number or "",
+        "p10_amount": p10_amount,
+        "p10_display": _format_money(p10_amount),
+        "closed_display": closed_display,
+    }
+
+
+def _sales_jobs_queryset(request):
+    """Jobs visible on the sales dashboard.
+
+    Per the current demo scope, any sales user can see every job — production
+    scoping (sales_rep == request.user.name) is flagged out-of-scope.
+    """
+    return (
+        Job.objects.select_related("floor_plan", "branch")
+        .prefetch_related("demo_draws")
+        .order_by("-created_at")
+    )
+
+
+def _build_sales_ui_context(request=None):
+    # Scope jobs to the current user when available; fall back to all jobs otherwise.
+    if request is not None:
+        base_qs = _sales_jobs_queryset(request)
+    else:
+        base_qs = Job.objects.select_related("floor_plan", "branch").prefetch_related("demo_draws").order_by("-created_at")
+
+    now = timezone.now()
+    in_progress_jobs = base_qs.filter(sales_closed_at__isnull=True)
+    closed_this_month_jobs = base_qs.filter(
+        sales_closed_at__isnull=False,
+        sales_closed_at__year=now.year,
+        sales_closed_at__month=now.month,
+    )
+
+    in_progress_rows = [_build_sales_in_progress_row(job) for job in in_progress_jobs]
+    closed_rows = [_build_sales_closed_row(job) for job in closed_this_month_jobs]
+
+    p10_total_amount = sum(row["p10_amount"] for row in in_progress_rows) + sum(
+        row["p10_amount"] for row in closed_rows
+    )
 
     rate_card = _build_simple_rate_card()
     exterior_rates = []
@@ -922,20 +1159,22 @@ def _build_sales_ui_context():
             }
         )
 
-    active_contract_total = sum(project.get("total_amount", 0) for project in active_projects)
+    month_label = now.strftime("%B %Y")
 
     return {
-        "sales_total": _format_money(active_contract_total),
+        "p10_total_display": _format_money(p10_total_amount),
+        "p10_month_label": month_label,
         "kpis": [
             {
-                "label": "Active builds",
-                "value": str(len(active_projects)),
+                "label": f"P10 Material — {month_label}",
+                "value": _format_money(p10_total_amount),
                 "value_class": "kpi-val",
             }
         ],
-        "projects_active": active_projects,
-        "projects_closed": closed_projects,
-        "models": models,
+        "projects_in_progress": in_progress_rows,
+        "projects_closed": closed_rows,
+        "in_progress_count": len(in_progress_rows),
+        "closed_count": len(closed_rows),
         "exterior_rates": exterior_rates,
         "interior_rates": interior_rates,
     }
@@ -1011,10 +1250,8 @@ def owner_dashboard_panel_view(request):
         request,
         "owner/dashboard.html",
         {
-            "notifications": context["notifications"],
-            "notif_count": context["notif_count"],
-            "dashboard_active_projects": context["dashboard_active_projects"],
-            "dashboard_closed_projects": context["dashboard_closed_projects"],
+            "dashboard_metrics": context["dashboard_metrics"],
+            "dashboard_jobs": context["dashboard_jobs"],
             "dashboard_active_count": context["dashboard_active_count"],
         },
     )
@@ -1078,10 +1315,8 @@ def owner_panel_mark_complete_view(request):
         template_name = template_map.get(panel, "owner/payments.html")
         partial_context = {
             "owner/dashboard.html": {
-                "notifications": context["notifications"],
-                "notif_count": context["notif_count"],
-                "dashboard_active_projects": context["dashboard_active_projects"],
-                "dashboard_closed_projects": context["dashboard_closed_projects"],
+                "dashboard_metrics": context["dashboard_metrics"],
+                "dashboard_jobs": context["dashboard_jobs"],
                 "dashboard_active_count": context["dashboard_active_count"],
             },
             "owner/all_projects.html": {
@@ -1361,26 +1596,59 @@ def _build_contract_seed_data():
     }
 
 
+def _load_editable_job(request, job_id):
+    """Return the Job for the given id (demo scope: any sales/exec user may edit)."""
+    if not job_id:
+        return None
+    user = request.user
+    if user.role not in (AppUser.ROLE_SALES, AppUser.ROLE_EXEC):
+        return None
+    try:
+        return Job.objects.get(pk=job_id)
+    except Job.DoesNotExist:
+        return None
+
+
 @role_required(AppUser.ROLE_SALES)
-def sales_shell_view(request):
+def sales_shell_view(request, job_id=None):
+    existing_state = None
+    existing_job_id = None
+    if job_id:
+        job = _load_editable_job(request, job_id)
+        if job is None:
+            return redirect("sales_overview")
+        existing_state = job.wizard_state or {}
+        existing_job_id = job.id
     return render(
         request,
         "sales/shell/index.html",
         {
             "wizard_mode": "shell",
             "wizard_seed_data": _build_contract_seed_data(),
+            "existing_state": existing_state,
+            "existing_job_id": existing_job_id,
         },
     )
 
 
 @role_required(AppUser.ROLE_SALES)
-def sales_turnkey_view(request):
+def sales_turnkey_view(request, job_id=None):
+    existing_state = None
+    existing_job_id = None
+    if job_id:
+        job = _load_editable_job(request, job_id)
+        if job is None:
+            return redirect("sales_overview")
+        existing_state = job.wizard_state or {}
+        existing_job_id = job.id
     return render(
         request,
         "sales/turnkey/index.html",
         {
             "wizard_mode": "turnkey",
             "wizard_seed_data": _build_contract_seed_data(),
+            "existing_state": existing_state,
+            "existing_job_id": existing_job_id,
         },
     )
 
@@ -1513,42 +1781,63 @@ def owner_view(request):
 
 @role_required(AppUser.ROLE_SALES)
 def sales_overview_view(request):
-    context = _build_sales_ui_context()
+    context = _build_sales_ui_context(request)
     return render(
         request,
         "sales/overview/index.html",
         {
             "kpis": context["kpis"],
-            "sales_total": context["sales_total"],
+            "p10_total_display": context["p10_total_display"],
+            "p10_month_label": context["p10_month_label"],
+            "in_progress_count": context["in_progress_count"],
+            "closed_count": context["closed_count"],
         },
     )
 
 
 @role_required(AppUser.ROLE_SALES)
-def sales_projects_panel_view(request):
+def sales_in_progress_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
-    context = _build_sales_ui_context()
+    context = _build_sales_ui_context(request)
     return render(
         request,
-        "sales/overview/projects.html",
+        "sales/overview/in_progress.html",
         {
-            "projects_active": context["projects_active"],
+            "projects_in_progress": context["projects_in_progress"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_SALES)
+def sales_closed_panel_view(request):
+    if not request.htmx:
+        return redirect("sales_overview")
+    context = _build_sales_ui_context(request)
+    return render(
+        request,
+        "sales/overview/closed.html",
+        {
             "projects_closed": context["projects_closed"],
+            "p10_month_label": context["p10_month_label"],
         },
     )
 
 
 @role_required(AppUser.ROLE_SALES)
-def sales_models_panel_view(request):
+def sales_header_panel_view(request):
+    """HTMX partial: re-renders the header + KPI tiles (P10 total, counts)."""
     if not request.htmx:
         return redirect("sales_overview")
-    context = _build_sales_ui_context()
+    context = _build_sales_ui_context(request)
     return render(
         request,
-        "sales/overview/models.html",
+        "sales/overview/_header.html",
         {
-            "models": context["models"],
+            "p10_total_display": context["p10_total_display"],
+            "p10_month_label": context["p10_month_label"],
+            "in_progress_count": context["in_progress_count"],
+            "closed_count": context["closed_count"],
         },
     )
 
@@ -1557,7 +1846,7 @@ def sales_models_panel_view(request):
 def sales_rates_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
-    context = _build_sales_ui_context()
+    context = _build_sales_ui_context(request)
     return render(
         request,
         "sales/overview/rates.html",
@@ -1566,6 +1855,41 @@ def sales_rates_panel_view(request):
             "interior_rates": context["interior_rates"],
         },
     )
+
+
+@role_required(AppUser.ROLE_SALES)
+@require_POST
+@csrf_protect
+def sales_finalize_contract_view(request, job_id):
+    """
+    Demo handoff shortcut: marks deposit (draw 0) + loan close (draw 1) as paid,
+    sets sales_closed_at=now(), then re-renders the In Progress panel so the card
+    disappears from the list.
+    """
+    from django.db import transaction
+
+    job = _load_editable_job(request, job_id)
+    if job is None:
+        return JsonResponse({"error": "Job not found or not editable"}, status=404)
+
+    with transaction.atomic():
+        job.sales_closed_at = timezone.now()
+        job.save(update_fields=["sales_closed_at"])
+        JobDraw.objects.filter(job=job, draw_number__in=[0, 1]).update(
+            status=JobDraw.STATUS_PAID,
+            paid_date=timezone.now().strftime("%b ") + str(timezone.now().day),
+        )
+
+    if request.htmx:
+        context = _build_sales_ui_context(request)
+        response = render(
+            request,
+            "sales/overview/in_progress.html",
+            {"projects_in_progress": context["projects_in_progress"]},
+        )
+        response["HX-Trigger"] = "sales-refresh"
+        return response
+    return redirect("sales_overview")
 
 
 @role_required(AppUser.ROLE_SALES)
@@ -1616,6 +1940,8 @@ def save_contract_view(request):
     shell_total   = int(body.get("shellTotal") or 0)
     turnkey_total = int(body.get("turnkeyTotal") or 0)
     draws_payload = body.get("draws") or []
+    trade_budgets_payload = body.get("tradeBudgets") or []
+    budget_total_payload = int(body.get("budgetTotal") or 0)
 
     if not customer_name:
         return JsonResponse({"error": "customer.name is required"}, status=400)
@@ -1625,6 +1951,13 @@ def save_contract_view(request):
     plan_obj   = FloorPlanModel.objects.filter(name__iexact=model_name).first()
 
     contract_total = turnkey_total if job_mode == "turnkey" and turnkey_total else shell_total
+    budget_total = budget_total_payload
+    if budget_total <= 0 and trade_budgets_payload:
+        budget_total = int(
+            sum(int(row.get("budgeted") or 0) for row in trade_budgets_payload)
+        )
+    if budget_total <= 0:
+        budget_total = int(contract_total or 0)
 
     # ── Create or update Job (match on customer_name + order_number) ──
     lookup = {"customer_name": customer_name}
@@ -1641,9 +1974,17 @@ def save_contract_view(request):
             "floor_plan":    plan_obj,
             "job_mode":      job_mode if job_mode in ("shell", "turnkey") else "shell",
             "p10_material":  p10,
+            "budget_total_amount": budget_total,
+            "budget_spent_amount": 0,
             "current_phase": "estimate",
         },
     )
+
+    # Persist the full raw wizard STATE payload for later rehydration on Edit.
+    raw_state = body.get("rawState")
+    if isinstance(raw_state, dict):
+        job.wizard_state = raw_state
+        job.save(update_fields=["wizard_state"])
 
     # ── Rebuild draw schedule ──
     if draws_payload:
@@ -1660,6 +2001,25 @@ def save_contract_view(request):
                 label=str(d.get("l") or f"Draw {draw_num}"),
                 amount=amount,
                 status=status,
+            )
+
+    # Keep owner/manager budget tabs populated for contracts saved from the wizard.
+    if trade_budgets_payload:
+        job.demo_trade_budgets.all().delete()
+        for idx, row in enumerate(trade_budgets_payload):
+            trade_name = str(row.get("trade") or "").strip()
+            if not trade_name:
+                continue
+            budgeted = int(row.get("budgeted") or 0)
+            actual = int(row.get("actual") or 0)
+            if budgeted <= 0 and actual <= 0:
+                continue
+            JobTradeBudget.objects.create(
+                job=job,
+                trade_name=trade_name,
+                budgeted=budgeted,
+                actual=actual,
+                sort_order=idx,
             )
 
     return JsonResponse({"ok": True, "job_id": job.id, "created": created})
