@@ -488,50 +488,6 @@
   white-space: nowrap;
 }
 
-/* ── Mark complete button ── */
-
-.btn-complete {
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--green);
-  color: #fff;
-  cursor: pointer;
-  font-family: var(--font-ui);
-}
-
-.btn-complete:hover {
-  opacity: 0.85;
-}
-
-/* ── Toast ── */
-
-.toast {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(60px);
-  background: #1e293b;
-  color: #fff;
-  padding: 10px 20px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 500;
-  z-index: 400;
-  opacity: 0;
-  transition: all 0.3s;
-  pointer-events: none;
-  white-space: nowrap;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
 /* ── Executive dashboard demo mirror ── */
 
 .exec-wrap {
@@ -1166,19 +1122,6 @@
   font-size: 9px;
   color: var(--g500);
   text-transform: uppercase;
-}
-
-.exec-mark-paid {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 10px 14px 14px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 11px;
 }
 
 .exec-empty {

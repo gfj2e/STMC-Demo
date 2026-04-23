@@ -2,15 +2,17 @@ import re
 import time
 from decimal import Decimal
 from functools import wraps
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -1367,53 +1369,6 @@ def owner_payments_panel_view(request):
     )
 
 
-@role_required(AppUser.ROLE_EXEC)
-@require_POST
-@csrf_protect
-def owner_panel_mark_complete_view(request):
-    job_id = request.POST.get("job_id")
-    draw_number = request.POST.get("draw_number")
-    panel = (request.POST.get("panel") or "payments").strip().lower()
-    try:
-        job_id = int(job_id)
-        draw_number = int(draw_number)
-    except (TypeError, ValueError):
-        return JsonResponse({"error": "Invalid draw payload"}, status=400)
-
-    try:
-        _mark_draw_complete(job_id, draw_number)
-    except JobDraw.DoesNotExist:
-        return JsonResponse({"error": "Draw not found"}, status=404)
-
-    if request.htmx:
-        context = _build_owner_ui_context()
-        template_map = {
-            "dashboard": "owner/dashboard.html",
-            "projects": "owner/all_projects.html",
-            "payments": "owner/payments.html",
-        }
-        template_name = template_map.get(panel, "owner/payments.html")
-        partial_context = {
-            "owner/dashboard.html": {
-                "dashboard_metrics": context["dashboard_metrics"],
-                "dashboard_jobs": context["dashboard_jobs"],
-                "dashboard_active_count": context["dashboard_active_count"],
-            },
-            "owner/all_projects.html": {
-                "all_projects_active": context["all_projects_active"],
-                "all_projects_closed": context["all_projects_closed"],
-            },
-            "owner/payments.html": {
-                "active_projects": context["active_projects"],
-                "closed_projects": context["closed_projects"],
-            },
-        }
-        response = render(request, template_name, partial_context[template_name])
-        response["HX-Trigger"] = "owner-refresh"
-        return response
-    return redirect("owner")
-
-
 def _build_seed_rates():
     sales = {
         "base": 12,
@@ -1622,7 +1577,10 @@ def _build_contract_seed_data():
             "isCustom": bool(plan.is_custom),
         }
         if plan.pdf_filename:
-            pdf_files[name] = plan.pdf_filename
+            pdf_files[name] = {
+                "filename": plan.pdf_filename,
+                "url": reverse("sales_floor_plan_pdf", kwargs={"filename": plan.pdf_filename}),
+            }
 
         craft_entry = {"paint": {}, "stain": {}}
         for row in plan.craftsman_presets.all():
@@ -1687,6 +1645,23 @@ def _load_editable_job(request, job_id):
         return Job.objects.get(pk=job_id)
     except Job.DoesNotExist:
         return None
+
+
+@role_required(AppUser.ROLE_SALES)
+@xframe_options_sameorigin
+def sales_floor_plan_pdf_view(request, filename):
+    safe_name = Path((filename or "").strip()).name
+    if not safe_name or not safe_name.lower().endswith(".pdf"):
+        raise Http404("PDF not found")
+
+    pdf_root = (settings.BASE_DIR / "pdf-plans").resolve()
+    pdf_path = (pdf_root / safe_name).resolve()
+    if pdf_root not in pdf_path.parents or not pdf_path.is_file():
+        raise Http404("PDF not found")
+
+    response = FileResponse(pdf_path.open("rb"), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{safe_name}"'
+    return response
 
 
 def _wizard_state_for_job(job):

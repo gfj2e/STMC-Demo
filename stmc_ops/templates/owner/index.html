@@ -52,7 +52,7 @@
     <div
       id="tab-dashboard-panel"
       hx-get="{% url 'owner_dashboard_panel' %}"
-      hx-trigger="load, owner-dashboard-refresh from:body, owner-refresh from:body"
+      hx-trigger="load, owner-dashboard-refresh from:body"
       hx-swap="innerHTML"
     >
       <div class="banner banner-empty">Loading dashboard...</div>
@@ -64,7 +64,7 @@
     <div
       id="tab-projects-panel"
       hx-get="{% url 'owner_all_projects_panel' %}"
-      hx-trigger="load, owner-projects-refresh from:body, owner-refresh from:body"
+      hx-trigger="load, owner-projects-refresh from:body"
       hx-swap="innerHTML"
     >
       <div class="banner banner-empty">Loading projects...</div>
@@ -76,7 +76,7 @@
     <div
       id="tab-payments-panel"
       hx-get="{% url 'owner_payments_panel' %}"
-      hx-trigger="load, owner-payments-refresh from:body, owner-refresh from:body"
+      hx-trigger="load, owner-payments-refresh from:body"
       hx-swap="innerHTML"
     >
       <div class="banner banner-empty">Loading payments...</div>
@@ -84,9 +84,6 @@
   </div>
 
 </div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
 
 <script>
   window.LOGIN_URL = '{% url "login" %}';

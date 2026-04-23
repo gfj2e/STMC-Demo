@@ -22,6 +22,7 @@ urlpatterns = [
     path("sales/leads/<int:job_id>/edit/", views.sales_edit_lead_view, name="sales_edit_lead"),
     path("sales/leads/<int:job_id>/delete/", views.sales_delete_lead_view, name="sales_delete_lead"),
     path("sales/leads/<int:job_id>/convert/", views.sales_convert_lead_view, name="sales_convert_lead"),
+    path("sales/floor-plan-pdfs/<str:filename>/", views.sales_floor_plan_pdf_view, name="sales_floor_plan_pdf"),
     path("sales/contracts/seed-data/", views.sales_contract_seed_data_view, name="sales_contract_seed_data"),
     path("sales/app/finalize-contract/<int:job_id>/", views.sales_finalize_contract_view, name="sales_finalize_contract"),
     path("app/seed-data/", views.app_seed_data_view, name="app_seed_data"),
@@ -36,5 +37,4 @@ urlpatterns = [
     path("owner/dashboard-panel/", views.owner_dashboard_panel_view, name="owner_dashboard_panel"),
     path("owner/all-projects-panel/", views.owner_all_projects_panel_view, name="owner_all_projects_panel"),
     path("owner/payments-panel/", views.owner_payments_panel_view, name="owner_payments_panel"),
-    path("owner/panel/complete/", views.owner_panel_mark_complete_view, name="owner_panel_complete"),
 ]

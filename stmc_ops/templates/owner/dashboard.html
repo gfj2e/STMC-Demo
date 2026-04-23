@@ -127,16 +127,6 @@
 							</tbody>
 						</table>
 
-						{% if job.current_draw and job.phase != 'closed' %}
-							<form method="post" data-complete-form="1" hx-post="{% url 'owner_panel_complete' %}" hx-target="#tab-dashboard-panel" hx-swap="innerHTML" class="exec-mark-paid">
-								{% csrf_token %}
-								<input type="hidden" name="panel" value="dashboard">
-								<input type="hidden" name="job_id" value="{{ job.id }}">
-								<input type="hidden" name="draw_number" value="{{ job.current_draw.number }}">
-								<span>{{ job.current_draw.label }} is ready to close.</span>
-								<button class="btn-complete" type="submit">Mark Complete</button>
-							</form>
-						{% endif %}
 					</div>
 
 					<div class="exec-tab-panel" data-job-panel="bills" data-job-id="{{ job.id }}" hidden>

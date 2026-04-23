@@ -9,16 +9,6 @@ function _initials(name) {
   return (name || '').split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
 }
 
-function showToast(message) {
-  const toast = document.getElementById('toast');
-  if (!toast) return;
-
-  toast.textContent = message;
-  toast.classList.add('show');
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => toast.classList.remove('show'), 3200);
-}
-
 function switchTab(btn, tab) {
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.style.display = 'none';
@@ -134,17 +124,6 @@ function initExecDashboard() {
 
 function bindHtmxFeedback() {
   if (!window.htmx) return;
-
-  document.body.addEventListener('htmx:afterRequest', event => {
-    const elt = event.detail && event.detail.elt;
-    if (!elt || !elt.matches('form[data-complete-form="1"]')) return;
-
-    if (event.detail.successful) {
-      showToast('Draw marked complete');
-    } else {
-      showToast('Error saving - try again');
-    }
-  });
 
   document.body.addEventListener('htmx:afterSwap', event => {
     const target = event.detail && event.detail.target;

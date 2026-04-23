@@ -30,21 +30,6 @@
 				</div>
 			{% endfor %}
 
-			{% if project.current_draw %}
-				<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
-					<div>
-						<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
-						<div style="font-size:10px;color:#3B82F6;opacity:.8">Tap to mark paid</div>
-					</div>
-					<form method="post" data-complete-form="1" hx-post="{% url 'owner_panel_complete' %}" hx-target="#tab-projects-panel" hx-swap="innerHTML" style="margin:0">
-						{% csrf_token %}
-						<input type="hidden" name="panel" value="projects">
-						<input type="hidden" name="job_id" value="{{ project.id }}">
-						<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
-						<button class="btn-complete" type="submit">Mark complete</button>
-					</form>
-				</div>
-			{% endif %}
 		</div>
 	{% endfor %}
 {% else %}

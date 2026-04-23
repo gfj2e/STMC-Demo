@@ -880,6 +880,46 @@ function stepperHTML(id, qty, handler){
        + '</div>';
 }
 
+function resolvePdfSource(model){
+  var entry = PDF_FILES[model];
+  if(!entry) return null;
+
+  if(typeof entry === "string"){
+    if(/^https?:\/\//i.test(entry) || entry.charAt(0) === "/"){
+      return {url: entry, filename: entry.split("/").pop()};
+    }
+    return {url: "pdfs/" + entry, filename: entry};
+  }
+
+  if(typeof entry === "object"){
+    var url = entry.url || "";
+    var filename = entry.filename || "";
+    if(!url && filename){
+      url = "pdfs/" + filename;
+    }
+    if(!url) return null;
+    return {url: url, filename: filename || url.split("/").pop()};
+  }
+
+  return null;
+}
+
+function renderFloorPlanViewerCard(model, title){
+  var src = resolvePdfSource(model);
+  if(!src) return "";
+
+  var fileLabel = src.filename || "floor-plan.pdf";
+  var h = '';
+  h += '<div class="card">';
+  h +=   '<div class="section-hdr"><span>'+esc(title || ("Floor Plan — " + model))+'</span>';
+  h +=     '<a class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff;text-decoration:none" href="'+esc(src.url)+'" target="_blank" rel="noopener">Open in New Window ↗</a>';
+  h +=   '</div>';
+  h +=   '<iframe src="'+esc(src.url)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
+  h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">Viewing: <strong>'+esc(fileLabel)+'</strong>. If preview does not load, use Open in New Window.</div>';
+  h += '</div>';
+  return h;
+}
+
 function radioPillsHTML(groupName, options, current, handler){
   // options: [{v:"concrete", l:"Concrete"}, ...]
   return '<div class="radio-pills">'
@@ -1704,20 +1744,11 @@ function renderStep5(){
   var mdl = MODELS[m] || {};
   var pm = PLAN_METRICS[m] || {};
   var isCustom = isCustomFloorPlan();
-  var pdfFile = PDF_FILES[m];
   var I = STATE.int;
   var h = '';
 
   // ── PDF VIEWER (top) ──────────────────────────────
-  if(pdfFile){
-    h += '<div class="card">';
-    h +=   '<div class="section-hdr"><span>Floor Plan — '+esc(m)+'</span>';
-    h +=     '<button class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff" onclick="window.open(\'pdfs/'+esc(pdfFile)+'\',\'_blank\')">Open in New Window ↗</button>';
-    h +=   '</div>';
-    h +=   '<iframe src="pdfs/'+esc(pdfFile)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
-    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, confirm a <code>pdfs/</code> folder sits alongside this HTML file containing <code>'+esc(pdfFile)+'</code>.</div>';
-    h += '</div>';
-  }
+  h += renderFloorPlanViewerCard(m, "Floor Plan — " + m);
 
   // ── ZONE A: CAD-DRIVEN SCHEDULE (read-only) ───────
   h += '<div class="card">';
@@ -3640,27 +3671,27 @@ function renderDrawScheduleHTML(isShell, p10, concTotal, custLabor, shellTotal, 
   h +=   '<table class="draw-table">';
   h +=     '<thead><tr><th>Draw</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>';
   h +=     '<tbody>';
-  h +=     '<tr class="draw-deposit"><td>Good Faith Deposit</td><td>Non-refundable, paid at signing</td><td class="num">'+fmt(deposit)+'</td></tr>';
-  h +=     '<tr><td>1st Home Draw (Loan Closing)</td><td>P10 Material minus deposit</td><td class="num">'+fmt(draw1)+'</td></tr>';
-  h +=     '<tr><td>1st Draw Shop/Detached Portion</td><td>If applicable</td><td class="num muted">'+fmt(0)+'</td></tr>';
-  h +=     '<tr><td>2nd Home Draw (Concrete Completion)</td><td>Concrete total</td><td class="num">'+fmt(draw2)+'</td></tr>';
-  h +=     '<tr><td>2nd Draw Shop/Detached Portion</td><td>If applicable</td><td class="num muted">'+fmt(0)+'</td></tr>';
-  h +=     '<tr><td>3rd Home Draw (Framing Completion)</td><td>Customer exterior labor</td><td class="num">'+fmt(draw3)+'</td></tr>';
+  h +=     '<tr class="draw-deposit"><td>Good Faith Deposit (Prepayment)</td><td>Non-refundable, paid at signing</td><td class="num">'+fmt(deposit)+'</td></tr>';
+  h +=     '<tr><td>1st Home Draw at Loan Closing (Minimum of 20% of total home contract)</td><td>Total Shell Material Amount minus Prepayment</td><td class="num">'+fmt(draw1)+'</td></tr>';
+  h +=     '<tr><td>1st Draw Shop/Detached Garage Portion (if applicable)</td><td>Total Shop/Detached Garage Deposit (Full Material Amount of shop/detached garage)</td><td class="num muted">'+fmt(0)+'</td></tr>';
+  h +=     '<tr><td>2nd Home Draw Upon Concrete Completion (Minimum 20%)</td><td>Includes remaining material, site prep, and concrete</td><td class="num">'+fmt(draw2)+'</td></tr>';
+  h +=     '<tr><td>2nd Draw Shop/Detached Garage Portion (if applicable)</td><td>Total Concrete and Labor Cost at Completion of Shop/Detached Garage</td><td class="num muted">'+fmt(0)+'</td></tr>';
+  h +=     '<tr><td>3rd Home Draw Upon Framing Completion (Minimum 15%)</td><td>Includes exterior labor</td><td class="num">'+fmt(draw3)+'</td></tr>';
   if(isShell){
-    h +=   '<tr><td>4th Home Draw</td><td>20% of total — mechanical rough-in</td><td class="num muted">—</td></tr>';
-    h +=   '<tr><td>5th Home Draw</td><td>20% of total — drywall/cabinets</td><td class="num muted">—</td></tr>';
-    h +=   '<tr><td>6th Home Draw</td><td>Final punch / CO</td><td class="num muted">—</td></tr>';
+    h +=   '<tr><td>4th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of mechanical rough-in/electric/plumbing/HVAC</td><td class="num muted">—</td></tr>';
+    h +=   '<tr><td>5th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of drywall/cabinets/countertops</td><td class="num muted">—</td></tr>';
+    h +=   '<tr><td>6th Home Draw (Minimum 5%)</td><td>Final Punch/Notice of Completion or Certificate of Occupancy if necessary</td><td class="num muted">—</td></tr>';
   } else {
     var draw4 = Math.round(turnkeyTotal * 0.20);
     var draw5 = Math.round(turnkeyTotal * 0.20);
     var draw6 = Math.max(0, turnkeyTotal - deposit - draw1 - draw2 - draw3 - draw4 - draw5);
-    h +=   '<tr><td>4th Home Draw</td><td>20% of Turnkey Total (mechanical rough-in)</td><td class="num">'+fmt(draw4)+'</td></tr>';
-    h +=   '<tr><td>5th Home Draw</td><td>20% of Turnkey Total (drywall/cabinets)</td><td class="num">'+fmt(draw5)+'</td></tr>';
-    h +=   '<tr><td>6th Home Draw</td><td>Remaining balance</td><td class="num">'+fmt(draw6)+'</td></tr>';
+    h +=   '<tr><td>4th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of mechanical rough-in/electric/plumbing/HVAC</td><td class="num">'+fmt(draw4)+'</td></tr>';
+    h +=   '<tr><td>5th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of drywall/cabinets/countertops</td><td class="num">'+fmt(draw5)+'</td></tr>';
+    h +=   '<tr><td>6th Home Draw (Minimum 5%)</td><td>Final Punch/Notice of Completion or Certificate of Occupancy if necessary</td><td class="num">'+fmt(draw6)+'</td></tr>';
   }
   h +=     '</tbody>';
   h +=   '</table>';
-  h +=   '<div class="card-pad" style="padding:10px 16px;font-size:11px;color:var(--g500);line-height:1.5">Note: progress in construction shall not proceed to the next step until the draw is received on the completed work up to that point.</div>';
+  h +=   '<div class="card-pad" style="padding:10px 16px;font-size:11px;color:var(--g500);line-height:1.5">Note that progress in construction shall not proceed to the next step until the draw is received on the completed work up to that point.<br>Contractor accepts cash, checks, and wires. Past due accounts are subject to a monthly fee which will be calculated at the rate of 1.5% monthly interest rate.<br>Summertown Metals Contracting • '+psDateStamp()+'</div>';
   h += '</div>';
   return h;
 }
@@ -3757,31 +3788,45 @@ function buildPsContractorLabor(){
 }
 
 function buildPsDrawSchedule(){
+  var isShell = STATE.jobMode === "shell";
   var items = buildSalesItems();
   var concTotal = sumItems(buildConcItems());
   var custLabor = sumItems(items) - concTotal;
   var p10 = pn(STATE.customer.p10);
   var shellTotal = p10 + custLabor + concTotal;
+  var turnkeyTotal = shellTotal + computeInteriorContractPrice();
   var deposit = 2500;
   var draw1 = Math.max(0, p10 - deposit);
+  var draw2 = concTotal;
+  var draw3 = custLabor;
 
   var h = buildPsHeader('Draw Schedule');
   h += '<table class="ps-table">';
   h +=   '<thead><tr><th style="width:38%">Draw</th><th style="width:42%">Description</th><th class="num" style="width:20%">Amount</th></tr></thead>';
   h +=   '<tbody>';
-  h +=     '<tr><td><strong>Good Faith Deposit</strong></td><td>Non-refundable, paid at signing</td><td class="num">'+fmt(deposit)+'</td></tr>';
-  h +=     '<tr><td>1st Home Draw (Loan Closing)</td><td>P10 Material minus deposit</td><td class="num">'+fmt(draw1)+'</td></tr>';
-  h +=     '<tr><td>1st Draw Shop/Detached Portion</td><td>If applicable</td><td class="num">'+fmt(0)+'</td></tr>';
-  h +=     '<tr><td>2nd Home Draw (Concrete Completion)</td><td>Concrete total</td><td class="num">'+fmt(concTotal)+'</td></tr>';
-  h +=     '<tr><td>2nd Draw Shop/Detached Portion</td><td>If applicable</td><td class="num">'+fmt(0)+'</td></tr>';
-  h +=     '<tr><td>3rd Home Draw (Framing Completion)</td><td>Customer exterior labor</td><td class="num">'+fmt(custLabor)+'</td></tr>';
-  h +=     '<tr><td>4th Home Draw</td><td>20% of total — mechanical rough-in (Turnkey only)</td><td class="num">—</td></tr>';
-  h +=     '<tr><td>5th Home Draw</td><td>20% of total — drywall/cabinets (Turnkey only)</td><td class="num">—</td></tr>';
-  h +=     '<tr><td>6th Home Draw</td><td>Final punch / CO (Turnkey only)</td><td class="num">—</td></tr>';
-  h +=     '<tr class="total"><td colspan="2">TOTAL EXTERIOR SHELL PACKAGE</td><td class="num">'+fmt(shellTotal)+'</td></tr>';
+  h +=     '<tr><td><strong>Good Faith Deposit (Prepayment)</strong></td><td>Non-refundable, paid at signing</td><td class="num">'+fmt(deposit)+'</td></tr>';
+  h +=     '<tr><td>1st Home Draw at Loan Closing (Minimum of 20% of total home contract)</td><td>Total Shell Material Amount minus Prepayment</td><td class="num">'+fmt(draw1)+'</td></tr>';
+  h +=     '<tr><td>1st Draw Shop/Detached Garage Portion (if applicable)</td><td>Total Shop/Detached Garage Deposit (Full Material Amount of shop/detached garage)</td><td class="num">'+fmt(0)+'</td></tr>';
+  h +=     '<tr><td>2nd Home Draw Upon Concrete Completion (Minimum 20%)</td><td>Includes remaining material, site prep, and concrete</td><td class="num">'+fmt(draw2)+'</td></tr>';
+  h +=     '<tr><td>2nd Draw Shop/Detached Garage Portion (if applicable)</td><td>Total Concrete and Labor Cost at Completion of Shop/Detached Garage</td><td class="num">'+fmt(0)+'</td></tr>';
+  h +=     '<tr><td>3rd Home Draw Upon Framing Completion (Minimum 15%)</td><td>Includes exterior labor</td><td class="num">'+fmt(draw3)+'</td></tr>';
+  if(isShell){
+    h +=   '<tr><td>4th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of mechanical rough-in/electric/plumbing/HVAC</td><td class="num">—</td></tr>';
+    h +=   '<tr><td>5th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of drywall/cabinets/countertops</td><td class="num">—</td></tr>';
+    h +=   '<tr><td>6th Home Draw (Minimum 5%)</td><td>Final Punch/Notice of Completion or Certificate of Occupancy if necessary</td><td class="num">—</td></tr>';
+    h +=   '<tr class="total"><td colspan="2">TOTAL EXTERIOR SHELL PACKAGE</td><td class="num">'+fmt(shellTotal)+'</td></tr>';
+  } else {
+    var draw4 = Math.round(turnkeyTotal * 0.20);
+    var draw5 = Math.round(turnkeyTotal * 0.20);
+    var draw6 = Math.max(0, turnkeyTotal - deposit - draw1 - draw2 - draw3 - draw4 - draw5);
+    h +=   '<tr><td>4th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of mechanical rough-in/electric/plumbing/HVAC</td><td class="num">'+fmt(draw4)+'</td></tr>';
+    h +=   '<tr><td>5th Home Draw (Minimum 20%)</td><td>20% of total contract upon completion of drywall/cabinets/countertops</td><td class="num">'+fmt(draw5)+'</td></tr>';
+    h +=   '<tr><td>6th Home Draw (Minimum 5%)</td><td>Final Punch/Notice of Completion or Certificate of Occupancy if necessary</td><td class="num">'+fmt(draw6)+'</td></tr>';
+    h +=   '<tr class="total"><td colspan="2">TOTAL CONTRACTED AMOUNT</td><td class="num">'+fmt(turnkeyTotal)+'</td></tr>';
+  }
   h +=   '</tbody>';
   h += '</table>';
-  h += '<div class="ps-footer">Progress in construction shall not proceed to the next step until the draw is received on the completed work up to that point.</div>';
+  h += '<div class="ps-footer">Note that progress in construction shall not proceed to the next step until the draw is received on the completed work up to that point.<br>Contractor accepts cash, checks, and wires. Past due accounts are subject to a monthly fee which will be calculated at the rate of 1.5% monthly interest rate.<br>Summertown Metals Contracting • '+psDateStamp()+'</div>';
   return h;
 }
 
