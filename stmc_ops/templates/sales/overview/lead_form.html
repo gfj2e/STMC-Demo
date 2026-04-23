@@ -1,0 +1,112 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% if mode == 'edit' %}Edit Lead{% else %}New Lead{% endif %} &mdash; STMC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
+<link rel="stylesheet" href="{% static 'sales.css' %}?v=3">
+</head>
+<body>
+
+{% include "sales/_nav.html" %}
+
+<div class="lead-form">
+  <h1>{% if mode == 'edit' %}Edit Lead{% else %}New Lead{% endif %}</h1>
+  <p class="sub">
+    {% if mode == 'edit' %}
+      Update customer info and notes. Click <strong>Convert to Contract</strong> from the Leads list when you're ready to build an estimate.
+    {% else %}
+      Capture an early-stage customer contact. You can convert it to a full contract later.
+    {% endif %}
+  </p>
+
+  {% if error %}
+    <div class="lf-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{{ form_action }}">
+    {% csrf_token %}
+
+    <div class="lf-row">
+      <label for="customer_name">Customer Name <span class="required">*</span></label>
+      <input type="text" id="customer_name" name="customer_name" required
+             value="{% if lead.customer_name %}{{ lead.customer_name }}{% endif %}" autofocus>
+    </div>
+
+    <div class="lf-grid-2">
+      <div class="lf-row">
+        <label for="customer_phone">Phone</label>
+        <input type="tel" id="customer_phone" name="customer_phone"
+               value="{% if lead.customer_phone %}{{ lead.customer_phone }}{% endif %}" placeholder="(555) 123-4567">
+      </div>
+      <div class="lf-row">
+        <label for="customer_email">Email</label>
+        <input type="email" id="customer_email" name="customer_email"
+               value="{% if lead.customer_email %}{{ lead.customer_email }}{% endif %}" placeholder="customer@example.com">
+      </div>
+    </div>
+
+    <div class="lf-row">
+      <label for="customer_addr">Address</label>
+      <input type="text" id="customer_addr" name="customer_addr"
+             value="{% if lead.customer_addr %}{{ lead.customer_addr }}{% endif %}" placeholder="Street, City, State">
+    </div>
+
+    <div class="lf-grid-2">
+      <div class="lf-row">
+        <label for="lead_source">Lead Source</label>
+        <select id="lead_source" name="lead_source">
+          <option value="">&mdash; Select &mdash;</option>
+          {% for key, label in lead_source_choices %}
+            <option value="{{ key }}" {% if lead.lead_source == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="lf-row">
+        <label for="lead_next_followup">Next Follow-up</label>
+        <input type="date" id="lead_next_followup" name="lead_next_followup"
+               value="{% if lead.lead_next_followup %}{{ lead.lead_next_followup|date:'Y-m-d' }}{% endif %}">
+      </div>
+    </div>
+
+    <div class="lf-row">
+      <label for="lead_notes">Notes</label>
+      <textarea id="lead_notes" name="lead_notes" placeholder="Interested in 3-bed shell, wants to see Oak Ridge model, financing through ABC Bank...">{% if lead.lead_notes %}{{ lead.lead_notes }}{% endif %}</textarea>
+    </div>
+
+    <div class="lf-actions">
+      <button type="submit" class="lf-btn-primary">
+        {% if mode == 'edit' %}Save Changes{% else %}Create Lead{% endif %}
+      </button>
+      <a href="{% url 'sales_overview' %}?tab=leads" class="lf-btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  window.LOGIN_URL = '{% url "login" %}';
+  window.LOGOUT_URL = '{% url "logout" %}';
+  window.CSRF_TOKEN = '{{ csrf_token }}';
+  window.STMC_USER = {
+    name: '{{ user.name|default:user.email|escapejs }}',
+    initials: '{{ user.initials|default:""|escapejs }}',
+    role: '{{ user.role|escapejs }}'
+  };
+</script>
+<script>
+  document.querySelectorAll(".logout-link").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      fetch(window.LOGOUT_URL, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "X-CSRFToken": window.CSRF_TOKEN }
+      }).finally(function () { window.location.href = window.LOGIN_URL; });
+    });
+  });
+</script>
+</body>
+</html>

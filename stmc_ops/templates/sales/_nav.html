@@ -2,13 +2,14 @@
 <nav class="app-nav" id="mv-tab-nav" aria-label="Sales Navigation">
   <div class="nav-tabs" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_shell' or request.resolver_match.url_name == 'sales_turnkey' or request.resolver_match.url_name == 'sales_shell_edit' or request.resolver_match.url_name == 'sales_turnkey_edit' %}active{% endif %}" data-mv-tab="new-contract" href="{% url 'sales_shell' %}">New Contract</a>
+    <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_new_lead' or request.resolver_match.url_name == 'sales_edit_lead' %}active{% endif %}" data-mv-tab="leads" href="{% url 'sales_overview' %}?tab=leads">Leads</a>
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_overview' %}active{% endif %}" data-mv-tab="in-progress" href="{% url 'sales_overview' %}">In Progress</a>
     <a class="app-nav-link" data-mv-tab="closed" href="{% url 'sales_overview' %}?tab=closed">Closed</a>
     <a class="app-nav-link" data-mv-tab="rates" href="{% url 'sales_overview' %}?tab=rates">Rate Card</a>
   </div>
   <div class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
-    <button class="logout-link" type="button">Logout</button>
     <span class="nav-user-name" id="hN" style="font-size:11px;color:#4b5563"></span>
     <span class="nav-badge" id="hA" style="width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#111827;color:#fff;font-size:10px;font-weight:700"></span>
+    <button class="logout-link" type="button">Logout</button>
   </div>
 </nav>

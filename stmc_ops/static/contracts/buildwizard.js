@@ -4404,6 +4404,10 @@ function saveContract(){
     budgetTotal:  budgetTotal,
     tradeBudgets: tradeBudgets,
     draws:        draws,
+    // When editing an existing row (lead conversion or Edit Contract), pass
+    // the row's pk so the server updates-in-place instead of matching on
+    // (customer_name, order_number). Server treats leadId/jobId the same.
+    jobId:        window.STMC_EDIT_JOB_ID || null,
     // Full wizard STATE snapshot — server stores on Job.wizard_state
     // so Edit Contract can rehydrate the wizard with every field intact.
     rawState:     STATE

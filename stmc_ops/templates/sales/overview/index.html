@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
-<link rel="stylesheet" href="{% static 'sales.css' %}">
+<link rel="stylesheet" href="{% static 'sales.css' %}?v=3">
 </head>
 <body>
 
@@ -27,6 +27,24 @@
 
 <!-- Tab panels -->
 <div class="container">
+
+  <!-- Leads -->
+  <div id="tab-leads" class="tab-panel" style="display:none">
+    <div class="leads-intro">
+      <div class="leads-intro-note">Early-stage customer contacts. Convert to a contract when ready.</div>
+      <a href="{% url 'sales_new_lead' %}" class="sales-btn sales-btn-primary">
+        + Add Lead
+      </a>
+    </div>
+    <div
+      id="tab-leads-panel"
+      hx-get="{% url 'sales_leads_panel' %}"
+      hx-trigger="load, sales-leads-refresh from:body, sales-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading leads...</div>
+    </div>
+  </div>
 
   <!-- In Progress -->
   <div id="tab-in-progress" class="tab-panel">
@@ -77,6 +95,6 @@
   };
 </script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="{% static 'sales.js' %}?v=2"></script>
+<script src="{% static 'sales.js' %}?v=3"></script>
 </body>
 </html>

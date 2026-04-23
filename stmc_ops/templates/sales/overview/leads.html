@@ -1,0 +1,72 @@
+{% if leads %}
+  <div class="card-section-title">
+    Leads <span class="count">({{ leads|length }})</span>
+  </div>
+  {% for lead in leads %}
+    <div class="proj-card lead-card">
+      <div class="proj-hdr">
+        <div class="proj-hdr-top">
+          <div class="lead-name-wrap">
+            <p class="proj-name lead-name">
+              <span>{{ lead.name }}</span>
+              {% if lead.stale %}<span class="pill lead-stale-pill">&#9888; {{ lead.created_display }} (stale)</span>{% endif %}
+            </p>
+            <p class="proj-sub">
+              {% if lead.source_display %}{{ lead.source_display }}{% else %}No source{% endif %}
+              {% if lead.address %} &middot; {{ lead.address }}{% endif %}
+              {% if lead.created_display and not lead.stale %} &middot; Added {{ lead.created_display }}{% endif %}
+            </p>
+          </div>
+        </div>
+
+        <!-- Contact + follow-up strip -->
+        <div class="lead-contact-grid">
+          <div>
+            <div class="lead-contact-label">Phone</div>
+            <div class="lead-contact-value lead-contact-value-mono">
+              {% if lead.phone %}<a href="tel:{{ lead.phone }}">{{ lead.phone }}</a>{% else %}&mdash;{% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="lead-contact-label">Email</div>
+            <div class="lead-contact-value">
+              {% if lead.email %}<a href="mailto:{{ lead.email }}">{{ lead.email }}</a>{% else %}&mdash;{% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="lead-contact-label">Next Follow-up</div>
+            <div class="lead-contact-value">
+              {% if lead.followup_display %}{{ lead.followup_display }}{% else %}&mdash;{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if lead.notes %}
+          <div class="lead-notes">{{ lead.notes }}</div>
+        {% endif %}
+      </div>
+
+      <div class="proj-body card-actions">
+        <a href="{{ lead.convert_url }}" class="sales-btn sales-btn-primary">
+          Convert to Contract
+        </a>
+        <a href="{{ lead.edit_url }}" class="sales-btn">
+          Edit
+        </a>
+        <button type="button"
+                class="sales-btn sales-btn-muted"
+                hx-post="{{ lead.delete_url }}"
+                hx-target="#tab-leads-panel"
+                hx-swap="innerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-confirm="Archive this lead? This can't be undone.">
+          Archive
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="banner banner-empty">
+    No leads yet. Click <strong>+ Add Lead</strong> to capture a new customer contact.
+  </div>
+{% endif %}

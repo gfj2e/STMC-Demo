@@ -1058,11 +1058,52 @@ def _job_loan_closed(job):
     return False
 
 
+# Sales commission rate applied to P10 material. Kept as a module-level
+# constant for the demo; in prod this would live on the rep's profile or
+# a per-branch config row.
+SALES_COMMISSION_RATE = 0.03  # 3 % of P10 material
+
+
+def _contract_total_for_job(job):
+    """Best-effort contract total (customer price) for a Job.
+
+    Priority:
+      1. wizard_state.turnkeyTotal (if job_mode==turnkey and value > 0)
+      2. wizard_state.shellTotal   (if value > 0)
+      3. job.budget_total_amount   (fallback; set on save_contract)
+    """
+    state = job.wizard_state or {}
+    if isinstance(state, dict):
+        if job.job_mode == "turnkey":
+            turnkey = int(state.get("turnkeyTotal") or 0)
+            if turnkey > 0:
+                return turnkey
+        shell = int(state.get("shellTotal") or 0)
+        if shell > 0:
+            return shell
+    return int(_to_number(job.budget_total_amount))
+
+
+def _build_sales_value_breakdown(job, p10_amount):
+    """Shared contract-value block used on both In Progress and Closed rows."""
+    contract_total = _contract_total_for_job(job)
+    commission_amount = int(round(p10_amount * SALES_COMMISSION_RATE))
+    p10_pct = round((p10_amount / contract_total) * 100, 1) if contract_total > 0 else 0.0
+    return {
+        "contract_total_amount": contract_total,
+        "contract_total_display": _format_money(contract_total) if contract_total else "--",
+        "p10_pct_display": f"{p10_pct:.1f}%" if contract_total > 0 else "--",
+        "commission_amount": commission_amount,
+        "commission_display": _format_money(commission_amount),
+        "commission_rate_display": f"{int(SALES_COMMISSION_RATE * 100)}% of P10",
+    }
+
+
 def _build_sales_in_progress_row(job):
     plan_name = job.floor_plan.name if job.floor_plan else "Custom"
     p10_amount = int(_to_number(job.p10_material))
     edit_url_name = "sales_turnkey_edit" if job.job_mode == "turnkey" else "sales_shell_edit"
-    return {
+    row = {
         "id": job.id,
         "name": job.customer_name or f"Build #{job.id}",
         "model_name": plan_name,
@@ -1076,6 +1117,37 @@ def _build_sales_in_progress_row(job):
         "finalize_url": reverse("sales_finalize_contract", args=[job.id]),
         "job_mode": job.job_mode,
     }
+    row.update(_build_sales_value_breakdown(job, p10_amount))
+    return row
+
+
+def _build_sales_lead_row(job):
+    """Compact row for the Leads tab. Leads don't have wizard data yet,
+    so we skip the contract/commission breakdown."""
+    source_display = dict(Job.LEAD_SOURCE_CHOICES).get(job.lead_source, "")
+    created_local = timezone.localtime(job.created_at) if timezone.is_aware(job.created_at) else job.created_at
+    created_display = created_local.strftime("%b %d, %Y") if created_local else ""
+    followup_display = job.lead_next_followup.strftime("%b %d, %Y") if job.lead_next_followup else ""
+    stale = False
+    if created_local:
+        age_days = (timezone.now() - job.created_at).days
+        stale = age_days >= 21
+    return {
+        "id": job.id,
+        "name": job.customer_name or f"Lead #{job.id}",
+        "phone": job.customer_phone or "",
+        "email": job.customer_email or "",
+        "address": job.customer_addr or "",
+        "source_display": source_display,
+        "source_key": job.lead_source or "",
+        "notes": job.lead_notes or "",
+        "followup_display": followup_display,
+        "created_display": created_display,
+        "stale": stale,
+        "edit_url": reverse("sales_edit_lead", args=[job.id]),
+        "convert_url": reverse("sales_convert_lead", args=[job.id]),
+        "delete_url": reverse("sales_delete_lead", args=[job.id]),
+    }
 
 
 def _build_sales_closed_row(job):
@@ -1086,7 +1158,7 @@ def _build_sales_closed_row(job):
     if closed_at:
         local_closed = timezone.localtime(closed_at) if timezone.is_aware(closed_at) else closed_at
         closed_display = local_closed.strftime("%b %d, %Y")
-    return {
+    row = {
         "id": job.id,
         "name": job.customer_name or f"Build #{job.id}",
         "model_name": plan_name,
@@ -1095,6 +1167,8 @@ def _build_sales_closed_row(job):
         "p10_display": _format_money(p10_amount),
         "closed_display": closed_display,
     }
+    row.update(_build_sales_value_breakdown(job, p10_amount))
+    return row
 
 
 def _sales_jobs_queryset(request):
@@ -1118,13 +1192,17 @@ def _build_sales_ui_context(request=None):
         base_qs = Job.objects.select_related("floor_plan", "branch").prefetch_related("demo_draws").order_by("-created_at")
 
     now = timezone.now()
-    in_progress_jobs = base_qs.filter(sales_closed_at__isnull=True)
+    # Leads: is_lead=True, not yet closed
+    lead_jobs = base_qs.filter(is_lead=True, sales_closed_at__isnull=True)
+    # In Progress: is_lead=False, not yet closed
+    in_progress_jobs = base_qs.filter(is_lead=False, sales_closed_at__isnull=True)
     closed_this_month_jobs = base_qs.filter(
         sales_closed_at__isnull=False,
         sales_closed_at__year=now.year,
         sales_closed_at__month=now.month,
     )
 
+    lead_rows = [_build_sales_lead_row(job) for job in lead_jobs]
     in_progress_rows = [_build_sales_in_progress_row(job) for job in in_progress_jobs]
     closed_rows = [_build_sales_closed_row(job) for job in closed_this_month_jobs]
 
@@ -1173,8 +1251,10 @@ def _build_sales_ui_context(request=None):
         ],
         "projects_in_progress": in_progress_rows,
         "projects_closed": closed_rows,
+        "leads": lead_rows,
         "in_progress_count": len(in_progress_rows),
         "closed_count": len(closed_rows),
+        "leads_count": len(lead_rows),
         "exterior_rates": exterior_rates,
         "interior_rates": interior_rates,
     }
@@ -1609,6 +1689,27 @@ def _load_editable_job(request, job_id):
         return None
 
 
+def _wizard_state_for_job(job):
+    """Return a wizard-ready STATE dict for rehydrating the BuildWizard.
+
+    For committed contracts we use the saved ``wizard_state`` verbatim.
+    For leads (which never ran the wizard) we synthesize a minimal state
+    pre-filling the Step-1 customer fields.
+    """
+    state = job.wizard_state or {}
+    if job.is_lead and not state:
+        return {
+            "customer": {
+                "name": job.customer_name or "",
+                "addr": job.customer_addr or "",
+                "order": job.order_number or "",
+                "rep":   job.sales_rep or "",
+                "p10":   0,
+            },
+        }
+    return state
+
+
 @role_required(AppUser.ROLE_SALES)
 def sales_shell_view(request, job_id=None):
     existing_state = None
@@ -1617,7 +1718,7 @@ def sales_shell_view(request, job_id=None):
         job = _load_editable_job(request, job_id)
         if job is None:
             return redirect("sales_overview")
-        existing_state = job.wizard_state or {}
+        existing_state = _wizard_state_for_job(job)
         existing_job_id = job.id
     return render(
         request,
@@ -1639,7 +1740,7 @@ def sales_turnkey_view(request, job_id=None):
         job = _load_editable_job(request, job_id)
         if job is None:
             return redirect("sales_overview")
-        existing_state = job.wizard_state or {}
+        existing_state = _wizard_state_for_job(job)
         existing_job_id = job.id
     return render(
         request,
@@ -1789,6 +1890,7 @@ def sales_overview_view(request):
             "kpis": context["kpis"],
             "p10_total_display": context["p10_total_display"],
             "p10_month_label": context["p10_month_label"],
+            "leads_count": context["leads_count"],
             "in_progress_count": context["in_progress_count"],
             "closed_count": context["closed_count"],
         },
@@ -1836,6 +1938,7 @@ def sales_header_panel_view(request):
         {
             "p10_total_display": context["p10_total_display"],
             "p10_month_label": context["p10_month_label"],
+            "leads_count": context["leads_count"],
             "in_progress_count": context["in_progress_count"],
             "closed_count": context["closed_count"],
         },
@@ -1890,6 +1993,186 @@ def sales_finalize_contract_view(request, job_id):
         response["HX-Trigger"] = "sales-refresh"
         return response
     return redirect("sales_overview")
+
+
+# ═══════════════════════════════════════════════════════════════
+# LEADS — early-stage customer contacts before a full contract
+# ═══════════════════════════════════════════════════════════════
+
+
+def _load_editable_lead(request, job_id):
+    """Like _load_editable_job but enforces is_lead=True (prevents accidental
+    contract edits through the lead routes)."""
+    job = _load_editable_job(request, job_id)
+    if job is None or not job.is_lead:
+        return None
+    return job
+
+
+def _parse_lead_followup(value):
+    value = (value or "").strip()
+    if not value:
+        return None
+    from datetime import datetime
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _render_leads_panel(request):
+    """Shared helper that renders the Leads tab HTMX fragment."""
+    context = _build_sales_ui_context(request)
+    response = render(request, "sales/overview/leads.html", {"leads": context["leads"]})
+    response["HX-Trigger"] = "sales-refresh"
+    return response
+
+
+@role_required(AppUser.ROLE_SALES)
+def sales_leads_panel_view(request):
+    """HTMX partial: the Leads tab list."""
+    if not request.htmx:
+        return redirect("sales_overview")
+    context = _build_sales_ui_context(request)
+    return render(
+        request,
+        "sales/overview/leads.html",
+        {"leads": context["leads"]},
+    )
+
+
+@role_required(AppUser.ROLE_SALES)
+@csrf_protect
+def sales_new_lead_view(request):
+    """GET renders an empty lead form; POST creates the lead."""
+    if request.method == "POST":
+        customer_name = (request.POST.get("customer_name") or "").strip()
+        if not customer_name:
+            return render(
+                request,
+                "sales/overview/lead_form.html",
+                {
+                    "mode": "new",
+                    "form_action": reverse("sales_new_lead"),
+                    "lead": {
+                        "customer_name": customer_name,
+                        "customer_phone": request.POST.get("customer_phone", ""),
+                        "customer_email": request.POST.get("customer_email", ""),
+                        "customer_addr": request.POST.get("customer_addr", ""),
+                        "lead_source": request.POST.get("lead_source", ""),
+                        "lead_notes": request.POST.get("lead_notes", ""),
+                        "lead_next_followup": request.POST.get("lead_next_followup", ""),
+                    },
+                    "lead_source_choices": Job.LEAD_SOURCE_CHOICES,
+                    "error": "Customer name is required.",
+                },
+            )
+        Job.objects.create(
+            customer_name=customer_name,
+            customer_phone=(request.POST.get("customer_phone") or "").strip(),
+            customer_email=(request.POST.get("customer_email") or "").strip(),
+            customer_addr=(request.POST.get("customer_addr") or "").strip(),
+            lead_source=(request.POST.get("lead_source") or "").strip(),
+            lead_notes=(request.POST.get("lead_notes") or "").strip(),
+            lead_next_followup=_parse_lead_followup(request.POST.get("lead_next_followup")),
+            sales_rep=getattr(request.user, "name", "") or "",
+            is_lead=True,
+            current_phase="estimate",
+        )
+        return redirect(reverse("sales_overview") + "?tab=leads")
+    # GET
+    return render(
+        request,
+        "sales/overview/lead_form.html",
+        {
+            "mode": "new",
+            "form_action": reverse("sales_new_lead"),
+            "lead": {},
+            "lead_source_choices": Job.LEAD_SOURCE_CHOICES,
+        },
+    )
+
+
+@role_required(AppUser.ROLE_SALES)
+@csrf_protect
+def sales_edit_lead_view(request, job_id):
+    """GET renders the lead form pre-filled; POST updates."""
+    lead = _load_editable_lead(request, job_id)
+    if lead is None:
+        return redirect(reverse("sales_overview") + "?tab=leads")
+
+    if request.method == "POST":
+        customer_name = (request.POST.get("customer_name") or "").strip()
+        if not customer_name:
+            return render(
+                request,
+                "sales/overview/lead_form.html",
+                {
+                    "mode": "edit",
+                    "form_action": reverse("sales_edit_lead", args=[lead.id]),
+                    "lead": lead,
+                    "lead_source_choices": Job.LEAD_SOURCE_CHOICES,
+                    "error": "Customer name is required.",
+                },
+            )
+        lead.customer_name = customer_name
+        lead.customer_phone = (request.POST.get("customer_phone") or "").strip()
+        lead.customer_email = (request.POST.get("customer_email") or "").strip()
+        lead.customer_addr = (request.POST.get("customer_addr") or "").strip()
+        lead.lead_source = (request.POST.get("lead_source") or "").strip()
+        lead.lead_notes = (request.POST.get("lead_notes") or "").strip()
+        lead.lead_next_followup = _parse_lead_followup(request.POST.get("lead_next_followup"))
+        lead.save(update_fields=[
+            "customer_name", "customer_phone", "customer_email", "customer_addr",
+            "lead_source", "lead_notes", "lead_next_followup", "updated_at",
+        ])
+        return redirect(reverse("sales_overview") + "?tab=leads")
+
+    return render(
+        request,
+        "sales/overview/lead_form.html",
+        {
+            "mode": "edit",
+            "form_action": reverse("sales_edit_lead", args=[lead.id]),
+            "lead": lead,
+            "lead_source_choices": Job.LEAD_SOURCE_CHOICES,
+        },
+    )
+
+
+@role_required(AppUser.ROLE_SALES)
+@require_POST
+@csrf_protect
+def sales_delete_lead_view(request, job_id):
+    """Archive (delete) a lead that didn't pan out. Only works on rows still
+    flagged is_lead=True — we don't allow this route to nuke committed contracts."""
+    lead = _load_editable_lead(request, job_id)
+    if lead is None:
+        if request.htmx:
+            return _render_leads_panel(request)
+        return redirect(reverse("sales_overview") + "?tab=leads")
+    lead.delete()
+    if request.htmx:
+        return _render_leads_panel(request)
+    return redirect(reverse("sales_overview") + "?tab=leads")
+
+
+@role_required(AppUser.ROLE_SALES)
+def sales_convert_lead_view(request, job_id):
+    """Convert a lead → full contract by opening the BuildWizard with the
+    lead's customer info pre-filled. Saving the wizard flips is_lead=False
+    and the row moves to In Progress.
+
+    Same job_id flows through both routes (shell + turnkey); the rep can
+    change jobMode inside the wizard if needed.
+    """
+    lead = _load_editable_lead(request, job_id)
+    if lead is None:
+        return redirect(reverse("sales_overview") + "?tab=leads")
+    # Route to shell by default; the wizard's own mode toggle lets the rep switch.
+    return redirect("sales_shell_edit", job_id=lead.id)
 
 
 @role_required(AppUser.ROLE_SALES)
@@ -1959,30 +2242,59 @@ def save_contract_view(request):
     if budget_total <= 0:
         budget_total = int(contract_total or 0)
 
-    # ── Create or update Job (match on customer_name + order_number) ──
-    lookup = {"customer_name": customer_name}
-    if order_number:
-        lookup["order_number"] = order_number
+    # ── Create or update Job ──
+    # Preferred: an explicit leadId/jobId in the payload (from lead conversion
+    # or wizard Edit flow). Falls back to matching on (customer_name, order_number)
+    # for brand-new contracts, keeping the existing idempotent save semantics.
+    explicit_job_id = body.get("leadId") or body.get("jobId")
+    job_defaults = {
+        "customer_addr": customer_addr,
+        "sales_rep":     sales_rep,
+        "order_number":  order_number,
+        "branch":        branch_obj,
+        "floor_plan":    plan_obj,
+        "job_mode":      job_mode if job_mode in ("shell", "turnkey") else "shell",
+        "p10_material":  p10,
+        "budget_total_amount": budget_total,
+        "budget_spent_amount": 0,
+        "current_phase": "estimate",
+        # A saved wizard is never a lead — this flips the row to In Progress.
+        "is_lead":       False,
+    }
 
-    job, created = Job.objects.update_or_create(
-        **lookup,
-        defaults={
-            "customer_addr": customer_addr,
-            "sales_rep":     sales_rep,
-            "order_number":  order_number,
-            "branch":        branch_obj,
-            "floor_plan":    plan_obj,
-            "job_mode":      job_mode if job_mode in ("shell", "turnkey") else "shell",
-            "p10_material":  p10,
-            "budget_total_amount": budget_total,
-            "budget_spent_amount": 0,
-            "current_phase": "estimate",
-        },
-    )
+    if explicit_job_id:
+        try:
+            job = Job.objects.get(pk=int(explicit_job_id))
+            for field, value in job_defaults.items():
+                setattr(job, field, value)
+            # customer_name is part of the lookup fields when not using explicit id,
+            # so set it here too.
+            job.customer_name = customer_name
+            job.save()
+            created = False
+        except (Job.DoesNotExist, ValueError, TypeError):
+            explicit_job_id = None  # fall through to update_or_create below
+
+    if not explicit_job_id:
+        lookup = {"customer_name": customer_name}
+        if order_number:
+            lookup["order_number"] = order_number
+        job, created = Job.objects.update_or_create(
+            **lookup,
+            defaults=job_defaults,
+        )
 
     # Persist the full raw wizard STATE payload for later rehydration on Edit.
+    # shellTotal / turnkeyTotal are computed in saveContract() (not on STATE),
+    # so we merge them into the stored snapshot here. _contract_total_for_job
+    # reads these keys to show the Total Contracted Amount on sales cards.
     raw_state = body.get("rawState")
     if isinstance(raw_state, dict):
+        raw_state = dict(raw_state)  # shallow copy so we don't mutate request body
+        if shell_total:
+            raw_state["shellTotal"] = shell_total
+        if turnkey_total:
+            raw_state["turnkeyTotal"] = turnkey_total
         job.wizard_state = raw_state
         job.save(update_fields=["wizard_state"])
 

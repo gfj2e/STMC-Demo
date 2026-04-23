@@ -16,6 +16,7 @@ function initials(name) {
 
 function updateHeaderTitle(tab) {
   var titles = {
+    leads: 'Leads',
     'in-progress': 'In Progress',
     closed: 'Closed',
     rates: 'Rate Card'
@@ -40,6 +41,7 @@ function activateTab(tab) {
   });
 
   var navMap = {
+    leads: 'leads',
     'in-progress': 'in-progress',
     closed: 'closed',
     rates: 'rates'
@@ -61,6 +63,7 @@ function activateTab(tab) {
 
 function bindTabs() {
   var tabByNav = {
+    leads: 'leads',
     'in-progress': 'in-progress',
     closed: 'closed',
     rates: 'rates'

@@ -493,6 +493,33 @@ class Job(models.Model):
                   "Null = In Progress; set = Closed on the sales side.",
     )
 
+    # ── LEAD FIELDS ──
+    # A Lead is a Job where the rep has captured customer info but hasn't
+    # committed a full contract estimate yet. Clearing is_lead (via the
+    # wizard save) promotes the row to In Progress.
+    LEAD_SOURCE_CHOICES = [
+        ('referral', 'Referral'),
+        ('web', 'Web / Inbound'),
+        ('walk_in', 'Walk-in'),
+        ('trade_show', 'Trade Show'),
+        ('repeat', 'Repeat Customer'),
+        ('other', 'Other'),
+    ]
+    is_lead = models.BooleanField(
+        default=False,
+        help_text="True = sales lead (early contact), False = committed contract. "
+                  "Cleared automatically when the wizard is saved.",
+    )
+    customer_phone = models.CharField(max_length=40, blank=True)
+    customer_email = models.EmailField(max_length=200, blank=True)
+    lead_source = models.CharField(max_length=20, choices=LEAD_SOURCE_CHOICES, blank=True)
+    lead_notes = models.TextField(blank=True)
+    lead_next_followup = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Optional date the rep plans to next contact the customer.",
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
