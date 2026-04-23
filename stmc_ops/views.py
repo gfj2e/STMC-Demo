@@ -1263,7 +1263,15 @@ def _build_sales_ui_context(request=None):
 
 
 def _mark_draw_complete(job_id, draw_number):
+    """Mark the specified draw as paid, advance the next pending draw to
+    current, and fire a QuickBooks invoice against the homeowner.
+
+    Returns `(today, event)` where `event` is the QbInvoiceEvent row (real
+    or fallback) — callers use it to attach invoice details to their
+    HTMX response header so the manager-side toast can display them.
+    """
     draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
+    job = draw.job
 
     dt = timezone.now()
     today = dt.strftime("%b ") + str(dt.day)
@@ -1295,7 +1303,13 @@ def _mark_draw_complete(job_id, draw_number):
     if new_phase:
         Job.objects.filter(pk=job_id).update(current_phase=new_phase)
 
-    return today
+    # Fire the QB invoice. send_invoice_for_draw never raises — it records
+    # a fallback event if QB is unavailable, so the demo toast/bell always
+    # get something to display.
+    from . import qb_invoice
+    event = qb_invoice.send_invoice_for_draw(job, draw)
+
+    return today, event
 
 
 @login_required
@@ -1318,9 +1332,19 @@ def mark_draw_complete_view(request):
     except JobDraw.DoesNotExist:
         return JsonResponse({"error": "Draw not found"}, status=404)
 
-    today = _mark_draw_complete(job_id, draw_number)
+    today, event = _mark_draw_complete(job_id, draw_number)
 
-    return JsonResponse({"ok": True, "paid_date": today})
+    return JsonResponse({
+        "ok": True,
+        "paid_date": today,
+        "invoice": {
+            "number": event.display_invoice_number,
+            "team": event.team_name,
+            "amount": f"{event.amount:,.0f}",
+            "status": event.status,
+            "url": event.qb_invoice_url,
+        },
+    })
 
 
 @role_required(AppUser.ROLE_EXEC)
@@ -1810,7 +1834,7 @@ def manager_panel_mark_complete_view(request):
         return JsonResponse({"error": "Invalid draw payload"}, status=400)
 
     try:
-        _mark_draw_complete(job_id, draw_number)
+        _today, event = _mark_draw_complete(job_id, draw_number)
     except JobDraw.DoesNotExist:
         return JsonResponse({"error": "Draw not found"}, status=404)
 
@@ -1837,7 +1861,21 @@ def manager_panel_mark_complete_view(request):
             },
         }
         response = render(request, template_name, partial_context[template_name])
-        response["HX-Trigger"] = "manager-refresh"
+        # JSON-form HX-Trigger fires TWO DOM CustomEvents on document.body:
+        #   * "manager-refresh" — existing panel-refresh signal
+        #   * "qb-invoice-sent" — new toast signal with invoice detail on
+        #     event.detail. Picked up by showToast() in manager.js.
+        import json as _json
+        response["HX-Trigger"] = _json.dumps({
+            "manager-refresh": {},
+            "qb-invoice-sent": {
+                "invoice_number": event.display_invoice_number,
+                "team": event.team_name,
+                "amount": f"{event.amount:,.0f}",
+                "status": event.status,
+                "url": event.qb_invoice_url,
+            },
+        })
         return response
     return redirect("manager")
 
@@ -1845,12 +1883,17 @@ def manager_panel_mark_complete_view(request):
 @role_required(AppUser.ROLE_EXEC)
 def owner_view(request):
     context = _build_owner_ui_context()
+    from . import qb_client
+    qb_connection = qb_client.get_connection()
     return render(
         request,
         "owner/index.html",
         {
             "kpis": context["kpis"],
             "owner_total": context["owner_total"],
+            "qb_connected": qb_connection is not None,
+            "qb_connection": qb_connection,
+            "qb_environment": settings.QB_ENVIRONMENT,
         },
     )
 
@@ -2310,3 +2353,208 @@ def save_contract_view(request):
             )
 
     return JsonResponse({"ok": True, "job_id": job.id, "created": created})
+
+
+# ═══════════════════════════════════════════════════════════════
+# QUICKBOOKS ONLINE — OAuth connect / callback / disconnect
+# ═══════════════════════════════════════════════════════════════
+#
+# Flow:
+#   1. Exec clicks "Connect QuickBooks" on the owner dashboard.
+#   2. qb_connect_view builds the Intuit authorize URL and redirects the
+#      browser to it. We store a CSRF-style `state` string in the session
+#      and verify it on callback (Intuit returns it unchanged).
+#   3. Intuit redirects to qb_callback_view with ?code=...&state=...&realmId=...
+#   4. We exchange the code for tokens, persist the QbConnection row,
+#      and redirect back to the owner dashboard.
+#
+# Sandbox caveat: the first Connect in a new browser profile will redirect
+# through Intuit's sandbox auth UI — you sign in with the same Intuit account
+# that owns the developer app.
+
+
+def _qb_config_missing_response():
+    """Shared error response when QB_CLIENT_ID / QB_CLIENT_SECRET aren't set."""
+    html = (
+        "<h1>QuickBooks is not configured</h1>"
+        "<p>Set <code>QB_CLIENT_ID</code> and <code>QB_CLIENT_SECRET</code> "
+        "in environment variables (or in <code>stmc/settings.py</code>) and "
+        "restart the server. See the comment block in settings.py for exact steps.</p>"
+    )
+    return HttpResponse(html, status=500)
+
+
+@role_required(AppUser.ROLE_EXEC)
+def qb_connect_view(request):
+    """Start the OAuth 2.0 authorization flow. Redirects the browser to
+    Intuit. On success, Intuit will redirect back to qb_callback_view."""
+    from . import qb_client
+
+    try:
+        auth_client = qb_client.build_auth_client()
+    except qb_client.QbConfigError:
+        return _qb_config_missing_response()
+
+    # Intuit requires a `state` parameter; we generate one, stash in session,
+    # and verify on callback. Prevents CSRF on the OAuth step.
+    import secrets as _secrets
+    state = _secrets.token_urlsafe(24)
+    request.session["qb_oauth_state"] = state
+
+    authorize_url = auth_client.get_authorization_url(
+        qb_client._scope_objects(),
+        state_token=state,
+    )
+    return redirect(authorize_url)
+
+
+@role_required(AppUser.ROLE_EXEC)
+def qb_callback_view(request):
+    """OAuth redirect target. Exchanges the authorization code for tokens
+    and persists a QbConnection row."""
+    from . import qb_client
+    from intuitlib.exceptions import AuthClientError
+
+    # Intuit may also hit us with ?error=access_denied if the user cancels.
+    error = request.GET.get("error")
+    if error:
+        return HttpResponse(
+            f"<h1>QuickBooks connection cancelled</h1><p>Intuit returned: {error}</p>"
+            "<p><a href='/owner/'>Back to dashboard</a></p>",
+            status=400,
+        )
+
+    code = request.GET.get("code")
+    realm_id = request.GET.get("realmId")
+    state = request.GET.get("state")
+    expected_state = request.session.pop("qb_oauth_state", None)
+
+    if not code or not realm_id:
+        return HttpResponse("<h1>QuickBooks callback missing code/realmId</h1>", status=400)
+    if not state or state != expected_state:
+        return HttpResponse(
+            "<h1>OAuth state mismatch</h1><p>Please retry the Connect flow.</p>",
+            status=400,
+        )
+
+    try:
+        auth_client = qb_client.build_auth_client()
+    except qb_client.QbConfigError:
+        return _qb_config_missing_response()
+
+    try:
+        auth_client.get_bearer_token(code, realm_id=realm_id)
+    except AuthClientError as exc:
+        return HttpResponse(
+            f"<h1>QuickBooks token exchange failed</h1><pre>{exc}</pre>",
+            status=500,
+        )
+
+    qb_client.save_connection_from_auth_client(
+        auth_client,
+        realm_id=realm_id,
+        connected_by_email=getattr(request.user, "email", "") or "",
+    )
+    return redirect("owner")
+
+
+@role_required(AppUser.ROLE_EXEC)
+@require_POST
+@csrf_protect
+def qb_disconnect_view(request):
+    """Drop the stored connection. The user can reconnect immediately; Intuit
+    itself keeps the authorization alive until the refresh token expires or
+    is revoked on Intuit's side (dashboard → My Apps → Disconnect)."""
+    from . import qb_client
+    qb_client.disconnect()
+    return redirect("owner")
+
+
+@role_required(AppUser.ROLE_EXEC)
+def qb_status_view(request):
+    """HTMX partial: renders the current QuickBooks connection status card.
+    Used on the owner dashboard and re-fetched after connect/disconnect."""
+    from . import qb_client
+    connection = qb_client.get_connection()
+    return render(
+        request,
+        "owner/_qb_status.html",
+        {
+            "qb_connected": connection is not None,
+            "qb_connection": connection,
+            "qb_environment": settings.QB_ENVIRONMENT,
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# OWNER BELL NOTIFICATIONS (Phase C)
+# ─────────────────────────────────────────────────────────────
+#
+# The bell lives in the owner nav. It:
+#   * Polls every 30 seconds for the unread count.
+#   * Shows a red badge when unread > 0.
+#   * Click opens a dropdown listing the 10 most recent QbInvoiceEvent rows.
+#   * Each row has an × button that marks that event read.
+#   * "Mark all read" button in the footer clears the badge in bulk.
+#   * Dismissal is global (demo simplicity — one read_at per event, not per user).
+#
+# Realism hook: the toast on the exec side fires when the bell-refresh poll
+# brings in a new count. The JS in owner.js tracks the last-known count and
+# compares on each refresh.
+
+
+def _bell_context():
+    """Shared context for the two bell partials. Keeps the unread count
+    and the top-10 event list in sync between the button and the dropdown."""
+    from .models import QbInvoiceEvent
+    events = list(QbInvoiceEvent.objects.all()[:10])
+    unread_count = QbInvoiceEvent.objects.filter(read_at__isnull=True).count()
+    return {
+        "events": events,
+        "unread_count": unread_count,
+    }
+
+
+@role_required(AppUser.ROLE_EXEC)
+def owner_notifications_bell_view(request):
+    """HTMX partial — bell button + badge. Polled every 30s by owner/index.html.
+    The dropdown itself is a separate fetch so we don't ship the full event
+    list on every poll."""
+    return render(request, "owner/_bell.html", _bell_context())
+
+
+@role_required(AppUser.ROLE_EXEC)
+def owner_notifications_dropdown_view(request):
+    """HTMX partial — the dropdown list. Fetched on-demand when the user
+    clicks the bell (not on the 30s poll)."""
+    return render(request, "owner/_bell_dropdown.html", _bell_context())
+
+
+@role_required(AppUser.ROLE_EXEC)
+@require_POST
+@csrf_protect
+def owner_notification_mark_read_view(request, event_id):
+    """POST — mark one event read. Returns the refreshed bell button +
+    broadcasts owner-bell-refresh so any open dropdown reloads too."""
+    from .models import QbInvoiceEvent
+    QbInvoiceEvent.objects.filter(pk=event_id, read_at__isnull=True).update(
+        read_at=timezone.now()
+    )
+    response = render(request, "owner/_bell.html", _bell_context())
+    response["HX-Trigger"] = "owner-bell-refresh"
+    return response
+
+
+@role_required(AppUser.ROLE_EXEC)
+@require_POST
+@csrf_protect
+def owner_notifications_mark_all_read_view(request):
+    """POST — bulk mark-as-read. Same response shape as single-row dismiss."""
+    from .models import QbInvoiceEvent
+    QbInvoiceEvent.objects.filter(read_at__isnull=True).update(
+        read_at=timezone.now()
+    )
+    response = render(request, "owner/_bell.html", _bell_context())
+    response["HX-Trigger"] = "owner-bell-refresh"
+    return response

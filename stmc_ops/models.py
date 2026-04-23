@@ -15,6 +15,7 @@ Design principles:
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 import json
 
 
@@ -828,3 +829,99 @@ class JobDraw(models.Model):
 
     def __str__(self):
         return f"{self.job.customer_name} — {self.label}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# QUICKBOOKS ONLINE INTEGRATION
+# ═══════════════════════════════════════════════════════════════
+#
+# Three models work together to back the draw-completion → QB invoice flow:
+#
+#   QbConnection  : singleton row holding the OAuth tokens + realm (QB company) ID.
+#                   One row max. Populated by the Connect QuickBooks flow.
+#   QbCustomerMap : caches the QB-side Customer.Id for each Job so repeated draws
+#                   on the same contract don't create duplicate customers.
+#   QbInvoiceEvent: one row per "draw marked complete" action. Stores the QB
+#                   invoice identifiers (or null if the API call failed and we
+#                   fell back to a local-only record), plus a read_at flag for
+#                   the owner bell notification UI.
+
+
+class QbConnection(models.Model):
+    """Singleton row (enforced in code) holding the current QuickBooks OAuth
+    tokens and realm (QB company) ID. The refresh token survives token refresh;
+    the access token is rotated every ~60 minutes."""
+    realm_id = models.CharField(max_length=64)
+    access_token = models.TextField()
+    refresh_token = models.TextField()
+    # Approximate expiry; we refresh proactively when within 5 min of this value.
+    access_token_expires_at = models.DateTimeField(default=timezone.now)
+    refresh_token_expires_at = models.DateTimeField(default=timezone.now)
+    connected_at = models.DateTimeField(default=timezone.now)
+    last_refreshed_at = models.DateTimeField(null=True, blank=True)
+    # Intuit account email of the user who authorized the connection (for audit).
+    connected_by_email = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "QuickBooks Connection"
+
+    def __str__(self):
+        return f"QuickBooks (realm {self.realm_id})"
+
+
+class QbCustomerMap(models.Model):
+    """One row per Job whose customer has been synced to QuickBooks. Keeps us
+    from creating duplicate QB Customers when multiple draws complete for the
+    same contract."""
+    job = models.OneToOneField(Job, on_delete=models.CASCADE, related_name="qb_customer_map")
+    qb_customer_id = models.CharField(max_length=32)
+    # Realm this mapping was created under — so if the connected QB company ever
+    # changes, we invalidate the cache.
+    realm_id = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Job {self.job_id} → QB Customer {self.qb_customer_id}"
+
+
+class QbInvoiceEvent(models.Model):
+    """One row per 'draw marked complete' action. When the QB API call
+    succeeds, qb_invoice_id / qb_invoice_doc_number / qb_invoice_url are set.
+    On failure (no connection, token refresh failed, API error) we still
+    create the row with status='failed_fallback' so the demo UI never breaks
+    — the owner just won't see a live QB linkout for that event."""
+
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed_fallback"
+    STATUS_CHOICES = [
+        (STATUS_SENT, "Sent to QuickBooks"),
+        (STATUS_FAILED, "Local fallback (QB unavailable)"),
+    ]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="qb_events")
+    draw = models.ForeignKey(JobDraw, on_delete=models.CASCADE, related_name="qb_events")
+    # Internal display values — always populated.
+    team_name = models.CharField(max_length=64)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    # QuickBooks-side identifiers — populated on success, null on fallback.
+    qb_invoice_id = models.CharField(max_length=32, blank=True, default="")
+    qb_invoice_doc_number = models.CharField(max_length=32, blank=True, default="")
+    qb_invoice_url = models.URLField(blank=True, default="")
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_SENT)
+    error_message = models.CharField(max_length=500, blank=True, default="")
+    # Notification read-state (shared across all exec users for demo simplicity).
+    created_at = models.DateTimeField(default=timezone.now)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        doc = self.qb_invoice_doc_number or f"(local #{self.pk})"
+        return f"{doc} — {self.team_name} — ${self.amount}"
+
+    @property
+    def display_invoice_number(self):
+        """For the bell UI: show the real QB DocNumber if we got one, else a
+        local fallback tag so the row still reads sensibly."""
+        return self.qb_invoice_doc_number or f"LOCAL-{self.pk:04d}"

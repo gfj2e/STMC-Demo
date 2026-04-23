@@ -20,11 +20,23 @@
     <button class="app-nav-link" data-tab="payments" type="button">Payments</button>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
+    <!-- Bell: polls the unread count every 30s. The inner dropdown is
+         lazy-loaded into #owner-bell-dropdown when the user clicks. -->
+    <div class="bell-container">
+      <div id="owner-bell-wrap"
+           hx-get="{% url 'owner_notifications_bell' %}"
+           hx-trigger="load, every 30s, owner-bell-refresh from:body"
+           hx-swap="innerHTML"></div>
+      <div id="owner-bell-dropdown" class="bell-dropdown" aria-live="polite"></div>
+    </div>
     <button class="logout-link" type="button">Logout</button>
     <span id="hN" style="font-size:11px;color:#4b5563"></span>
     <span id="hA" style="width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#111827;color:#fff;font-size:10px;font-weight:700"></span>
   </div>
 </nav>
+
+<!-- Toast container for live QB invoice notifications -->
+<div class="toast" id="toast"></div>
 
 <!-- Header -->
 <div class="header">
@@ -49,6 +61,16 @@
 
   <!-- Dashboard -->
   <div id="tab-dashboard" class="tab-panel">
+    <!-- QuickBooks connection status (rendered server-side; HTMX re-fetches only
+         after connect / disconnect via qb-status-refresh). -->
+    <div
+      id="qb-status-wrap"
+      hx-get="{% url 'qb_status' %}"
+      hx-trigger="qb-status-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      {% include "owner/_qb_status.html" %}
+    </div>
     <div
       id="tab-dashboard-panel"
       hx-get="{% url 'owner_dashboard_panel' %}"

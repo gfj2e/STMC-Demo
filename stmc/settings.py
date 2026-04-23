@@ -10,10 +10,19 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env in the project root, if present.
+# Real env vars always win (load_dotenv does not override by default), so
+# production deploys can still inject creds via systemd / container env.
+# Create .env from .env.example for local development.
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -37,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # for {{ dt|naturaltime }} in bell dropdown
     'django_htmx',
     'stmc_ops',
 ]
@@ -131,6 +141,27 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # Login throttle (used by stmc_ops.views.login_submit_view)
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_LOCKOUT_SECONDS = 15 * 60
+
+# ─────────────────────────────────────────────────────────────
+# QUICKBOOKS ONLINE (Intuit) — OAuth 2.0 + REST API
+# ─────────────────────────────────────────────────────────────
+# How to fill these in:
+#   1. Go to https://developer.intuit.com → Dashboard → My Apps → pick your app.
+#   2. Under "Keys & credentials" → select the "Development" tab
+#      (sandbox credentials; "Production" is only used when going live).
+#   3. Copy "Client ID" and "Client Secret" into the env vars below.
+#   4. Under "Redirect URIs" add exactly:  http://localhost:8000/stmc_ops/qb/callback/
+#      (must match QB_REDIRECT_URI below).
+#   5. Create a Sandbox Company (Dashboard → Sandbox) if you don't have one.
+#
+# Set these via environment variables (preferred) OR edit in place for dev.
+QB_CLIENT_ID = os.environ.get("QB_CLIENT_ID", "")
+QB_CLIENT_SECRET = os.environ.get("QB_CLIENT_SECRET", "")
+QB_REDIRECT_URI = os.environ.get("QB_REDIRECT_URI", "http://localhost:8000/stmc_ops/qb/callback/")
+# "sandbox" talks to https://sandbox-quickbooks.api.intuit.com; "production" to the real API.
+QB_ENVIRONMENT = os.environ.get("QB_ENVIRONMENT", "sandbox")
+# Scope for accounting-side API (invoices, customers, items). Always the same for our use.
+QB_SCOPES = ["com.intuit.quickbooks.accounting"]
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/

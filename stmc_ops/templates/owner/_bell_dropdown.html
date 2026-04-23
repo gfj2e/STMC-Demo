@@ -1,0 +1,74 @@
+{% load humanize %}
+{% comment %}
+Owner notification dropdown — top 10 QB invoice events, newest first.
+
+Opened when the user clicks the bell. Closed by the click-outside handler
+in owner.js. Re-fetched on owner-bell-refresh (after any mark-read action).
+
+Context:
+  events        — list[QbInvoiceEvent]
+  unread_count  — int
+{% endcomment %}
+
+<div class="bell-dropdown-card" role="menu">
+  <header class="bell-dropdown-head">
+    <div>
+      <div class="bell-dropdown-title">QuickBooks Invoices</div>
+      <div class="bell-dropdown-sub">
+        {% if unread_count %}{{ unread_count }} unread{% else %}All caught up{% endif %}
+      </div>
+    </div>
+    {% if unread_count %}
+      <form method="post" action="{% url 'owner_notifications_mark_all_read' %}"
+            hx-post="{% url 'owner_notifications_mark_all_read' %}"
+            hx-target="#owner-bell-wrap"
+            hx-swap="innerHTML">
+        {% csrf_token %}
+        <button type="submit" class="bell-link">Mark all read</button>
+      </form>
+    {% endif %}
+  </header>
+
+  {% if events %}
+    <ul class="bell-list">
+      {% for ev in events %}
+        <li class="bell-row {% if not ev.read_at %}bell-row-unread{% endif %}">
+          <div class="bell-row-main">
+            <div class="bell-row-head">
+              <span class="bell-row-invoice">
+                {% if ev.qb_invoice_url %}
+                  <a href="{{ ev.qb_invoice_url }}" target="_blank" rel="noopener">
+                    {{ ev.display_invoice_number }}
+                  </a>
+                {% else %}
+                  {{ ev.display_invoice_number }}
+                {% endif %}
+              </span>
+              <span class="bell-row-team">{{ ev.team_name }}</span>
+            </div>
+            <div class="bell-row-meta">
+              {{ ev.job.customer_name|default:"(Unnamed job)" }}
+              &middot; ${{ ev.amount|floatformat:0|intcomma }}
+              &middot; {{ ev.created_at|naturaltime }}
+              {% if ev.status == "failed_fallback" %}
+                &middot; <span class="bell-row-tag bell-row-tag-fail">Local only</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if not ev.read_at %}
+            <form method="post" action="{% url 'owner_notification_mark_read' ev.id %}"
+                  hx-post="{% url 'owner_notification_mark_read' ev.id %}"
+                  hx-target="#owner-bell-wrap"
+                  hx-swap="innerHTML"
+                  class="bell-row-dismiss-form">
+              {% csrf_token %}
+              <button type="submit" class="bell-row-dismiss" aria-label="Dismiss">&times;</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="bell-empty">No invoice activity yet.</div>
+  {% endif %}
+</div>

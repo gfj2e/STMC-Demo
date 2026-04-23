@@ -1,0 +1,51 @@
+{% comment %}
+QuickBooks Online connection status card (HTMX partial).
+
+Fetched by the owner dashboard on load and re-fetched after connect / disconnect
+via the `qb-status-refresh` HTMX trigger. Fragment only — no <html>/<body>.
+
+Context:
+  qb_connected   — bool; True if a QbConnection row exists
+  qb_connection  — QbConnection or None (realm_id, connected_at, connected_by_email)
+  qb_environment — "sandbox" or "production" (settings.QB_ENVIRONMENT)
+{% endcomment %}
+
+<div class="qb-card">
+  <div class="qb-card-inner">
+    <div class="qb-card-head">
+      <span class="qb-logo">QB</span>
+      <div>
+        <div class="qb-title">QuickBooks Online</div>
+        <div class="qb-env">{{ qb_environment|title }} environment</div>
+      </div>
+    </div>
+
+    {% if qb_connected %}
+      <div class="qb-card-state">
+        <span class="pill pill-success">Connected</span>
+        <span class="qb-meta">
+          Realm {{ qb_connection.realm_id }}
+          {% if qb_connection.connected_by_email %}
+            · by {{ qb_connection.connected_by_email }}
+          {% endif %}
+          · since {{ qb_connection.connected_at|date:"M j, Y" }}
+        </span>
+      </div>
+      <form method="post" action="{% url 'qb_disconnect' %}" class="qb-card-actions">
+        {% csrf_token %}
+        <button type="submit" class="qb-btn qb-btn-ghost"
+                onclick="return confirm('Disconnect QuickBooks? Invoices created after this point will fall back to local-only until you reconnect.');">
+          Disconnect
+        </button>
+      </form>
+    {% else %}
+      <div class="qb-card-state">
+        <span class="pill pill-muted">Not connected</span>
+        <span class="qb-meta">Invoice events will be recorded locally only until connected.</span>
+      </div>
+      <div class="qb-card-actions">
+        <a href="{% url 'qb_connect' %}" class="qb-btn qb-btn-primary">Connect QuickBooks</a>
+      </div>
+    {% endif %}
+  </div>
+</div>

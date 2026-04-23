@@ -1177,3 +1177,368 @@
     width: 90px;
   }
 }
+
+/* ── QuickBooks connection status card ── */
+
+.qb-card {
+  margin: 12px 0 4px;
+}
+
+.qb-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.qb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.qb-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2ca01c;         /* Intuit QuickBooks green */
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.qb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g900);
+  line-height: 1.1;
+}
+
+.qb-env {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--g500);
+  margin-top: 2px;
+}
+
+.qb-card-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.qb-meta {
+  font-size: 11px;
+  color: var(--g500);
+  font-family: var(--font-mono);
+}
+
+.qb-card-actions {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.qb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+
+.qb-btn-primary {
+  background: #2ca01c;
+  color: #fff;
+}
+
+.qb-btn-primary:hover {
+  background: #238317;
+}
+
+.qb-btn-ghost {
+  background: #fff;
+  color: var(--g700);
+  border-color: var(--g300);
+}
+
+.qb-btn-ghost:hover {
+  background: var(--g100);
+}
+
+/* ── Notification bell ── */
+
+.bell-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+#owner-bell-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.bell-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: background 0.12s;
+}
+
+.bell-btn:hover {
+  background: var(--g100);
+}
+
+.bell-btn-active {
+  color: var(--red);
+}
+
+.bell-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* Position: fixed escapes the nav's overflow-x:auto clipping context.
+   Coordinates are tuned to sit just below the sticky nav (~46px tall)
+   flush against the right edge with a little inset. */
+.bell-dropdown {
+  position: fixed;
+  top: 46px;
+  right: 12px;
+  width: 340px;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  z-index: 300;
+  display: none;  /* toggled via .bell-dropdown-open */
+}
+
+.bell-dropdown.bell-dropdown-open {
+  display: block;
+}
+
+.bell-dropdown-card {
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(17, 24, 39, 0.14);
+  overflow: hidden;
+}
+
+.bell-dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--g100);
+  background: var(--g50);
+}
+
+.bell-dropdown-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g900);
+}
+
+.bell-dropdown-sub {
+  font-size: 10px;
+  color: var(--g500);
+  margin-top: 1px;
+}
+
+.bell-link {
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--red);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.bell-link:hover {
+  text-decoration: underline;
+}
+
+.bell-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.bell-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--g100);
+}
+
+.bell-row:last-child {
+  border-bottom: none;
+}
+
+.bell-row:hover {
+  background: var(--g50);
+}
+
+.bell-row-unread {
+  background: #fff7ed;
+}
+
+.bell-row-unread:hover {
+  background: #ffedd5;
+}
+
+.bell-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.bell-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bell-row-invoice {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g900);
+}
+
+.bell-row-invoice a {
+  color: #2ca01c;  /* QuickBooks green */
+  text-decoration: none;
+}
+
+.bell-row-invoice a:hover {
+  text-decoration: underline;
+}
+
+.bell-row-team {
+  font-size: 11px;
+  color: var(--g600);
+  font-weight: 600;
+}
+
+.bell-row-meta {
+  font-size: 11px;
+  color: var(--g500);
+  margin-top: 3px;
+  word-break: break-word;
+}
+
+.bell-row-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bell-row-tag-fail {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bell-row-dismiss-form {
+  margin: 0;
+  padding: 0;
+}
+
+.bell-row-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--g400);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.bell-row-dismiss:hover {
+  background: var(--g200);
+  color: var(--g700);
+}
+
+.bell-empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--g500);
+}
+
+/* ── Toast (shared shape with manager toast) ── */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(16px);
+  background: #111827;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(17, 24, 39, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+  z-index: 9999;
+  max-width: 90%;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

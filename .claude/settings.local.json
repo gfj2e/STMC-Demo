@@ -24,7 +24,13 @@
       "Bash(python manage.py shell -c \"from stmc_ops.models import Job; print\\('Total jobs:', Job.objects.count\\(\\)\\); print\\('In progress:', Job.objects.filter\\(sales_closed_at__isnull=True\\).count\\(\\)\\); print\\('Closed:', Job.objects.filter\\(sales_closed_at__isnull=False\\).count\\(\\)\\); j = Job.objects.first\\(\\); print\\('Sample:', j.customer_name if j else None, '| sales_closed_at:', j.sales_closed_at if j else None, '| wizard_state keys:', list\\(\\(j.wizard_state or {}\\).keys\\(\\)\\) if j else None\\)\")",
       "Bash(python manage.py shell -c \"from stmc_ops.models import Job, AppUser; print\\('Sales users:'\\); [print\\(' ', u.email, '|', repr\\(u.name\\)\\) for u in AppUser.objects.filter\\(role='sales'\\)]; print\\('Job sales_reps:'\\); [print\\(' ', repr\\(j.sales_rep\\), '|', j.customer_name\\) for j in Job.objects.all\\(\\)]\")",
       "Bash(python -c ' *)",
-      "Bash(python manage.py shell -c ' *)"
+      "Bash(python manage.py shell -c ' *)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import django; django.setup\\(\\) if False else None; import os; os.environ.setdefault\\('DJANGO_SETTINGS_MODULE', 'stmc.settings'\\); import django; django.setup\\(\\); from stmc_ops import qb_client; print\\('OK', qb_client.is_connected\\(\\)\\)\")",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(.venv/Scripts/python manage.py check)",
+      "Bash(.venv/Scripts/python -c \"import pkgutil, quickbooks.objects; [print\\(m.name\\) for m in pkgutil.iter_modules\\(quickbooks.objects.__path__\\)]\")",
+      "Bash(.venv/Scripts/python -c ' *)"
     ]
   }
 }

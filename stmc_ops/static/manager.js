@@ -76,15 +76,32 @@ function bindProjectToggles() {
 function bindHtmxFeedback() {
   if (!window.htmx) return;
 
+  // Error path only — the success path fires a richer toast via the
+  // 'qb-invoice-sent' listener below (triggered by the server's
+  // HX-Trigger JSON header on the complete endpoint).
   document.body.addEventListener('htmx:afterRequest', function (event) {
     var elt = event.detail && event.detail.elt;
     if (!elt || !elt.matches('form[data-complete-form="1"]')) return;
-
-    if (event.detail.successful) {
-      showToast('Draw marked complete');
-      return;
+    if (!event.detail.successful) {
+      showToast('Error saving - try again');
     }
-    showToast('Error saving - try again');
+  });
+}
+
+function bindQbInvoiceToast() {
+  // Fired by the server's HX-Trigger: {"qb-invoice-sent": {...}} response
+  // header after manager_panel_mark_complete_view. Detail payload:
+  //   { invoice_number, team, amount, status, url }
+  // status is "sent" (real QB invoice) or "failed_fallback" (local only).
+  document.body.addEventListener('qb-invoice-sent', function (event) {
+    var d = (event && event.detail) || {};
+    var prefix = d.status === 'failed_fallback'
+      ? 'Draw complete (QB unavailable - recorded locally)'
+      : 'QuickBooks Invoice ' + (d.invoice_number || '');
+    var suffix = d.team
+      ? ' sent for ' + d.team + ' - $' + (d.amount || '0')
+      : '';
+    showToast(prefix + suffix);
   });
 }
 
@@ -101,6 +118,7 @@ function init() {
   bindLogout();
   bindProjectToggles();
   bindHtmxFeedback();
+  bindQbInvoiceToast();
   initAuthHeader();
 }
 

@@ -1,0 +1,25 @@
+{% comment %}
+Owner notification bell — just the button and the unread badge.
+
+Swapped into #owner-bell-wrap by HTMX on load, every 30 seconds, and after
+mark-read actions broadcast owner-bell-refresh. The dropdown itself is a
+separate partial (_bell_dropdown.html) fetched only when the user clicks.
+
+Context:
+  unread_count — int
+  events       — unused here (dropdown renders its own copy on demand)
+{% endcomment %}
+
+<button type="button"
+        class="bell-btn{% if unread_count %} bell-btn-active{% endif %}"
+        data-unread-count="{{ unread_count }}"
+        aria-label="Notifications — {{ unread_count }} unread"
+        hx-get="{% url 'owner_notifications_dropdown' %}"
+        hx-target="#owner-bell-dropdown"
+        hx-swap="innerHTML"
+        onclick="window.toggleBellDropdown && window.toggleBellDropdown()">
+  <span aria-hidden="true">&#128276;</span>
+  {% if unread_count %}
+    <span class="bell-badge">{{ unread_count }}</span>
+  {% endif %}
+</button>

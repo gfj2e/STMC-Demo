@@ -131,6 +131,68 @@ function bindHtmxFeedback() {
     if (target.id === 'tab-dashboard-panel') {
       initExecDashboard();
     }
+    // When the bell button reloads (30s poll OR explicit refresh), compare
+    // the unread count to the previous tick. A bump = a new invoice landed
+    // while the exec is on the page — fire a toast for the "it just
+    // happened" feel, matching what the PM sees on the manager side.
+    if (target.id === 'owner-bell-wrap') {
+      handleBellRefresh(target);
+    }
+  });
+}
+
+// ── Toast ───────────────────────────────────────────────────
+// Copy of manager.js showToast (same shape, same 3.2s fade) so the
+// QB-invoice live indicator reads identically across roles.
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => { toast.classList.remove('show'); }, 3200);
+}
+
+// ── Bell dropdown ───────────────────────────────────────────
+
+let _lastBellCount = null;  // tracks unread count across 30s polls
+
+function handleBellRefresh(wrap) {
+  const btn = wrap.querySelector('.bell-btn');
+  if (!btn) return;
+  const count = Number(btn.dataset.unreadCount || 0);
+  if (_lastBellCount !== null && count > _lastBellCount) {
+    // New invoice arrived since the previous poll — surface it live.
+    showToast('New QuickBooks invoice received');
+  }
+  _lastBellCount = count;
+}
+
+window.toggleBellDropdown = function () {
+  const dropdown = document.getElementById('owner-bell-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('bell-dropdown-open');
+};
+
+function closeBellDropdown() {
+  const dropdown = document.getElementById('owner-bell-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.remove('bell-dropdown-open');
+}
+
+function bindBellClickOutside() {
+  // Auto-close the dropdown when the user clicks anywhere else. We ignore
+  // clicks inside the bell container (the button itself, dropdown rows,
+  // mark-read forms) so interactions there don't self-dismiss.
+  document.addEventListener('click', event => {
+    const inBell = event.target.closest('.bell-container');
+    if (!inBell) closeBellDropdown();
+  });
+
+  // Also close on Escape for keyboard users.
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeBellDropdown();
   });
 }
 
@@ -148,6 +210,7 @@ function init() {
   bindProjectToggles();
   bindExecDashboardEvents();
   bindHtmxFeedback();
+  bindBellClickOutside();
   initAuthHeader();
   initExecDashboard();
 }

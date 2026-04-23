@@ -37,4 +37,20 @@ urlpatterns = [
     path("owner/dashboard-panel/", views.owner_dashboard_panel_view, name="owner_dashboard_panel"),
     path("owner/all-projects-panel/", views.owner_all_projects_panel_view, name="owner_all_projects_panel"),
     path("owner/payments-panel/", views.owner_payments_panel_view, name="owner_payments_panel"),
+    # ── QuickBooks Online (Intuit) OAuth ──
+    path("qb/connect/", views.qb_connect_view, name="qb_connect"),
+    path("qb/callback/", views.qb_callback_view, name="qb_callback"),
+    path("qb/disconnect/", views.qb_disconnect_view, name="qb_disconnect"),
+    path("owner/qb-status/", views.qb_status_view, name="qb_status"),
+    # ── Owner bell notifications ──
+    path("owner/notifications/bell/", views.owner_notifications_bell_view,
+         name="owner_notifications_bell"),
+    path("owner/notifications/dropdown/", views.owner_notifications_dropdown_view,
+         name="owner_notifications_dropdown"),
+    path("owner/notifications/<int:event_id>/read/",
+         views.owner_notification_mark_read_view,
+         name="owner_notification_mark_read"),
+    path("owner/notifications/mark-all-read/",
+         views.owner_notifications_mark_all_read_view,
+         name="owner_notifications_mark_all_read"),
 ]
