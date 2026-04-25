@@ -27,6 +27,7 @@ from .models import (
     InteriorRateCard,
     IslandAddon,
     Job,
+    JobChangeOrder,
     JobDraw,
     JobTradeBudget,
     PlanMetric,
@@ -421,7 +422,9 @@ def _progress_from_fields(job, budget_total, budget_spent):
 def _build_manager_owner_data():
     jobs = list(
         Job.objects.select_related("floor_plan", "branch")
-        .prefetch_related("demo_trade_budgets", "demo_draws", "budget_lines__trade")
+        .prefetch_related(
+            "demo_trade_budgets", "demo_draws", "budget_lines__trade", "change_orders",
+        )
         .order_by("order_number")[:12]
     )
 
@@ -491,6 +494,20 @@ def _build_manager_owner_data():
         collected_total += collected
         awaiting_total += max(0, contract - collected)
 
+        # Per-job signed contract change orders. Surfaced on the PM's My
+        # Builds card; PM-created via the change-order modal.
+        co = []
+        for co_row in job.change_orders.all():
+            co.append({
+                "id": co_row.id,
+                "n": co_row.number,
+                "desc": co_row.description,
+                "amt": int(_to_number(co_row.price_change)),
+                "new_total": int(_to_number(co_row.new_contract_total)),
+                "timing": co_row.get_payment_timing_display(),
+                "created": timezone.localtime(co_row.created_at).strftime("%b %d, %Y"),
+            })
+
         projects.append({
             "id": job.id,
             "nm": name,
@@ -504,6 +521,11 @@ def _build_manager_owner_data():
             "bg": bg,
             "ac": ac,
             "dr": dr,
+            "co": co,
+            # Loan-closing draw (#1) paid? Gates PM change-order creation —
+            # change orders can only be authored once the sales rep has closed
+            # the loan, since the contract isn't legally finalized until then.
+            "loan_closed": _job_loan_closed(job),
         })
 
     active_builds = sum(1 for p in projects if p["ph"] != "closed")
@@ -889,6 +911,25 @@ def _build_project_ui_rows(projects):
         subtitle = f"{project.get('md', '')} · {project.get('cu', '')} · PM: {project.get('pm', '')}"
         overdue_draw = any(draw.get("s") == JobDraw.STATUS_CURRENT for draw in draws)
 
+        change_order_rows = []
+        for co_row in project.get("co", []) or []:
+            amt = int(co_row.get("amt") or 0)
+            is_credit = amt < 0
+            display_amt = _format_money(abs(amt))
+            change_order_rows.append({
+                "id": co_row.get("id"),
+                "number": co_row.get("n"),
+                "description": co_row.get("desc", ""),
+                "amount_raw": amt,
+                # Show credits as "-$4,145" with a minus sign; charges as "+$2,000".
+                "amount_display": ("-" if is_credit else "+") + display_amt,
+                "is_credit": is_credit,
+                "new_total_display": _format_money(co_row.get("new_total") or 0)
+                    if (co_row.get("new_total") or 0) > 0 else "",
+                "timing": co_row.get("timing", ""),
+                "created": co_row.get("created", ""),
+            })
+
         rows.append(
             {
                 "id": project.get("id"),
@@ -909,6 +950,9 @@ def _build_project_ui_rows(projects):
                 "draws": draw_rows,
                 "draw_segments": draw_segments,
                 "timeline_draws": timeline_rows,
+                "change_orders": change_order_rows,
+                "change_order_count": len(change_order_rows),
+                "loan_closed": bool(project.get("loan_closed")),
                 "trades": trade_rows,
                 "bills": bills,
                 "bills_count": len(bills),
@@ -1880,6 +1924,166 @@ def manager_draws_panel_view(request):
         {
             "draws_active": context["draws_active"],
             "draws_closed": context["draws_closed"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_change_order_modal_view(request):
+    """Render the Create Change Order modal form for a given job. HTMX-only —
+    swapped into the modal host on the My Builds panel."""
+    if not request.htmx:
+        return redirect("manager")
+    try:
+        job_id = int(request.GET.get("job_id") or 0)
+    except (TypeError, ValueError):
+        return HttpResponse(status=400)
+    try:
+        job = Job.objects.select_related("branch", "floor_plan").prefetch_related("demo_draws").get(pk=job_id)
+    except Job.DoesNotExist:
+        return HttpResponse(status=404)
+
+    # Server-side gate: change orders require a closed loan (1st Home Draw
+    # paid). UI hides the button, but defend against a direct request too.
+    if not _job_loan_closed(job):
+        return HttpResponse(
+            "Change orders are unavailable until the sales rep closes the loan.",
+            status=403,
+        )
+
+    # Pre-allocate the next CO number so the modal can show it as the heading.
+    next_number = (
+        JobChangeOrder.objects.filter(job=job).order_by("-number").values_list("number", flat=True).first() or 0
+    ) + 1
+    # Match the logic used by _build_manager_owner_data: contract = sum of
+    # demo draws. Avoids _estimate_job_contract, which references a Job
+    # field (int_contract) that doesn't exist on the model.
+    draws_total = int(sum(int(_to_number(d.amount)) for d in job.demo_draws.all()))
+    contract_total = draws_total or int(_to_number(job.budget_total_amount))
+
+    return render(
+        request,
+        "manager/_change_order_modal.html",
+        {
+            "job": job,
+            "next_number": next_number,
+            "contract_total": contract_total,
+            "contract_total_display": _format_money(contract_total),
+            # Default to the sales rep on file — closest analogue to "Project Manager".
+            "default_pm": job.sales_rep or "",
+            "default_customer": job.customer_name or "",
+            "default_address": job.customer_addr or "",
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+@require_POST
+@csrf_protect
+def manager_change_order_create_view(request):
+    """Persist a new change order from the modal form, then re-render the My
+    Builds panel so the card immediately reflects the new entry."""
+    try:
+        job_id = int(request.POST.get("job_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid job"}, status=400)
+    try:
+        job = Job.objects.prefetch_related("demo_draws").get(pk=job_id)
+    except Job.DoesNotExist:
+        return JsonResponse({"error": "Job not found"}, status=404)
+
+    if not _job_loan_closed(job):
+        return JsonResponse(
+            {"error": "Loan must be closed before a change order can be created."},
+            status=403,
+        )
+
+    def _decimal(name, default="0"):
+        raw = (request.POST.get(name) or "").strip().replace(",", "").replace("$", "")
+        if raw == "":
+            raw = default
+        try:
+            return Decimal(raw)
+        except Exception:
+            return Decimal(default)
+
+    description = (request.POST.get("description") or "").strip()
+    price_change = _decimal("price_change")
+    new_total = _decimal("new_contract_total")
+    timing = (request.POST.get("payment_timing") or "immediately").strip()
+    valid_timings = {key for key, _ in JobChangeOrder.PAYMENT_TIMING_CHOICES}
+    if timing not in valid_timings:
+        timing = "immediately"
+
+    next_number = (
+        JobChangeOrder.objects.filter(job=job).order_by("-number").values_list("number", flat=True).first() or 0
+    ) + 1
+
+    JobChangeOrder.objects.create(
+        job=job,
+        number=next_number,
+        customer_name=(request.POST.get("customer_name") or job.customer_name or "")[:200],
+        project_address=(request.POST.get("project_address") or job.customer_addr or "")[:300],
+        project_manager=(request.POST.get("project_manager") or job.sales_rep or "")[:120],
+        description=description,
+        price_change=price_change,
+        new_contract_total=new_total,
+        payment_timing=timing,
+    )
+
+    if request.htmx:
+        context = _build_manager_ui_context()
+        response = render(
+            request,
+            "manager/my_builds.html",
+            {
+                "builds_active": context["builds_active"],
+                "builds_closed": context["builds_closed"],
+            },
+        )
+        # Closes the modal on the client and shows a confirmation toast.
+        import json as _json
+        response["HX-Trigger"] = _json.dumps({
+            "change-order-created": {
+                "number": next_number,
+                "customer": job.customer_name or f"Build #{job.id}",
+                "amount": f"{price_change:,.2f}",
+            },
+            "manager-refresh": {},
+        })
+        return response
+    return redirect("manager")
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_mark_complete_modal_view(request):
+    """Render the Cancel/Confirm modal for Mark Complete. HTMX-only — swapped
+    into the modal host on the Draws panel so the PM gets a soft confirmation
+    step before the QB invoice POST fires."""
+    if not request.htmx:
+        return redirect("manager")
+    try:
+        job_id = int(request.GET.get("job_id") or 0)
+        draw_number = int(request.GET.get("draw_number") or 0)
+    except (TypeError, ValueError):
+        return HttpResponse(status=400)
+    panel = (request.GET.get("panel") or "draws").strip().lower()
+    if panel not in {"draws", "builds", "budgets"}:
+        panel = "draws"
+    try:
+        draw = JobDraw.objects.select_related("job").get(
+            job_id=job_id, draw_number=draw_number
+        )
+    except JobDraw.DoesNotExist:
+        return HttpResponse(status=404)
+    return render(
+        request,
+        "manager/_confirm_complete_modal.html",
+        {
+            "job": draw.job,
+            "draw": draw,
+            "panel": panel,
+            "amount_display": _format_money(int(_to_number(draw.amount))),
         },
     )
 

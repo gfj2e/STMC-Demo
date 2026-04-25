@@ -806,6 +806,48 @@ class JobTradeBudget(models.Model):
         return f"{self.job.customer_name} — {self.trade_name}"
 
 
+class JobChangeOrder(models.Model):
+    """A signed contract change order for a job. Modeled after the paper
+    "Change Order" form (Version 2.2 Feb 2025). Numbered per-job (CO #1,
+    CO #2, ...). Surfaced on the PM's My Builds card so the PM can see at
+    a glance how many change orders a contract has accumulated."""
+
+    PAYMENT_TIMING_CHOICES = [
+        ('material_labor', 'Due with Material and Labor'),
+        ('interiors', 'Due with Interiors'),
+        ('immediately', 'Due immediately'),
+    ]
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='change_orders')
+    # Per-job sequential number. Allocated in the create view by counting
+    # existing rows + 1 — there's no concurrency story for the demo.
+    number = models.IntegerField()
+    customer_name = models.CharField(max_length=200, blank=True)
+    project_address = models.CharField(max_length=300, blank=True)
+    project_manager = models.CharField(max_length=120, blank=True)
+    description = models.TextField(blank=True)
+    # Signed amount: negative for a credit, positive for additional charge.
+    price_change = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Optional — the paper form leaves it blank ("N/A") for credits, so we
+    # allow zero / negative here too. The PM can fill it in if known.
+    new_contract_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payment_timing = models.CharField(
+        max_length=20, choices=PAYMENT_TIMING_CHOICES, default='immediately'
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['number']
+        unique_together = ['job', 'number']
+
+    def __str__(self):
+        return f"CO #{self.number} — {self.job.customer_name}"
+
+    @property
+    def is_credit(self):
+        return self.price_change < 0
+
+
 class JobDraw(models.Model):
     """Individual draw entry — used by manager/owner draw-schedule views."""
     STATUS_PAID = 'p'

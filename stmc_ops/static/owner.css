@@ -1,13 +1,23 @@
 /* ── App nav ── */
 
+/* Red pill button — matches the sales nav so the logout affordance is
+   consistent across all role dashboards. */
 .logout-link {
-  border: none;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
   background: transparent;
-  color: #9ca3af;
-  font-size: 11px;
-  text-decoration: underline;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
   cursor: pointer;
-  padding: 0;
+  font-family: inherit;
+}
+
+.logout-link:hover {
+  background: #fef2f2;
 }
 
 .app-nav {

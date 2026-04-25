@@ -20,6 +20,16 @@
 html,body{background:var(--g100);font-family:var(--font-ui);color:var(--g900);line-height:1.4;font-size:14px}
 body{min-height:100vh;padding-bottom:80px}
 
+/* Red pill logout button — consistent across the entire app. Wizard pages
+   load only this bundle, so this rule is required for the nav button to
+   pick up the canonical styling. */
+.logout-link{
+  text-decoration:none;font-size:12px;font-weight:600;color:var(--red);
+  background:transparent;padding:8px 12px;border-radius:999px;
+  border:1px solid;white-space:nowrap;cursor:pointer;font-family:inherit;
+}
+.logout-link:hover{background:#fef2f2}
+
 /* ═══════════════════════════════════════════════════════════════
    STICKY HEADER — wizard PNG absolute-positioned per §15
    ═══════════════════════════════════════════════════════════════ */

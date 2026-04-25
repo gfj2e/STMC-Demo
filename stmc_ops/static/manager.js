@@ -143,6 +143,51 @@ function initAuthHeader() {
   if (badgeEl) badgeEl.textContent = user.initials || initials(user.name);
 }
 
+function closeChangeOrderModal() {
+  var host = document.getElementById('co-modal-host');
+  if (host) host.innerHTML = '';
+}
+
+function bindChangeOrderModal() {
+  // Close on overlay click (outside the inner .modal box) or Cancel button.
+  document.addEventListener('click', function (event) {
+    var cancel = event.target.closest('[data-co-cancel]');
+    if (cancel) {
+      event.preventDefault();
+      closeChangeOrderModal();
+      return;
+    }
+    var overlay = event.target.closest('[data-co-modal]');
+    if (overlay && event.target === overlay) {
+      closeChangeOrderModal();
+    }
+  });
+
+  // Close on Esc.
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    if (document.querySelector('[data-co-modal]')) closeChangeOrderModal();
+  });
+
+  // Server fires a JSON HX-Trigger {"change-order-created": {...}} after a
+  // successful POST. The response body re-renders #tab-builds-panel; we
+  // close the modal here and show a confirmation toast.
+  document.body.addEventListener('change-order-created', function (event) {
+    var d = (event && event.detail) || {};
+    closeChangeOrderModal();
+    var amt = parseFloat((d.amount || '0').replace(/,/g, ''));
+    var sign = amt < 0 ? '-' : '+';
+    var pretty = Math.abs(amt).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    showToast(
+      'Change Order #' + (d.number || '?') + ' added to ' +
+      (d.customer || 'build') + ' (' + sign + '$' + pretty + ')'
+    );
+  });
+}
+
 function init() {
   bindTabs();
   bindLogout();
@@ -150,6 +195,7 @@ function init() {
   bindHtmxFeedback();
   bindCompleteBusyLabel();
   bindQbInvoiceToast();
+  bindChangeOrderModal();
   initAuthHeader();
 }
 

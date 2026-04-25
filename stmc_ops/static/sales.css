@@ -1,14 +1,8 @@
 ﻿/* ── Nav ── */
 
-.logout-link {
-  border: none;
-  background: transparent;
-  color: #fca5a5;
-  font-size: 11px;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
+/* Red pill button — shared across all role dashboards. Defined once below
+   (and again in styles.css/manager.css/owner.css/buildwizard.css for the
+   pages that load only that bundle). */
 
 .app-nav {
   position: sticky;
@@ -40,15 +34,22 @@
   background: #fef2f2;
 }
 
-.logout-link  {
+.logout-link {
   text-decoration: none;
   font-size: 12px;
   font-weight: 600;
   color: var(--red);
+  background: transparent;
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.logout-link:hover {
+  background: #fef2f2;
 }
 
 /* ── Tab bar ── */

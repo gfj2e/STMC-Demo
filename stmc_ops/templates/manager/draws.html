@@ -1,3 +1,6 @@
+{# Modal host — populated by HTMX when the PM clicks "Mark complete". #}
+<div id="co-modal-host"></div>
+
 {% if draws_active %}
 	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active <span style="font-weight:400">({{ draws_active|length }})</span></div>
 	{% for project in draws_active %}
@@ -28,28 +31,14 @@
 							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
 							<div style="font-size:10px;color:#3B82F6;opacity:.8">Creates QB invoice</div>
 						</div>
-						<form method="post" data-complete-form="1"
-						      hx-post="{% url 'manager_panel_complete' %}"
-						      hx-target="#tab-draws-panel"
-						      hx-swap="innerHTML"
-						      hx-disabled-elt="find button"
-						      style="margin:0">
-							{% csrf_token %}
-							<input type="hidden" name="panel" value="draws">
-							<input type="hidden" name="job_id" value="{{ project.id }}">
-							<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
-							{% comment %}
-								hx-disabled-elt disables the button while the POST is
-								in-flight. The data-busy-label attribute + JS hook in
-								manager.js swaps the label to "Sending invoice..."
-								during the request so the PM has visual feedback that
-								the click registered.
-							{% endcomment %}
-							<button class="btn-complete" type="submit"
-							        data-busy-label="Sending invoice...">
-								<span class="btn-complete-label">Mark complete</span>
-							</button>
-						</form>
+						{# GET-loads the confirm modal into #co-modal-host. The modal's #}
+						{# own form does the actual POST to manager_panel_complete. #}
+						<button type="button" class="btn-complete"
+						        hx-get="{% url 'manager_mark_complete_modal' %}?job_id={{ project.id }}&draw_number={{ project.current_draw.number }}&panel=draws"
+						        hx-target="#co-modal-host"
+						        hx-swap="innerHTML">
+							Mark complete
+						</button>
 					</div>
 				{% endif %}
 			</div>

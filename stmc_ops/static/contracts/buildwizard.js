@@ -633,7 +633,10 @@ function renderNav(){
   prev.disabled = cur === 0;
   var sid = currentStepId();
   var atEnd = cur === ids.length - 1;
-  next.disabled = atEnd || !canAdvanceFromStep(sid);
+  // At the final step the button finalizes the contract (save + redirect to
+  // the sales In Progress tab) — so it must be enabled there. Otherwise it's
+  // still gated by the per-step canAdvance rules.
+  next.disabled = !canAdvanceFromStep(sid);
   if(atEnd){ next.textContent = "— End —"; } else { next.textContent = "Next →"; }
   status.textContent = "Step "+(cur+1)+" of "+ids.length+" · "+STEP_DEFS[sid].label;
 }
@@ -652,6 +655,11 @@ function wizNext(){
       window.scrollTo({top:0, behavior:"smooth"});
       return;
     }
+  }
+  // Final step: "— End —" button finalizes the contract.
+  if(STATE._stepIdx === ids.length - 1){
+    finishContract();
+    return;
   }
   if(STATE._stepIdx < ids.length - 1){
     STATE._stepIdx++;
@@ -4385,7 +4393,10 @@ function resetAll(){
 }
 
 /* ── Server-side contract save ── */
-function saveContract(){
+// opts.onSuccess(data)  — fired after a successful save. Used by
+// finishContract() below to redirect into the sales overview after saving.
+function saveContract(opts){
+  opts = opts || {};
   var btn = document.getElementById("saveContractBtn");
   if(btn){ btn.disabled = true; btn.textContent = "Saving…"; }
 
@@ -4479,6 +4490,7 @@ function saveContract(){
     if(data.ok){
       if(btn){ btn.textContent = "✅ Contract Saved!"; btn.style.background = "#1a6e3c"; }
       setSaveStatus("Contract saved to server", true);
+      if(typeof opts.onSuccess === "function"){ opts.onSuccess(data); }
     } else {
       if(btn){ btn.disabled = false; btn.textContent = "💾 Save Contract"; }
       alert("Save failed: " + (data.error || "unknown error"));
@@ -4487,6 +4499,23 @@ function saveContract(){
   .catch(function(err){
     if(btn){ btn.disabled = false; btn.textContent = "💾 Save Contract"; }
     alert("Network error saving contract: " + err);
+  });
+}
+
+/* ── End-of-wizard finalize ──
+   The "— End —" button on the last step calls this. We save the contract
+   (which sets is_lead=False, flipping the row to In Progress per CLAUDE.md)
+   and redirect to the sales overview, which loads the In Progress tab by
+   default. The localStorage autosave is cleared so a fresh wizard start
+   doesn't rehydrate the just-finalized contract. */
+function finishContract(){
+  var nextBtn = document.getElementById("navNext");
+  if(nextBtn){ nextBtn.disabled = true; nextBtn.textContent = "Finalizing…"; }
+  saveContract({
+    onSuccess: function(){
+      try{ localStorage.removeItem(LS_AUTOSAVE_KEY); } catch(e){}
+      window.location.href = "/stmc_ops/sales/overview/";
+    }
   });
 }
 

@@ -1,0 +1,86 @@
+<div class="modal-overlay" id="co-modal" data-co-modal="1">
+  <div class="modal co-modal" role="dialog" aria-modal="true" aria-labelledby="co-modal-title">
+    <div class="modal-hdr" id="co-modal-title">
+      Change Order #{{ next_number }} — {{ job.customer_name|default:"New Build" }}
+    </div>
+    <form
+      hx-post="{% url 'manager_change_order_create' %}"
+      hx-target="#tab-builds-panel"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type='submit']"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="job_id" value="{{ job.id }}">
+
+      <div class="modal-body">
+        <div class="co-grid">
+          <label class="co-field">
+            <span class="co-lbl">Customer Name</span>
+            <input type="text" name="customer_name" value="{{ default_customer }}" maxlength="200" required>
+          </label>
+
+          <label class="co-field">
+            <span class="co-lbl">Project Address</span>
+            <input type="text" name="project_address" value="{{ default_address }}" maxlength="300">
+          </label>
+
+          <label class="co-field">
+            <span class="co-lbl">Project Manager</span>
+            <input type="text" name="project_manager" value="{{ default_pm }}" maxlength="120">
+          </label>
+
+          <label class="co-field co-field-full">
+            <span class="co-lbl">Description of Changes</span>
+            <textarea name="description" rows="5" placeholder="Describe the change, the reason, and any credits/charges..." required></textarea>
+          </label>
+
+          <label class="co-field">
+            <span class="co-lbl">Price of Changes ($)</span>
+            <input
+              type="number"
+              name="price_change"
+              step="0.01"
+              value="0"
+              required
+              inputmode="decimal"
+            >
+            <span class="co-hint">Use a negative value for a credit (e.g. -4145.00)</span>
+          </label>
+
+          <label class="co-field">
+            <span class="co-lbl">New Contract Total ($)</span>
+            <input
+              type="number"
+              name="new_contract_total"
+              step="0.01"
+              value="{{ contract_total }}"
+              inputmode="decimal"
+            >
+            <span class="co-hint">Optional — leave 0 to skip (current: {{ contract_total_display }})</span>
+          </label>
+
+          <fieldset class="co-field co-field-full co-radio-group">
+            <legend class="co-lbl">Payment Timing</legend>
+            <label class="co-radio">
+              <input type="radio" name="payment_timing" value="material_labor">
+              <span>Due with Material and Labor</span>
+            </label>
+            <label class="co-radio">
+              <input type="radio" name="payment_timing" value="interiors">
+              <span>Due with Interiors</span>
+            </label>
+            <label class="co-radio">
+              <input type="radio" name="payment_timing" value="immediately" checked>
+              <span>Due immediately</span>
+            </label>
+          </fieldset>
+        </div>
+      </div>
+
+      <div class="modal-ftr">
+        <button type="button" class="modal-btn" data-co-cancel="1">Cancel</button>
+        <button type="submit" class="modal-btn co-modal-submit">Create Change Order</button>
+      </div>
+    </form>
+  </div>
+</div>

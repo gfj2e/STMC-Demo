@@ -1,0 +1,46 @@
+<div class="modal-overlay" data-co-modal="1">
+  <div class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <div class="modal-hdr" id="confirm-modal-title">Mark Draw Complete</div>
+    <div class="modal-body">
+      <p class="confirm-lead">
+        Mark <strong>{{ draw.label }}</strong> complete for
+        <strong>{{ job.customer_name|default:"this build" }}</strong>?
+      </p>
+      <div class="confirm-meta">
+        <div class="confirm-meta-row">
+          <span class="confirm-meta-lbl">Amount</span>
+          <span class="confirm-meta-val">{{ amount_display }}</span>
+        </div>
+        <div class="confirm-meta-row">
+          <span class="confirm-meta-lbl">Draw</span>
+          <span class="confirm-meta-val">#{{ draw.draw_number }} — {{ draw.label }}</span>
+        </div>
+      </div>
+      <p class="confirm-note">
+        This will create a QuickBooks invoice for the amount above and update the
+        draw schedule. This action can't be undone from the dashboard.
+      </p>
+    </div>
+    <div class="modal-ftr">
+      <button type="button" class="modal-btn" data-co-cancel="1">Cancel</button>
+      <form
+        method="post"
+        data-complete-form="1"
+        hx-post="{% url 'manager_panel_complete' %}"
+        hx-target="#tab-{{ panel }}-panel"
+        hx-swap="innerHTML"
+        hx-disabled-elt="find button"
+        style="margin:0"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="panel" value="{{ panel }}">
+        <input type="hidden" name="job_id" value="{{ job.id }}">
+        <input type="hidden" name="draw_number" value="{{ draw.draw_number }}">
+        <button class="modal-btn confirm-modal-submit btn-complete" type="submit"
+                data-busy-label="Sending invoice...">
+          <span class="btn-complete-label">Confirm &amp; Send</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

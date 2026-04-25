@@ -67,6 +67,20 @@ def fetch_month_payments(qb) -> Decimal:
         total += Decimal(str(getattr(p, "TotalAmt", 0) or 0))
     return total
 
+def fetch_unpaid_payments(qb) -> Decimal:
+    
+    from quickbooks.objects.invoice import Invoice
+    
+    query = (
+        "SELECT Id, Balance,TxnDate FROM Invoice WHERE Balance > '0'"
+        "MAXRESULTS 1000"
+    )
+    
+    results = Invoice.query(query, qb=qb)
+    total = Decimal("0.00")
+    for i in results:
+        total += Decimal(str(getattr(i, "Balance", 0) or 0))
+    return total
 
 # ─────────────────────────────────────────────────────────────
 # ORCHESTRATION

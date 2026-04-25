@@ -187,11 +187,24 @@ select {
   opacity: 0.8;
 }
 
+/* Red pill button — shared across all role dashboards (sales, manager,
+   owner) and the login screen so the logout affordance is consistent. */
 .logout-link {
-  font-size: 11px;
-  opacity: 0.8;
-  text-decoration: underline;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
   cursor: pointer;
+  font-family: inherit;
+}
+
+.logout-link:hover {
+  background: #fef2f2;
 }
 
 .nav {

@@ -1,3 +1,6 @@
+{# Modal host — populated by HTMX when the PM clicks "New Change Order". #}
+<div id="co-modal-host"></div>
+
 {% if builds_active %}
 	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active Builds <span style="font-weight:400">({{ builds_active|length }})</span></div>
 	{% for project in builds_active %}
@@ -9,6 +12,9 @@
 						<p class="proj-sub">{{ project.subtitle }}</p>
 					</div>
 					<div style="display:flex;align-items:center;gap:8px">
+						{% if project.change_order_count %}
+							<span class="pill pill-warning" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO ×{{ project.change_order_count }}</span>
+						{% endif %}
 						{% if project.current_draw and project.current_draw.step_label %}
 							<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
 						{% else %}
@@ -42,6 +48,48 @@
 						</div>
 					</div>
 				{% endfor %}
+
+				<div class="co-section">
+					<div class="co-section-hdr">
+						<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
+						{% if project.loan_closed %}
+							<button
+								type="button"
+								class="co-add-btn"
+								hx-get="{% url 'manager_change_order_modal' %}?job_id={{ project.id }}"
+								hx-target="#co-modal-host"
+								hx-swap="innerHTML"
+							>+ New Change Order</button>
+						{% else %}
+							<button
+								type="button"
+								class="co-add-btn co-add-btn-locked"
+								disabled
+								title="Available after the sales rep closes the loan (1st Home Draw paid)"
+							>🔒 Locked — loan not closed</button>
+						{% endif %}
+					</div>
+					{% if project.change_orders %}
+						{% for co in project.change_orders %}
+							<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
+								<div class="co-row-num">CO #{{ co.number }}</div>
+								<div class="co-row-body">
+									<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
+									<div class="co-row-meta">
+										{% if co.created %}<span>{{ co.created }}</span>{% endif %}
+										{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
+										{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
+									</div>
+								</div>
+								<div class="co-row-amt">{{ co.amount_display }}</div>
+							</div>
+						{% endfor %}
+					{% elif project.loan_closed %}
+						<div class="co-empty">No change orders on this contract yet.</div>
+					{% else %}
+						<div class="co-empty">Change orders unlock after the sales rep closes the loan.</div>
+					{% endif %}
+				</div>
 			</div>
 		</div>
 	{% endfor %}

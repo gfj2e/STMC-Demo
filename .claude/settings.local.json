@@ -33,7 +33,9 @@
       "Bash(.venv/Scripts/python -c ' *)",
       "Bash(.venv/Scripts/python manage.py shell -c ' *)",
       "Bash(.venv/Scripts/python manage.py makemigrations stmc_ops)",
-      "Bash(.venv/Scripts/python manage.py migrate)"
+      "Bash(.venv/Scripts/python manage.py migrate)",
+      "Bash(.venv/Scripts/python -c \"import django; django.setup\\(\\)\")",
+      "Bash(.venv/Scripts/python manage.py seed_data)"
     ]
   }
 }
