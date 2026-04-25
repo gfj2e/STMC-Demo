@@ -84,7 +84,37 @@ function bindHtmxFeedback() {
     if (!elt || !elt.matches('form[data-complete-form="1"]')) return;
     if (!event.detail.successful) {
       showToast('Error saving - try again');
+      // Restore the button label if the request failed. On success the
+      // server swaps #tab-draws-panel so the button element is replaced
+      // entirely and this restore is moot.
+      restoreCompleteLabel(elt);
     }
+  });
+}
+
+function restoreCompleteLabel(form) {
+  var label = form.querySelector('.btn-complete-label');
+  if (label && label.dataset.originalLabel) {
+    label.textContent = label.dataset.originalLabel;
+  }
+}
+
+function bindCompleteBusyLabel() {
+  // When the Mark Complete form fires off, swap the label to "Sending..."
+  // so the PM gets immediate feedback that the click registered. Combined
+  // with hx-disabled-elt on the button this gives us both visual busy
+  // state AND hard debounce — impossible to double-submit.
+  document.body.addEventListener('htmx:beforeRequest', function (event) {
+    var elt = event.detail && event.detail.elt;
+    if (!elt || !elt.matches('form[data-complete-form="1"]')) return;
+    var button = elt.querySelector('.btn-complete');
+    var label = elt.querySelector('.btn-complete-label');
+    if (!button || !label) return;
+    var busyText = button.getAttribute('data-busy-label') || 'Sending...';
+    if (!label.dataset.originalLabel) {
+      label.dataset.originalLabel = label.textContent;
+    }
+    label.textContent = busyText;
   });
 }
 
@@ -118,6 +148,7 @@ function init() {
   bindLogout();
   bindProjectToggles();
   bindHtmxFeedback();
+  bindCompleteBusyLabel();
   bindQbInvoiceToast();
   initAuthHeader();
 }

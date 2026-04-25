@@ -42,6 +42,7 @@ urlpatterns = [
     path("qb/callback/", views.qb_callback_view, name="qb_callback"),
     path("qb/disconnect/", views.qb_disconnect_view, name="qb_disconnect"),
     path("owner/qb-status/", views.qb_status_view, name="qb_status"),
+    path("owner/qb-sync/refresh/", views.qb_sync_refresh_view, name="qb_sync_refresh"),
     # ── Owner bell notifications ──
     path("owner/notifications/bell/", views.owner_notifications_bell_view,
          name="owner_notifications_bell"),

@@ -984,19 +984,44 @@ def _build_owner_ui_context():
     matched_count = sum(1 for bill in bill_rows if bill.get("status") in {"paid", "review"})
     unmatched_count = sum(1 for bill in bill_rows if bill.get("status") == "review")
 
+    # ── QuickBooks Sync tile ─────────────────────────────────────
+    # `qb_payments` and `last_pull` are now driven by the real QbSyncSnapshot
+    # (populated via the "Refresh from QuickBooks" button on the dashboard,
+    # which calls qb_pull.refresh_snapshot). The other qb_* fields remain
+    # mocked for now — those pull paths (Bills/matching) aren't implemented.
+    # `is_connected` reflects the real OAuth connection, not "do we have jobs."
+    from . import qb_client as _qb_client
+    from . import qb_pull as _qb_pull
+    qb_conn = _qb_client.get_connection()
+    qb_snapshot = _qb_pull.get_snapshot()
+
+    if qb_snapshot and qb_snapshot.fetched_at:
+        qb_payments_display = _format_money(int(qb_snapshot.payments_this_month))
+        last_pull_display = timezone.localtime(qb_snapshot.fetched_at).strftime(
+            "%b %d, %Y %I:%M %p"
+        ).replace(" 0", " ")
+    else:
+        qb_payments_display = "—"
+        last_pull_display = "Never"
+
+    qb_sync_status = qb_snapshot.status if qb_snapshot else "offline"
+    qb_sync_error = qb_snapshot.last_error if qb_snapshot else ""
+
     dashboard_metrics = {
         "active_jobs": len(dashboard_jobs),
         "under_contract": _format_money(contract_total),
         "collected": _format_money(collected_total),
         "outstanding": _format_money(outstanding_total),
-        "qb_payments": _format_money(collected_total),
+        "qb_payments": qb_payments_display,       # real: from snapshot
         "qb_matched": f"{matched_count} / {len(bill_rows)}" if bill_rows else "0 / 0",
         "qb_unmatched": unmatched_count,
         "contract_revenue": _format_money(contract_total),
         "actual_cost": _format_money(actual_total),
         "live_margin_pct": f"{live_margin_pct:.1f}%",
-        "last_pull": timezone.localtime().strftime("%b %d, %Y %I:%M %p").replace(" 0", " "),
-        "is_connected": bool(dashboard_jobs),
+        "last_pull": last_pull_display,           # real: from snapshot.fetched_at
+        "is_connected": qb_conn is not None,      # real: from QbConnection row
+        "qb_sync_status": qb_sync_status,         # "ok" / "stale" / "offline"
+        "qb_sync_error": qb_sync_error,
         "budget_total": _format_money(budget_total),
     }
 
@@ -1266,20 +1291,59 @@ def _mark_draw_complete(job_id, draw_number):
     """Mark the specified draw as paid, advance the next pending draw to
     current, and fire a QuickBooks invoice against the homeowner.
 
+    Idempotent and race-safe. If the draw is already PAID (e.g. the PM
+    double-clicked faster than the first request could return), we return
+    the previously-recorded invoice event without creating a duplicate
+    QB invoice. The SQL UPDATE with a status predicate is atomic — only
+    one concurrent request wins the transition.
+
     Returns `(today, event)` where `event` is the QbInvoiceEvent row (real
     or fallback) — callers use it to attach invoice details to their
     HTMX response header so the manager-side toast can display them.
     """
+    from .models import QbInvoiceEvent
+
     draw = JobDraw.objects.get(job_id=job_id, draw_number=draw_number)
     job = draw.job
 
     dt = timezone.now()
     today = dt.strftime("%b ") + str(dt.day)
 
-    draw.status = JobDraw.STATUS_PAID
-    draw.paid_date = today
-    draw.save(update_fields=["status", "paid_date"])
+    # Atomic conditional update: flip status to PAID only if it isn't
+    # already. The row count tells us whether *this* request won the
+    # race. If it didn't (0 rows updated), the draw was already paid —
+    # return the existing event and skip the QB call to avoid duplicates.
+    won_race = JobDraw.objects.filter(
+        pk=draw.pk,
+    ).exclude(status=JobDraw.STATUS_PAID).update(
+        status=JobDraw.STATUS_PAID,
+        paid_date=today,
+    )
 
+    if not won_race:
+        # Someone else already paid this draw (spam click or concurrent
+        # tab). Return the most recent event for the draw if we have one;
+        # otherwise synthesize a fallback so the caller still gets a
+        # non-None event to attach to the HTMX response.
+        existing = (
+            QbInvoiceEvent.objects.filter(draw_id=draw.pk)
+            .order_by("-created_at")
+            .first()
+        )
+        if existing is not None:
+            return today, existing
+        # Draw was paid but no event exists (data from before Phase B).
+        # Fall through to create one via the normal path so the UI still
+        # has something sensible to render, but don't hit QB.
+        from . import qb_invoice as _qi
+        synthetic = _qi._record_fallback_event(
+            job, draw, _qi._phase_label_for(draw),
+            draw.amount or 0,
+            "Draw was already marked paid; no QB invoice was created.",
+        )
+        return today, synthetic
+
+    # We won the race — continue with the full transition.
     next_draw = JobDraw.objects.filter(
         job_id=job_id, status=JobDraw.STATUS_PENDING
     ).order_by("draw_number").first()
@@ -1880,20 +1944,27 @@ def manager_panel_mark_complete_view(request):
     return redirect("manager")
 
 
+@never_cache
 @role_required(AppUser.ROLE_EXEC)
 def owner_view(request):
+    # @never_cache prevents the browser from restoring this page from bfcache
+    # after the user logs out. Without it, hitting Back would resurrect the
+    # page with its HTMX polls (notification bell, dashboard refresh) still
+    # scheduled. The next poll would hit role_required against an empty
+    # session, return 401 + HX-Redirect=login, and yank the user to the
+    # login page seemingly out of nowhere.
     context = _build_owner_ui_context()
-    from . import qb_client
-    qb_connection = qb_client.get_connection()
+    # Unified QB card context — same shape as qb_status_view / qb_sync_refresh_view
+    # so the {% include "owner/_qb_status.html" %} in owner/index.html hydrates
+    # identically on first load and on every HTMX refresh.
+    qb_ctx = _qb_status_context()
     return render(
         request,
         "owner/index.html",
         {
             "kpis": context["kpis"],
             "owner_total": context["owner_total"],
-            "qb_connected": qb_connection is not None,
-            "qb_connection": qb_connection,
-            "qb_environment": settings.QB_ENVIRONMENT,
+            **qb_ctx,
         },
     )
 
@@ -2000,6 +2071,18 @@ def sales_finalize_contract_view(request, job_id):
             status=JobDraw.STATUS_PAID,
             paid_date=timezone.now().strftime("%b ") + str(timezone.now().day),
         )
+        # Hand-off to the PM: promote the lowest-numbered non-paid draw to
+        # CURRENT so the manager's "Mark Complete" button renders. Without
+        # this the PM dashboard shows only PENDING rows with no action.
+        next_current = (
+            JobDraw.objects.filter(job=job)
+            .exclude(status=JobDraw.STATUS_PAID)
+            .order_by("draw_number")
+            .first()
+        )
+        if next_current and next_current.status != JobDraw.STATUS_CURRENT:
+            next_current.status = JobDraw.STATUS_CURRENT
+            next_current.save(update_fields=["status"])
 
     if request.htmx:
         context = _build_sales_ui_context(request)
@@ -2384,6 +2467,64 @@ def _qb_config_missing_response():
     return HttpResponse(html, status=500)
 
 
+# Namespace for our OAuth state signer — keeps these tokens from ever
+# colliding with other uses of TimestampSigner in the project.
+_QB_STATE_SALT = "stmc_ops.qb.oauth_state"
+# State must survive the round-trip to Intuit + user authorization clicks.
+# 10 minutes is generous without being so long that a captured URL stays
+# exploitable for an attacker.
+_QB_STATE_MAX_AGE_SECONDS = 10 * 60
+
+
+def _build_qb_oauth_state(user_id: int) -> str:
+    """Generate a signed, timestamped state token that also identifies the
+    user who initiated the flow.
+
+    Two jobs in one token:
+
+    1. CSRF protection for the OAuth callback (its original purpose).
+       Only holders of SECRET_KEY can mint a valid signature, and the
+       embedded timestamp bounds replay to 10 minutes.
+    2. Re-establish the user's session after callback. Some browsers
+       (incognito, strict tracking, Safari ITP) drop the session cookie
+       on the Intuit→localhost cross-site redirect. Rather than asking
+       the user to log in again after every Connect flow, we embed their
+       user_id in the state and use it on callback to log them back in.
+
+    Security model: this turns the state into a short-lived login ticket
+    for one specific user. It's safe because:
+      - Only our server can sign a valid state (SECRET_KEY).
+      - The ticket expires in 10 minutes.
+      - Intuit's authorization code is single-use, so a replay of the
+        full callback URL can only complete the flow once.
+      - The state was issued to a user who was already authenticated
+        (qb_connect_view is @role_required).
+    """
+    import secrets as _secrets
+    from django.core.signing import TimestampSigner
+    signer = TimestampSigner(salt=_QB_STATE_SALT)
+    # Payload = "<user_id>:<nonce>" — nonce prevents two concurrent flows
+    # for the same user from producing identical tokens.
+    payload = f"{int(user_id)}:{_secrets.token_urlsafe(12)}"
+    return signer.sign(payload)
+
+
+def _verify_qb_oauth_state(state: str):
+    """Verify the signature + age. Return the embedded user_id (int) on
+    success, or None on any failure (bad signature, expired, malformed)."""
+    from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+    signer = TimestampSigner(salt=_QB_STATE_SALT)
+    try:
+        payload = signer.unsign(state, max_age=_QB_STATE_MAX_AGE_SECONDS)
+    except (BadSignature, SignatureExpired):
+        return None
+    user_id_str, _, _nonce = payload.partition(":")
+    try:
+        return int(user_id_str)
+    except (TypeError, ValueError):
+        return None
+
+
 @role_required(AppUser.ROLE_EXEC)
 def qb_connect_view(request):
     """Start the OAuth 2.0 authorization flow. Redirects the browser to
@@ -2395,11 +2536,11 @@ def qb_connect_view(request):
     except qb_client.QbConfigError:
         return _qb_config_missing_response()
 
-    # Intuit requires a `state` parameter; we generate one, stash in session,
-    # and verify on callback. Prevents CSRF on the OAuth step.
-    import secrets as _secrets
-    state = _secrets.token_urlsafe(24)
-    request.session["qb_oauth_state"] = state
+    # Signed `state` — proves on callback that we issued it AND carries
+    # the initiating user's id so we can restore their session after
+    # the round-trip even if the browser dropped the session cookie
+    # (incognito / strict tracking protection / Safari ITP).
+    state = _build_qb_oauth_state(request.user.id)
 
     authorize_url = auth_client.get_authorization_url(
         qb_client._scope_objects(),
@@ -2408,10 +2549,21 @@ def qb_connect_view(request):
     return redirect(authorize_url)
 
 
-@role_required(AppUser.ROLE_EXEC)
 def qb_callback_view(request):
     """OAuth redirect target. Exchanges the authorization code for tokens
-    and persists a QbConnection row."""
+    and persists a QbConnection row.
+
+    NOT decorated with @role_required and NOT session-dependent. The OAuth
+    2.0 `state` token we issued in qb_connect_view is signed with Django's
+    SECRET_KEY via TimestampSigner; verifying the signature proves we
+    issued it, and the embedded timestamp bounds replay attacks to a
+    10-minute window. This design survives:
+      * session cookie being dropped on the cross-site redirect
+        (strict tracking protection, Safari ITP, incognito mode, third-
+        party cookie blocking)
+      * the user opening the OAuth flow in a new tab, window, or browser
+      * any browser quirk around SameSite=Lax on cross-site redirects
+    """
     from . import qb_client
     from intuitlib.exceptions import AuthClientError
 
@@ -2420,20 +2572,27 @@ def qb_callback_view(request):
     if error:
         return HttpResponse(
             f"<h1>QuickBooks connection cancelled</h1><p>Intuit returned: {error}</p>"
-            "<p><a href='/owner/'>Back to dashboard</a></p>",
+            "<p><a href='/stmc_ops/owner/'>Back to dashboard</a></p>",
             status=400,
         )
 
     code = request.GET.get("code")
     realm_id = request.GET.get("realmId")
     state = request.GET.get("state")
-    expected_state = request.session.pop("qb_oauth_state", None)
 
     if not code or not realm_id:
         return HttpResponse("<h1>QuickBooks callback missing code/realmId</h1>", status=400)
-    if not state or state != expected_state:
+
+    initiating_user_id = _verify_qb_oauth_state(state) if state else None
+    if initiating_user_id is None:
+        # Either: state missing, tampered, forged without SECRET_KEY, or
+        # older than the allowed 10-minute window. Any of these = reject.
         return HttpResponse(
-            "<h1>OAuth state mismatch</h1><p>Please retry the Connect flow.</p>",
+            "<h1>OAuth state invalid or expired</h1>"
+            "<p>This callback could not be verified. Please retry the "
+            "Connect QuickBooks flow — it must complete within 10 "
+            "minutes of clicking the button.</p>"
+            "<p><a href='/stmc_ops/owner/'>Back to dashboard</a></p>",
             status=400,
         )
 
@@ -2450,12 +2609,99 @@ def qb_callback_view(request):
             status=500,
         )
 
+    # Look up the user who initiated this flow (per the signed state).
+    # Used both for the audit field below and to restore their session if
+    # the browser dropped the session cookie on the cross-site redirect.
+    initiating_user = None
+    try:
+        initiating_user = AppUser.objects.filter(pk=initiating_user_id).first()
+    except Exception:
+        pass
+
+    audit_email = ""
+    if request.user.is_authenticated:
+        audit_email = getattr(request.user, "email", "") or ""
+    elif initiating_user:
+        audit_email = initiating_user.email or ""
+
     qb_client.save_connection_from_auth_client(
         auth_client,
         realm_id=realm_id,
-        connected_by_email=getattr(request.user, "email", "") or "",
+        connected_by_email=audit_email,
     )
+
+    # Session restoration: if the browser didn't round-trip the session
+    # cookie (common in incognito / Safari ITP), request.user will be
+    # AnonymousUser at this point even though the signed state proves
+    # who started the flow. Log them back in so the redirect to /owner/
+    # doesn't bounce them to login.
+    if not request.user.is_authenticated and initiating_user is not None:
+        from django.contrib.auth import login as _auth_login
+        _auth_login(request, initiating_user)
+
     return redirect("owner")
+
+
+def _qb_status_context():
+    """Build the context dict consumed by owner/_qb_status.html.
+
+    Shared by three entry points so the merged card renders identically:
+      * owner_view (initial page render)
+      * qb_status_view (HTMX refresh after connect/disconnect)
+      * qb_sync_refresh_view (HTMX refresh after pulling payments)
+    """
+    from . import qb_client
+    from . import qb_pull
+    connection = qb_client.get_connection()
+    snapshot = qb_pull.get_snapshot()
+
+    if snapshot and snapshot.fetched_at:
+        payments_display = f"${int(snapshot.payments_this_month):,}"
+        last_pull = timezone.localtime(snapshot.fetched_at).strftime(
+            "%b %d, %Y %I:%M %p"
+        ).replace(" 0", " ")
+    else:
+        payments_display = "—"
+        last_pull = "Never"
+
+    return {
+        "qb_connected": connection is not None,
+        "qb_connection": connection,
+        "qb_environment": settings.QB_ENVIRONMENT,
+        "qb_portal_url": qb_client.portal_url(connection) if connection else "",
+        "qb_payments_display": payments_display,
+        "qb_last_pull": last_pull,
+        "qb_sync_status": snapshot.status if snapshot else "offline",
+        "qb_sync_error": snapshot.last_error if snapshot else "",
+    }
+
+
+@role_required(AppUser.ROLE_EXEC)
+@require_POST
+@csrf_protect
+def qb_sync_refresh_view(request):
+    """Pull fresh metrics from QB (currently just month-to-date Payments)
+    and re-render the unified QB card. Never 500s — if the pull fails,
+    the snapshot status becomes 'stale' and the card surfaces the warning
+    pill instead of crashing the page.
+    """
+    from . import qb_pull
+    snapshot = qb_pull.refresh_snapshot()
+
+    response = render(request, "owner/_qb_status.html", _qb_status_context())
+    import json as _json
+    response["HX-Trigger"] = _json.dumps({
+        "qb-sync-refreshed": {
+            "status": snapshot.status,
+            "payments": f"{int(snapshot.payments_this_month):,}" if snapshot.payments_this_month else "0",
+            "error": snapshot.last_error,
+        },
+        # Also refresh the dashboard panel below — Portfolio Profit doesn't
+        # depend on the QB pull today, but this keeps the two in sync if
+        # Actual Cost / matching metrics get wired in later.
+        "owner-dashboard-refresh": {},
+    })
+    return response
 
 
 @role_required(AppUser.ROLE_EXEC)
@@ -2472,19 +2718,9 @@ def qb_disconnect_view(request):
 
 @role_required(AppUser.ROLE_EXEC)
 def qb_status_view(request):
-    """HTMX partial: renders the current QuickBooks connection status card.
+    """HTMX partial: renders the unified QuickBooks card.
     Used on the owner dashboard and re-fetched after connect/disconnect."""
-    from . import qb_client
-    connection = qb_client.get_connection()
-    return render(
-        request,
-        "owner/_qb_status.html",
-        {
-            "qb_connected": connection is not None,
-            "qb_connection": connection,
-            "qb_environment": settings.QB_ENVIRONMENT,
-        },
-    )
+    return render(request, "owner/_qb_status.html", _qb_status_context())
 
 
 # ─────────────────────────────────────────────────────────────

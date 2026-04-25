@@ -236,10 +236,38 @@ def is_connected() -> bool:
 
 
 def invoice_public_url(connection: QbConnection, qb_invoice_id: str) -> str:
-    """Build the human-readable URL to view an invoice inside QuickBooks.
-    Sandbox and production use different base domains."""
+    """Build a URL that opens QBO to a page where the user can find this
+    invoice.
+
+    We intentionally link to the Sales Transactions list rather than to
+    QBO's "direct invoice" deep-link (`/app/invoice?txnId=X`). The deep-
+    link is officially supported but unreliable in practice: if the user
+    has multiple QB companies, a stale session, or hits the URL without
+    being pre-authenticated, QBO silently opens an empty new-invoice form
+    instead of loading the specified transaction. The Sales Transactions
+    list always opens the right page — users locate the specific invoice
+    by its DocNumber (shown as the link text in the bell dropdown).
+
+    `qb_invoice_id` is accepted but unused — kept on the signature so
+    future callers can swap back to a deep-link format if Intuit's URL
+    behavior becomes reliable.
+    """
+    # QBO's Sales page (menu label "Sales" / "Sales Transactions") lives
+    # at /app/sales, not /app/salestransactions. The list is sorted newest
+    # first so freshly-created invoices appear at the top.
+    return f"{_qbo_base_url()}/app/sales"
+
+
+def portal_url(connection: QbConnection) -> str:
+    """Build the URL that drops the user into the connected company's
+    QuickBooks Online portal homepage. The realm id is included as a hint;
+    QBO will prompt the user to switch companies if they're signed into a
+    different one."""
+    return f"{_qbo_base_url()}/app/homepage?companyId={connection.realm_id}"
+
+
+def _qbo_base_url() -> str:
+    """Sandbox and production live on different QBO domains."""
     if settings.QB_ENVIRONMENT == "production":
-        base = "https://app.qbo.intuit.com"
-    else:
-        base = "https://app.sandbox.qbo.intuit.com"
-    return f"{base}/app/invoice?txnId={qb_invoice_id}"
+        return "https://app.qbo.intuit.com"
+    return "https://app.sandbox.qbo.intuit.com"

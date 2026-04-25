@@ -439,6 +439,19 @@
   opacity: 0.85;
 }
 
+/* Disabled / in-flight state. HTMX's hx-disabled-elt applies the standard
+   `disabled` attribute while a request is in flight. Visual feedback: cursor
+   changes, opacity drops, hover no-op. The label text is swapped to
+   "Sending invoice..." by a JS hook (see bindCompleteBusyLabel in manager.js). */
+.btn-complete[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-complete[disabled]:hover {
+  opacity: 0.6;
+}
+
 /* ── Toast ── */
 
 .toast {

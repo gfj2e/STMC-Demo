@@ -1,51 +1,113 @@
 {% comment %}
-QuickBooks Online connection status card (HTMX partial).
+QuickBooks Online — unified status + sync card (HTMX partial).
 
-Fetched by the owner dashboard on load and re-fetched after connect / disconnect
-via the `qb-status-refresh` HTMX trigger. Fragment only — no <html>/<body>.
+Combines what used to be two cards (OAuth status + "QuickBooks Sync" panel)
+into a single card. The top band shows OAuth state + actions (Connect /
+Open in QB / Disconnect). The lower band shows live sync data pulled from
+QB (currently just month-to-date Payments) plus the Refresh button.
+
+Re-rendered on:
+  * qb-status-refresh  — after connect / disconnect flows
+  * qb-sync-refreshed  — after the Refresh-from-QuickBooks POST returns
 
 Context:
-  qb_connected   — bool; True if a QbConnection row exists
-  qb_connection  — QbConnection or None (realm_id, connected_at, connected_by_email)
-  qb_environment — "sandbox" or "production" (settings.QB_ENVIRONMENT)
+  qb_connected          — bool; True if a QbConnection row exists
+  qb_connection         — QbConnection or None
+  qb_environment        — "sandbox" or "production"
+  qb_portal_url         — deep link into the connected company's QBO portal
+  qb_payments_display   — formatted money string (e.g. "$1,234") or "—"
+  qb_last_pull          — human-readable last-pull timestamp or "Never"
+  qb_sync_status        — "ok" / "stale" / "offline"
+  qb_sync_error         — error message (stale state only)
 {% endcomment %}
 
 <div class="qb-card">
   <div class="qb-card-inner">
-    <div class="qb-card-head">
-      <span class="qb-logo">QB</span>
-      <div>
-        <div class="qb-title">QuickBooks Online</div>
-        <div class="qb-env">{{ qb_environment|title }} environment</div>
+
+    {% comment %} Top band — logo, title, connection pill + meta, action buttons. {% endcomment %}
+    <div class="qb-card-head-row">
+      <div class="qb-card-head">
+        <span class="qb-logo">QB</span>
+        <div>
+          <div class="qb-title">QuickBooks Online</div>
+          <div class="qb-env">{{ qb_environment|title }} Environment</div>
+        </div>
+      </div>
+
+      <div class="qb-card-state">
+        {% if qb_connected %}
+          {% if qb_sync_status == "stale" %}
+            <span class="pill pill-danger" title="{{ qb_sync_error }}">Stale</span>
+          {% else %}
+            <span class="pill pill-success">Connected</span>
+          {% endif %}
+          <span class="qb-meta">
+            Realm {{ qb_connection.realm_id }}
+            {% if qb_connection.connected_by_email %}
+              · by {{ qb_connection.connected_by_email }}
+            {% endif %}
+            · since {{ qb_connection.connected_at|date:"M j, Y" }}
+          </span>
+        {% else %}
+          <span class="pill pill-muted">Not connected</span>
+          <span class="qb-meta">Invoice events will be recorded locally only until connected.</span>
+        {% endif %}
+      </div>
+
+      <div class="qb-card-actions">
+        {% if qb_connected %}
+          <a href="{{ qb_portal_url }}" target="_blank" rel="noopener" class="qb-btn qb-btn-primary">
+            Open in QuickBooks
+          </a>
+          <form method="post" action="{% url 'qb_disconnect' %}" style="display:inline;margin:0">
+            {% csrf_token %}
+            <button type="submit" class="qb-btn qb-btn-ghost"
+                    onclick="return confirm('Disconnect QuickBooks? Invoices created after this point will fall back to local-only until you reconnect.');">
+              Disconnect
+            </button>
+          </form>
+        {% else %}
+          <a href="{% url 'qb_connect' %}" class="qb-btn qb-btn-primary">Connect QuickBooks</a>
+        {% endif %}
       </div>
     </div>
 
     {% if qb_connected %}
-      <div class="qb-card-state">
-        <span class="pill pill-success">Connected</span>
-        <span class="qb-meta">
-          Realm {{ qb_connection.realm_id }}
-          {% if qb_connection.connected_by_email %}
-            · by {{ qb_connection.connected_by_email }}
-          {% endif %}
-          · since {{ qb_connection.connected_at|date:"M j, Y" }}
-        </span>
-      </div>
-      <form method="post" action="{% url 'qb_disconnect' %}" class="qb-card-actions">
-        {% csrf_token %}
-        <button type="submit" class="qb-btn qb-btn-ghost"
-                onclick="return confirm('Disconnect QuickBooks? Invoices created after this point will fall back to local-only until you reconnect.');">
-          Disconnect
-        </button>
-      </form>
-    {% else %}
-      <div class="qb-card-state">
-        <span class="pill pill-muted">Not connected</span>
-        <span class="qb-meta">Invoice events will be recorded locally only until connected.</span>
-      </div>
-      <div class="qb-card-actions">
-        <a href="{% url 'qb_connect' %}" class="qb-btn qb-btn-primary">Connect QuickBooks</a>
+      {% comment %}
+        Lower band — live sync data + Refresh button. Only shown when
+        the company is actually connected; otherwise there's nothing
+        meaningful to display here.
+      {% endcomment %}
+      <div class="qb-card-sync">
+        <div class="qb-card-sync-row">
+          <div>
+            <div class="qb-card-sync-label">Payments pulled this month</div>
+            <div class="qb-card-sync-sub">Last pull: {{ qb_last_pull }}</div>
+          </div>
+          <div class="qb-card-sync-value">{{ qb_payments_display }}</div>
+        </div>
+
+        <div class="qb-card-sync-footer">
+          <span class="qb-card-sync-hint">
+            Pull the latest payments total from QuickBooks.
+          </span>
+          <form method="post"
+                action="{% url 'qb_sync_refresh' %}"
+                hx-post="{% url 'qb_sync_refresh' %}"
+                hx-target="#qb-status-wrap"
+                hx-swap="innerHTML"
+                hx-disabled-elt="find button"
+                data-qb-refresh-form="1"
+                style="margin:0">
+            {% csrf_token %}
+            <button type="submit" class="qb-btn qb-btn-primary qb-btn-sm"
+                    data-busy-label="Refreshing...">
+              <span class="qb-btn-label">Refresh from QuickBooks</span>
+            </button>
+          </form>
+        </div>
       </div>
     {% endif %}
+
   </div>
 </div>

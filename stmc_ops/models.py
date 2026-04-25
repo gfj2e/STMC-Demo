@@ -925,3 +925,54 @@ class QbInvoiceEvent(models.Model):
         """For the bell UI: show the real QB DocNumber if we got one, else a
         local fallback tag so the row still reads sensibly."""
         return self.qb_invoice_doc_number or f"LOCAL-{self.pk:04d}"
+
+
+class QbSyncSnapshot(models.Model):
+    """Cached read-only aggregates pulled from QuickBooks.
+
+    We don't hit the QB API on every dashboard page load — it's too slow
+    (each query is 500ms-2s) and would bump us into Intuit's ~500/min rate
+    limit with multiple concurrent viewers. Instead, we refresh this row
+    explicitly (via the dashboard's "Refresh from QuickBooks" button) or
+    on a schedule, and the dashboard reads from here.
+
+    Singleton: we only ever keep one row. Code enforcement, not a DB
+    constraint — same pattern as QbConnection.
+
+    Statuses:
+      ok       — last pull succeeded. Values are authoritative.
+      stale    — last pull failed but we have prior values. UI shows the
+                 old numbers with a warning.
+      offline  — QB isn't connected at all. Values may be zero.
+    """
+
+    STATUS_OK = "ok"
+    STATUS_STALE = "stale"
+    STATUS_OFFLINE = "offline"
+    STATUS_CHOICES = [
+        (STATUS_OK, "OK"),
+        (STATUS_STALE, "Stale (last pull failed)"),
+        (STATUS_OFFLINE, "QB not connected"),
+    ]
+
+    # Dollar total of all Payment objects whose TxnDate falls in the current
+    # calendar month, summed in the realm's currency. Stored as Decimal so
+    # the dashboard can format with thousands separators.
+    payments_this_month = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0
+    )
+    # When the pull ran. Displayed as "Last pull: ..." in the header.
+    fetched_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_OFFLINE
+    )
+    # Short error message from the most recent failed pull, for debugging.
+    last_error = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        verbose_name = "QuickBooks Sync Snapshot"
+
+    def __str__(self):
+        if self.fetched_at:
+            return f"QB snapshot @ {self.fetched_at:%Y-%m-%d %H:%M} ({self.status})"
+        return "QB snapshot (never fetched)"

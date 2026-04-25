@@ -28,12 +28,27 @@
 							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
 							<div style="font-size:10px;color:#3B82F6;opacity:.8">Creates QB invoice</div>
 						</div>
-						<form method="post" data-complete-form="1" hx-post="{% url 'manager_panel_complete' %}" hx-target="#tab-draws-panel" hx-swap="innerHTML" style="margin:0">
+						<form method="post" data-complete-form="1"
+						      hx-post="{% url 'manager_panel_complete' %}"
+						      hx-target="#tab-draws-panel"
+						      hx-swap="innerHTML"
+						      hx-disabled-elt="find button"
+						      style="margin:0">
 							{% csrf_token %}
 							<input type="hidden" name="panel" value="draws">
 							<input type="hidden" name="job_id" value="{{ project.id }}">
 							<input type="hidden" name="draw_number" value="{{ project.current_draw.number }}">
-							<button class="btn-complete" type="submit">Mark complete</button>
+							{% comment %}
+								hx-disabled-elt disables the button while the POST is
+								in-flight. The data-busy-label attribute + JS hook in
+								manager.js swaps the label to "Sending invoice..."
+								during the request so the PM has visual feedback that
+								the click registered.
+							{% endcomment %}
+							<button class="btn-complete" type="submit"
+							        data-busy-label="Sending invoice...">
+								<span class="btn-complete-label">Mark complete</span>
+							</button>
 						</form>
 					</div>
 				{% endif %}

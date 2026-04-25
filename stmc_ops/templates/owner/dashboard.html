@@ -1,31 +1,10 @@
 <div class="exec-wrap">
-	<div class="exec-stitle">QuickBooks Sync <span class="exec-flag">PULL FROM QB - READ ONLY</span></div>
-	<div class="exec-qb-card">
-		<div class="exec-qb-head">
-			<div class="exec-qb-logo">QB</div>
-			<div class="exec-qb-title-wrap">
-				<div class="exec-qb-title">QuickBooks Online</div>
-				<div class="exec-qb-sub">Read-only - Last pull: {{ dashboard_metrics.last_pull }}</div>
-			</div>
-			{% if dashboard_metrics.is_connected %}
-				<div class="exec-qb-status">Connected</div>
-			{% else %}
-				<div class="exec-qb-status is-offline">No Data</div>
-			{% endif %}
-		</div>
-		<div class="exec-qb-row">
-			<span>Payments pulled this month</span>
-			<span class="exec-qb-val is-green">{{ dashboard_metrics.qb_payments }}</span>
-		</div>
-		<div class="exec-qb-row">
-			<span>Bills matched to budget lines</span>
-			<span class="exec-qb-val">{{ dashboard_metrics.qb_matched }}</span>
-		</div>
-		<div class="exec-qb-row">
-			<span>Unmatched transactions</span>
-			<span class="exec-qb-val is-red">{{ dashboard_metrics.qb_unmatched }} need review</span>
-		</div>
-	</div>
+	{% comment %}
+		QuickBooks Sync card lives in the header area now — see
+		owner/_qb_status.html, rendered into #qb-status-wrap. It combines
+		the OAuth status (Connect / Disconnect / Open in QB) with the live
+		Payments pulled-this-month read-back + Refresh button.
+	{% endcomment %}
 
 	<div class="exec-stitle">Portfolio Profit</div>
 	<div class="exec-profit-grid">

@@ -139,6 +139,33 @@ function bindHtmxFeedback() {
       handleBellRefresh(target);
     }
   });
+
+  // QB Sync refresh: swap the button label while the pull is in-flight
+  // so the exec sees "Refreshing..." instead of a silent hang while QB
+  // takes a second or two to answer.
+  document.body.addEventListener('htmx:beforeRequest', event => {
+    const elt = event.detail && event.detail.elt;
+    if (!elt || !elt.matches('form[data-qb-refresh-form="1"]')) return;
+    const button = elt.querySelector('button[data-busy-label]');
+    const label = elt.querySelector('.qb-btn-label');
+    if (!button || !label) return;
+    const busy = button.getAttribute('data-busy-label') || 'Refreshing...';
+    if (!label.dataset.originalLabel) label.dataset.originalLabel = label.textContent;
+    label.textContent = busy;
+  });
+
+  // After the server returns a JSON HX-Trigger with qb-sync-refreshed
+  // details, fire a toast summarizing the result.
+  document.body.addEventListener('qb-sync-refreshed', event => {
+    const d = (event && event.detail) || {};
+    if (d.status === 'ok') {
+      showToast('QuickBooks synced — $' + (d.payments || '0') + ' pulled');
+    } else if (d.status === 'stale') {
+      showToast('QuickBooks sync failed — showing last known values');
+    } else {
+      showToast('QuickBooks is not connected');
+    }
+  });
 }
 
 // ── Toast ───────────────────────────────────────────────────

@@ -30,7 +30,10 @@
       "Bash(.venv/Scripts/pip install *)",
       "Bash(.venv/Scripts/python manage.py check)",
       "Bash(.venv/Scripts/python -c \"import pkgutil, quickbooks.objects; [print\\(m.name\\) for m in pkgutil.iter_modules\\(quickbooks.objects.__path__\\)]\")",
-      "Bash(.venv/Scripts/python -c ' *)"
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(.venv/Scripts/python manage.py shell -c ' *)",
+      "Bash(.venv/Scripts/python manage.py makemigrations stmc_ops)",
+      "Bash(.venv/Scripts/python manage.py migrate)"
     ]
   }
 }

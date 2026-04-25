@@ -40,24 +40,54 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────
 # DRAW → HUMAN-READABLE PHASE LABEL
 # ─────────────────────────────────────────────────────────────
-# The seeded JobDraw rows have draw_number 0..6 matching the construction
-# stages. We surface a friendly label in the toast / bell ("Framing Crew")
-# rather than the raw "draw #3". Falls back to `draw.label` if draw_number
-# doesn't match the map (which keeps future seed data working).
+# We surface a concise phase name in the toast/bell (e.g. "Concrete
+# Completion") rather than the raw `draw.label` ("2nd Home Draw (Concrete
+# Completion)"). The transformation is purely text-based — we derive the
+# label from draw.label itself, *not* from draw_number. An earlier version
+# of this function mapped draw_number → label, which produced wrong text
+# whenever the seed data used draw numbers outside the 0-6 range it
+# assumed. Parsing draw.label is always correct regardless of numbering.
 
-_PHASE_LABELS = {
-    0: "Deposit",
-    1: "Slab / Foundation",
-    2: "Concrete",
-    3: "Framing",
-    4: "MEP Rough-In",
-    5: "Drywall & Finish",
-    6: "Final",
-}
+
+import re as _re
 
 
 def _phase_label_for(draw: JobDraw) -> str:
-    return _PHASE_LABELS.get(draw.draw_number, draw.label or f"Draw #{draw.draw_number}")
+    """Concise phase label for a draw, derived from draw.label.
+
+    Heuristics (tried in order):
+      1. If the label has a parenthetical — "3rd Home Draw (Framing
+         Completion)" — return the text inside: "Framing Completion".
+         This matches how the seeded contracts name draws.
+      2. Otherwise strip any ordinal prefix ("1st ", "2nd ", "3rd ", "4th "…)
+         and the phrase "Home Draw" from the start — falls back cleanly
+         for simpler labels.
+      3. If none of the above apply, use the full draw.label as-is.
+      4. Last-resort fallback: "Draw #N" using draw_number.
+    """
+    label = (draw.label or "").strip()
+    if not label:
+        return f"Draw #{draw.draw_number}"
+
+    # (1) Extract text inside the last pair of parens, if any.
+    paren_match = _re.search(r"\(([^()]+)\)\s*$", label)
+    if paren_match:
+        return paren_match.group(1).strip()
+
+    # (2) Strip ordinal prefix + any leading punctuation/separator. Labels
+    # in the wild include en-dashes, em-dashes, colons, hyphens, bullets,
+    # and occasionally UTF-8 mojibake where a dash got corrupted — strip
+    # everything until we hit an alphanumeric character.
+    cleaned = _re.sub(r"^\d+(st|nd|rd|th)\b", "", label, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r"^[^\w(]+", "", cleaned)  # drop leading non-word garbage
+    cleaned = _re.sub(r"^home\s+draw\b", "", cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r"^[^\w(]+", "", cleaned)  # strip again after "Home Draw"
+    cleaned = cleaned.strip()
+    if cleaned:
+        return cleaned
+
+    # (3) / (4) Fallbacks.
+    return label or f"Draw #{draw.draw_number}"
 
 
 # ─────────────────────────────────────────────────────────────

@@ -246,6 +246,11 @@
   color: var(--g600);
 }
 
+.pill-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 /* ── Meta row ── */
 
 .meta-row {
@@ -571,6 +576,45 @@
 .exec-qb-status.is-offline {
   background: var(--amber-light);
   color: var(--amber-dark);
+}
+
+.exec-qb-status.is-stale {
+  background: #fee2e2;
+  color: #991b1b;
+  cursor: help;
+}
+
+.exec-qb-refresh-row {
+  padding-top: 10px;
+}
+
+.exec-qb-refresh-hint {
+  color: var(--g500);
+  font-size: 11px;
+}
+
+.exec-qb-refresh-btn {
+  border: 1px solid #2ca01c;
+  background: #fff;
+  color: #2ca01c;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.exec-qb-refresh-btn:hover {
+  background: #2ca01c;
+  color: #fff;
+}
+
+.exec-qb-refresh-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #fff;
+  color: #2ca01c;
 }
 
 .exec-qb-row {
@@ -1184,16 +1228,25 @@
   margin: 12px 0 4px;
 }
 
+/* Outer card is now a vertical stack: top band (logo + state + actions)
+   on top, optional sync band (Payments + Refresh) below a thin divider. */
 .qb-card-inner {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
   padding: 10px 14px;
   background: #fff;
   border: 1px solid var(--g200);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+/* Top band keeps the old horizontal layout. */
+.qb-card-head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .qb-card-head {
@@ -1283,6 +1336,68 @@
 
 .qb-btn-ghost:hover {
   background: var(--g100);
+}
+
+.qb-btn-sm {
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+.qb-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.qb-btn[disabled]:hover {
+  background: #2ca01c;  /* freeze primary color while disabled */
+}
+
+/* Sync band (Payments row + Refresh button). Separated from the top
+   band by a thin top border so the card reads as two related sections. */
+.qb-card-sync {
+  border-top: 1px solid var(--g100);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qb-card-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qb-card-sync-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g700);
+}
+
+.qb-card-sync-sub {
+  font-size: 10px;
+  color: var(--g500);
+  margin-top: 2px;
+}
+
+.qb-card-sync-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.qb-card-sync-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qb-card-sync-hint {
+  font-size: 11px;
+  color: var(--g500);
 }
 
 /* ── Notification bell ── */
