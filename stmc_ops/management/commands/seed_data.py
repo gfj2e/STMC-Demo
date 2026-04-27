@@ -14,62 +14,10 @@ This file contains the STRUCTURE seed. The model preset seed is in seed_models.p
 from django.core.management.base import BaseCommand
 from decimal import Decimal
 from stmc_ops.models import (
-    AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, ExteriorRateCard, Job,
+    AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, Job,
     JobTradeBudget, JobDraw,
     UpgradeCategory, UpgradeSection, UpgradeItem, ApplianceConfig, IslandAddon,
 )
-
-
-# Wizard display options that are not model rows but still part of seeded config.
-WIZARD_ROOF_AREA_NAMES = [
-    "House Roof", "Main Roof", "Main House", "Front Porch", "Back Porch", "Porch Roof",
-    "Porch & Garage", "Garage", "Garage Roof", "Carport", "Carport Roof", "Dormers",
-    "Lean-To", "Bonus Room", "Side Entry", "Side Shed", "Custom",
-]
-
-WIZARD_ROOF_TYPES = [
-    {"v": "metal", "l": "Metal"},
-    {"v": "ss", "l": "Standing Seam"},
-    {"v": "shingles", "l": "Shingles"},
-]
-
-WIZARD_CONC_TYPES = [
-    {"v": "", "l": "None / Not Yet Selected"},
-    {"v": "4fiber", "l": "4\" w/ Fiber"},
-    {"v": "6fiber", "l": "6\" w/ Fiber"},
-    {"v": "4mono", "l": "4\" Mono Footer & Fiber"},
-    {"v": "6mono", "l": "6\" Mono Footer & Fiber"},
-]
-
-WIZARD_CUSTOM_TRADE_CATS = [
-    {"v": "trim", "l": "Trim & Doors", "route": "trim", "hasSub": True},
-    {"v": "flooring", "l": "Flooring", "route": "flooring", "hasSub": True},
-    {"v": "drywall", "l": "Drywall", "route": "drywall", "hasSub": True},
-    {"v": "paint", "l": "Paint", "route": "paint", "hasSub": True},
-    {"v": "electrical", "l": "Electrical", "route": "electrical", "hasSub": True},
-    {"v": "plumbing", "l": "Plumbing", "route": "plumbing", "hasSub": True},
-    {"v": "insulation", "l": "Insulation", "route": "insulation", "hasSub": True},
-    {"v": "hvac", "l": "HVAC", "route": "hvac", "hasSub": True},
-    {"v": "cabinets", "l": "Cabinets", "route": "cabinets", "hasSub": False},
-    {"v": "countertops", "l": "Countertops", "route": "countertops", "hasSub": False},
-    {"v": "tile", "l": "Tile", "route": "tile", "hasSub": False},
-    {"v": "concreteFinish", "l": "Concrete Finish", "route": "concreteFinish", "hasSub": False},
-    {"v": "fireplaces", "l": "Fireplaces", "route": "fireplaces", "hasSub": False},
-    {"v": "lighting", "l": "Lighting", "route": "lighting", "hasSub": False},
-    {"v": "general", "l": "General / Other", "route": "general", "hasSub": False},
-]
-
-WIZARD_CONCRETE_FINISH_REFERENCE_PRICING = [
-    {"l": "Joint Filler on Saw-Cut Joints", "r": "$3.00/SF"},
-    {"l": "Grind & Seal - Solvent Base", "r": "$4.50/SF"},
-    {"l": "Grind & Seal - Water Base", "r": "$4.25/SF"},
-    {"l": "Exterior Clean & Seal", "r": "$3.75/SF"},
-    {"l": "Polish Concrete", "r": "$5.50/SF"},
-    {"l": "Flake Epoxy", "r": "$5.75/SF"},
-    {"l": "Metallic Epoxy", "r": "$12.50/SF"},
-    {"l": "Add Dye", "r": "+$0.75/SF"},
-    {"l": "Travel Fee (75+ miles)", "r": "$350 flat"},
-]
 
 
 class Command(BaseCommand):
@@ -79,7 +27,6 @@ class Command(BaseCommand):
         self.seed_users()
         self.seed_branches()
         self.seed_interior_rate_card()
-        self.seed_exterior_rate_card()
         self.seed_budget_trades()
         self.seed_trade_rate_mappings()
         self.seed_appliance_configs()
@@ -183,112 +130,6 @@ class Command(BaseCommand):
             InteriorRateCard.objects.update_or_create(key=d["key"], defaults=d)
         self.stdout.write(f'  Interior Rate Card: {len(data)} entries')
 
-    # ─────────────────────────────────────────
-    # EXTERIOR RATE CARD (P object — flattened)
-    # ─────────────────────────────────────────
-    def seed_exterior_rate_card(self):
-        data = [
-            # Sales (customer-facing)
-            {"key": "sales_base", "category": "sales", "label": "Base Labor", "rate": 12, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_crawl", "category": "sales", "label": "Crawlspace Add", "rate": 3, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_ssAdd", "category": "sales", "label": "Standing Seam Add", "rate": 2, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_sidingAdd", "category": "sales", "label": "Siding Upgrade", "rate": 1.5, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_steepAdd", "category": "sales", "label": "Steep Pitch Add", "rate": 1.75, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_stoneW", "category": "sales", "label": "Stone (≤100mi)", "rate": 24, "unit": "SF", "miles_tier": "u"},
-            {"key": "sales_stoneO", "category": "sales", "label": "Stone (>100mi)", "rate": 26, "unit": "SF", "miles_tier": "o"},
-            {"key": "sales_stoneLift", "category": "sales", "label": "Stone Chimney/Roofline", "rate": 1500, "unit": "ea", "miles_tier": ""},
-            {"key": "sales_tg", "category": "sales", "label": "T&G Porch Ceilings", "rate": 5, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_awning", "category": "sales", "label": "Timber Framed Awnings", "rate": 450, "unit": "ea", "miles_tier": ""},
-            {"key": "sales_cupola", "category": "sales", "label": "Cupola Installation", "rate": 250, "unit": "ea", "miles_tier": ""},
-            {"key": "sales_deck", "category": "sales", "label": "Deck", "rate": 5, "unit": "SF", "miles_tier": ""},
-            {"key": "sales_bsmtWall", "category": "sales", "label": "Basement Wall", "rate": 10, "unit": "LF", "miles_tier": ""},
-            # Contractor — Framing
-            {"key": "ctr_fSlab_u", "category": "contractor", "label": "Framing Slab (under 100mi)", "rate": 5.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fSlab_o", "category": "contractor", "label": "Framing Slab (over 100mi)", "rate": 6, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_fUp_u", "category": "contractor", "label": "Framing Upstairs (under)", "rate": 5.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fUp_o", "category": "contractor", "label": "Framing Upstairs (over)", "rate": 6, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_fAttic_u", "category": "contractor", "label": "Attic/Carport (under)", "rate": 4, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fAttic_o", "category": "contractor", "label": "Attic/Carport (over)", "rate": 4.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_fPorch_u", "category": "contractor", "label": "Porch Framing (under)", "rate": 5.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fPorch_o", "category": "contractor", "label": "Porch Framing (over)", "rate": 6, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_fBsmt_u", "category": "contractor", "label": "Basement Framing (under)", "rate": 7.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fBsmt_o", "category": "contractor", "label": "Basement Framing (over)", "rate": 8, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_fRafter_u", "category": "contractor", "label": "Rafter Framing (under)", "rate": 6, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_fRafter_o", "category": "contractor", "label": "Rafter Framing (over)", "rate": 6.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_bsmtLf", "category": "contractor", "label": "Basement Rooms LF", "rate": 10, "unit": "LF", "miles_tier": ""},
-            {"key": "ctr_deckRoof_u", "category": "contractor", "label": "Deck w/ Roof (under)", "rate": 7, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_deckRoof_o", "category": "contractor", "label": "Deck w/ Roof (over)", "rate": 7.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_awnU", "category": "contractor", "label": "Awning Under 8'", "rate": 350, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_awnO", "category": "contractor", "label": "Awning Over 8'", "rate": 450, "unit": "ea", "miles_tier": ""},
-            # Contractor — Roof
-            {"key": "ctr_r612_u", "category": "contractor", "label": "Metal Roof ≤7/12 (under)", "rate": 1.3, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_r612_o", "category": "contractor", "label": "Metal Roof ≤7/12 (over)", "rate": 1.3, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_r812_u", "category": "contractor", "label": "Metal Roof ≥8/12 (under)", "rate": 1.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_r812_o", "category": "contractor", "label": "Metal Roof ≥8/12 (over)", "rate": 1.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_ss_u", "category": "contractor", "label": "Standing Seam ≤7/12", "rate": 2.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_ss_o", "category": "contractor", "label": "Standing Seam ≤7/12", "rate": 2.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_ss912_u", "category": "contractor", "label": "Standing Seam ≥8/12", "rate": 2.8, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_ss912_o", "category": "contractor", "label": "Standing Seam ≥8/12", "rate": 2.8, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_shing_u", "category": "contractor", "label": "Shingles", "rate": 0.75, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_shing_o", "category": "contractor", "label": "Shingles", "rate": 0.75, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_osb", "category": "contractor", "label": "OSB Sheathing", "rate": 0.5, "unit": "SF", "miles_tier": ""},
-            # Contractor — Walls
-            {"key": "ctr_mWall_u", "category": "contractor", "label": "Metal Walls (under)", "rate": 1.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_mWall_o", "category": "contractor", "label": "Metal Walls (over)", "rate": 1.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_mCeil_u", "category": "contractor", "label": "Metal Ceiling (under)", "rate": 1.75, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_mCeil_o", "category": "contractor", "label": "Metal Ceiling (over)", "rate": 1.75, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_bb_u", "category": "contractor", "label": "Board & Batten", "rate": 3, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_bb_o", "category": "contractor", "label": "Board & Batten", "rate": 3, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_lph_u", "category": "contractor", "label": "LP/Hardie Siding", "rate": 2, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_lph_o", "category": "contractor", "label": "LP/Hardie Siding", "rate": 2, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_vinyl_u", "category": "contractor", "label": "Vinyl Siding", "rate": 1.5, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_vinyl_o", "category": "contractor", "label": "Vinyl Siding", "rate": 1.5, "unit": "SF", "miles_tier": "o"},
-            {"key": "ctr_sof_u", "category": "contractor", "label": "Soffit", "rate": 5.5, "unit": "LF", "miles_tier": "u"},
-            {"key": "ctr_sof_o", "category": "contractor", "label": "Soffit", "rate": 5.5, "unit": "LF", "miles_tier": "o"},
-            {"key": "ctr_bw_u", "category": "contractor", "label": "Beam Wrap", "rate": 5.5, "unit": "LF", "miles_tier": "u"},
-            {"key": "ctr_bw_o", "category": "contractor", "label": "Beam Wrap", "rate": 5.5, "unit": "LF", "miles_tier": "o"},
-            # Contractor — Stone
-            {"key": "ctr_stone_u", "category": "contractor", "label": "Stone Labor (under)", "rate": 16, "unit": "SF", "miles_tier": "u"},
-            {"key": "ctr_stone_o", "category": "contractor", "label": "Stone Labor (over)", "rate": 17, "unit": "SF", "miles_tier": "o"},
-            # Contractor — D&W
-            {"key": "ctr_dblD", "category": "contractor", "label": "Double Door", "rate": 150, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_sglD", "category": "contractor", "label": "Single Door", "rate": 100, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_dblW", "category": "contractor", "label": "Double Window", "rate": 100, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_sglW", "category": "contractor", "label": "Single Window", "rate": 50, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_s2s", "category": "contractor", "label": "2nd Story Single Window", "rate": 75, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_s2d", "category": "contractor", "label": "2nd Story Double Window", "rate": 150, "unit": "ea", "miles_tier": ""},
-            # Contractor — Other
-            {"key": "ctr_cup", "category": "contractor", "label": "Cupola Install", "rate": 125, "unit": "ea", "miles_tier": ""},
-            {"key": "ctr_tgC", "category": "contractor", "label": "T&G Porch Ceiling", "rate": 2.25, "unit": "SF", "miles_tier": ""},
-            {"key": "ctr_deckNR", "category": "contractor", "label": "Deck No Roof", "rate": 5.5, "unit": "SF", "miles_tier": ""},
-            {"key": "ctr_trex", "category": "contractor", "label": "TREX Decking", "rate": 1, "unit": "SF", "miles_tier": ""},
-            # Concrete
-            {"key": "conc_4fiber_z1", "category": "concrete", "label": "4\" Fiber Zone 1", "rate": 5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_4fiber_z2", "category": "concrete", "label": "4\" Fiber Zone 2", "rate": 5.25, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_4fiber_z3", "category": "concrete", "label": "4\" Fiber Zone 3", "rate": 5.25, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6fiber_z1", "category": "concrete", "label": "6\" Fiber Zone 1", "rate": 6.25, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6fiber_z2", "category": "concrete", "label": "6\" Fiber Zone 2", "rate": 6.5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6fiber_z3", "category": "concrete", "label": "6\" Fiber Zone 3", "rate": 6.5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_4mono_z1", "category": "concrete", "label": "4\" Mono Zone 1", "rate": 8, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_4mono_z2", "category": "concrete", "label": "4\" Mono Zone 2", "rate": 8.5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_4mono_z3", "category": "concrete", "label": "4\" Mono Zone 3", "rate": 9, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6mono_z1", "category": "concrete", "label": "6\" Mono Zone 1", "rate": 8.5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6mono_z2", "category": "concrete", "label": "6\" Mono Zone 2", "rate": 9, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_6mono_z3", "category": "concrete", "label": "6\" Mono Zone 3", "rate": 9.5, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_lp", "category": "concrete", "label": "Line Pump", "rate": 1750, "unit": "flat", "miles_tier": ""},
-            {"key": "conc_bp", "category": "concrete", "label": "Boom Pump", "rate": 2500, "unit": "flat", "miles_tier": ""},
-            {"key": "conc_wire", "category": "concrete", "label": "Wire on 4' Grid", "rate": 0.85, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_rebar", "category": "concrete", "label": "Rebar on 4' Grid", "rate": 1.25, "unit": "SF", "miles_tier": ""},
-            {"key": "conc_foam", "category": "concrete", "label": "2\" Foam Perimeter", "rate": 9, "unit": "LF", "miles_tier": ""},
-            {"key": "conc_punch", "category": "concrete", "label": "Punch Minimum", "rate": 2500, "unit": "flat", "miles_tier": ""},
-            {"key": "conc_minF", "category": "concrete", "label": "Fiber Minimum", "rate": 3500, "unit": "flat", "miles_tier": ""},
-            {"key": "conc_minM", "category": "concrete", "label": "Mono Minimum", "rate": 5500, "unit": "flat", "miles_tier": ""},
-        ]
-        for d in data:
-            ExteriorRateCard.objects.update_or_create(key=d["key"], defaults=d)
-        self.stdout.write(f'  Exterior Rate Card: {len(data)} entries')
-
-    # ─────────────────────────────────────────
     # BUDGET TRADES (16 interior + 7 exterior)
     # ─────────────────────────────────────────
     def seed_budget_trades(self):

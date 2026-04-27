@@ -8,8 +8,9 @@ urlpatterns = [
     path("login/submit/", views.login_submit_view, name="login_submit"),
     path("logout/", views.logout_view, name="logout"),
     path("sales/", views.sales_view, name="sales"),
-    path("sales/shell/", views.sales_shell_view, name="sales_shell"),
-    path("sales/shell/<int:job_id>/", views.sales_shell_view, name="sales_shell_edit"),
+    # Sales-rep "New Contract" wizard. Internally always interior-only since
+    # the rework that retired the shell calculator. URL name preserved for
+    # backward-compat with bookmarks and the nav link.
     path("sales/turnkey/", views.sales_turnkey_view, name="sales_turnkey"),
     path("sales/turnkey/<int:job_id>/", views.sales_turnkey_view, name="sales_turnkey_edit"),
     path("sales/overview/", views.sales_overview_view, name="sales_overview"),
@@ -23,7 +24,6 @@ urlpatterns = [
     path("sales/leads/<int:job_id>/delete/", views.sales_delete_lead_view, name="sales_delete_lead"),
     path("sales/leads/<int:job_id>/convert/", views.sales_convert_lead_view, name="sales_convert_lead"),
     path("sales/floor-plan-pdfs/<str:filename>/", views.sales_floor_plan_pdf_view, name="sales_floor_plan_pdf"),
-    path("sales/contracts/seed-data/", views.sales_contract_seed_data_view, name="sales_contract_seed_data"),
     path("sales/app/finalize-contract/<int:job_id>/", views.sales_finalize_contract_view, name="sales_finalize_contract"),
     path("app/seed-data/", views.app_seed_data_view, name="app_seed_data"),
     path("app/draw/complete/", views.mark_draw_complete_view, name="mark_draw_complete"),

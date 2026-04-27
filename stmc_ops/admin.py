@@ -3,15 +3,14 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from .models import (
     AppUser, Branch,
     FloorPlanModel, SlabAreaPreset, RoofAreaPreset, CraftsmanPreset, PlanMetric,
-    ExteriorRateCard, InteriorRateCard,
+    InteriorRateCard,
     BudgetTrade, BudgetTradeRate,
     UpgradeCategory, UpgradeSection, UpgradeItem,
     ApplianceConfig, IslandAddon,
     Job, JobDraw, JobTradeBudget,
-    JobSlabRow, JobRoofRow, JobCustomCharge, JobContractorOverride,
     JobCraftsmanSelection, JobCustomCraftsmanRow,
     JobCabinetUpgrade, JobCabinetCustomLine, JobCountertopArea,
-    JobUpgradeSelection, JobSelectionCustomLine, JobConcreteFinishLine,
+    JobUpgradeSelection, JobSelectionCustomLine,
     JobCustomUpgrade, JobCredit, JobBudgetLine,
 )
 
@@ -44,13 +43,6 @@ class AppUserAdmin(DjangoUserAdmin):
             "fields": ("email", "username", "name", "initials", "role", "password1", "password2"),
         }),
     )
-
-
-@admin.register(ExteriorRateCard)
-class ExteriorRateCardAdmin(admin.ModelAdmin):
-    list_display = ("label", "key", "category", "rate", "unit", "miles_tier")
-    list_filter = ("category", "miles_tier")
-    search_fields = ("label", "key")
 
 
 @admin.register(InteriorRateCard)
@@ -176,24 +168,6 @@ class JobTradeBudgetInline(admin.TabularInline):
     fields = ("trade_name", "budgeted", "actual", "sort_order")
 
 
-class JobSlabRowInline(admin.TabularInline):
-    model = JobSlabRow
-    extra = 0
-    fields = ("area_name", "sqft", "tg_ceiling", "sort_order")
-
-
-class JobRoofRowInline(admin.TabularInline):
-    model = JobRoofRow
-    extra = 0
-    fields = ("area_name", "roof_type", "steep", "sqft", "sort_order")
-
-
-class JobCustomChargeInline(admin.TabularInline):
-    model = JobCustomCharge
-    extra = 0
-    fields = ("charge_type", "description", "rate", "unit", "qty")
-
-
 class JobBudgetLineInline(admin.TabularInline):
     model = JobBudgetLine
     extra = 0
@@ -221,7 +195,7 @@ class JobAdmin(admin.ModelAdmin):
             "fields": ("p10_material", "adjusted_int_contract", "budget_total_amount", "collected_amount"),
         }),
     )
-    inlines = [JobDrawInline, JobTradeBudgetInline, JobSlabRowInline, JobRoofRowInline, JobCustomChargeInline, JobBudgetLineInline]
+    inlines = [JobDrawInline, JobTradeBudgetInline, JobBudgetLineInline]
 
 
 @admin.register(JobDraw)

@@ -1,7 +1,7 @@
 {% load static %}
 <nav class="app-nav" id="mv-tab-nav" aria-label="Sales Navigation">
   <div class="nav-tabs" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_shell' or request.resolver_match.url_name == 'sales_turnkey' or request.resolver_match.url_name == 'sales_shell_edit' or request.resolver_match.url_name == 'sales_turnkey_edit' %}active{% endif %}" data-mv-tab="new-contract" href="{% url 'sales_shell' %}">New Contract</a>
+    <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_turnkey' or request.resolver_match.url_name == 'sales_turnkey_edit' %}active{% endif %}" data-mv-tab="new-contract" href="{% url 'sales_turnkey' %}">New Contract</a>
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_new_lead' or request.resolver_match.url_name == 'sales_edit_lead' %}active{% endif %}" data-mv-tab="leads" href="{% url 'sales_overview' %}?tab=leads">Leads</a>
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_overview' %}active{% endif %}" data-mv-tab="in-progress" href="{% url 'sales_overview' %}">In Progress</a>
     <a class="app-nav-link" data-mv-tab="closed" href="{% url 'sales_overview' %}?tab=closed">Closed</a>

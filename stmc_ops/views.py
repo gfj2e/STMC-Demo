@@ -17,32 +17,15 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import (
-    ApplianceConfig,
     AppUser,
-    BudgetTrade,
     Branch,
-    CraftsmanPreset,
-    ExteriorRateCard,
     FloorPlanModel,
     InteriorRateCard,
-    IslandAddon,
     Job,
     JobChangeOrder,
     JobDraw,
     JobTradeBudget,
-    PlanMetric,
-    RoofAreaPreset,
-    SlabAreaPreset,
-    UpgradeCategory,
 )
-from .management.commands.seed_data import (
-    WIZARD_CONC_TYPES,
-    WIZARD_CONCRETE_FINISH_REFERENCE_PRICING,
-    WIZARD_CUSTOM_TRADE_CATS,
-    WIZARD_ROOF_AREA_NAMES,
-    WIZARD_ROOF_TYPES,
-)
-from .management.commands.seed_models import MODEL_ALIASES
 
 
 # ─────────────────────────────────────────────────────────────
@@ -199,7 +182,7 @@ def logout_view(request):
 def sales_view(request):
     if request.user.role not in (AppUser.ROLE_SALES, AppUser.ROLE_EXEC):
         return redirect(_dashboard_for(request.user))
-    return redirect("sales_shell")
+    return redirect("sales_turnkey")
 
 
 def _to_number(value):
@@ -220,101 +203,6 @@ def _model_id_from_name(name):
     value = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")
     return value or "custom_model"
 
-
-def _build_interior_trade_groups():
-    groups = []
-    trades = BudgetTrade.objects.filter(scope="interior").order_by("sort_order", "name")
-    for trade in trades:
-        rates = [
-            mapping.rate_card.key
-            for mapping in trade.rate_mappings.select_related("rate_card").all().order_by("rate_card__key")
-        ]
-        groups.append({"key": trade.key, "name": trade.name, "rates": rates})
-    return groups
-
-
-def _build_selection_defs():
-    # Build the Step 7 config from seeded upgrade catalog rows.
-    type_map = {
-        "toggle": "toggle",
-        "qty": "qty",
-        "sf": "sf",
-        "lf": "lf",
-        "radio": "radio",
-    }
-    wanted = ["docusign", "electrical", "plumbing", "trim"]
-    categories = (
-        UpgradeCategory.objects.filter(key__in=wanted)
-        .prefetch_related("sections__items", "sections__items__budget_trade")
-        .order_by("sort_order")
-    )
-    by_key = {cat.key: cat for cat in categories}
-
-    defs = {}
-    for key in wanted:
-        cat = by_key.get(key)
-        sections = []
-        if cat:
-            for section in cat.sections.all():
-                if section.name == "Gas Type":
-                    sections.append(
-                        {
-                            "title": "Gas Type",
-                            "type": "radio",
-                            "id": "gasType",
-                            "options": [
-                                {"v": "", "l": "-- Not Selected --"},
-                                {"v": "natural", "l": "Natural Gas"},
-                                {"v": "propane", "l": "Propane"},
-                            ],
-                        }
-                    )
-                    continue
-
-                sec = {"title": section.name, "items": []}
-                for item in section.items.all():
-                    row = {
-                        "id": item.item_id,
-                        "type": type_map.get(item.input_type, "toggle"),
-                        "label": item.label,
-                        "price": _to_number(item.price),
-                    }
-                    if item.unit:
-                        row["unit"] = item.unit
-                    if item.budget_trade:
-                        row["trade"] = item.budget_trade.key
-                    if item.has_base_addon and _to_number(item.base_addon_amount) > 0:
-                        row["baseAddOn"] = _to_number(item.base_addon_amount)
-                    fp = _to_number(item.adds_fixture_points)
-                    if fp > 0:
-                        row["fp"] = fp
-                    if item.is_split_budget:
-                        row["special"] = "tankless"
-                    sec["items"].append(row)
-                sections.append(sec)
-
-        defs[key] = {
-            "label": cat.name if cat else key.title(),
-            "sections": sections,
-        }
-
-    # Keep concrete finish reference pricing available for the Trim pill.
-    trim_defs = defs.get("trim", {"label": "Trim", "sections": []})
-    trim_defs["sections"].append(
-        {
-            "title": "Concrete Floor Finishes",
-            "type": "concreteFinishLines",
-            "referencePricing": WIZARD_CONCRETE_FINISH_REFERENCE_PRICING,
-        }
-    )
-    defs["trim"] = trim_defs
-    return defs
-
-
-def _build_custom_trade_categories():
-    # Filter to seeded interior trades that actually exist.
-    valid_keys = set(BudgetTrade.objects.filter(scope="interior").values_list("key", flat=True))
-    return [row for row in WIZARD_CUSTOM_TRADE_CATS if row["v"] in valid_keys]
 
 
 def _format_money(value):
@@ -441,12 +329,16 @@ def _build_manager_owner_data():
         pm_name = job.sales_rep or "P. Olson"
         phase = job.current_phase
 
-        # Trade budgets from DB
+        # Trade budgets from DB. `lk` (locked) tracks rows where a paid Bill
+        # has been pulled from QB -- the manager template renders these as
+        # "Paid" pills instead of the dim "$0 / $budgeted" pair.
         bg = {}
         ac = {}
+        lk = {}
         for tb in job.demo_trade_budgets.all():
             bg[tb.trade_name] = int(tb.budgeted)
             ac[tb.trade_name] = int(tb.actual)
+            lk[tb.trade_name] = bool(tb.is_complete)
 
         # Fallback for contracts saved without demo trade rows:
         # use computed budget lines when present, then a single total budget row.
@@ -520,6 +412,7 @@ def _build_manager_owner_data():
             "ct": contract,
             "bg": bg,
             "ac": ac,
+            "lk": lk,
             "dr": dr,
             "co": co,
             # Loan-closing draw (#1) paid? Gates PM change-order creation —
@@ -585,22 +478,8 @@ def _build_manager_owner_data():
 
 
 def _build_simple_rate_card():
-    """Simplified exterior+interior rate card for the Sales rate card tab."""
-    exterior = []
+    """Interior-only rate card for the Sales rate card tab."""
     interior = []
-
-    # Simplified contractor exterior rates used in the estimator
-    ext_keys = [
-        ("ctr_fSlab_u", "Framing — Slab", "Framing", "e"),
-        ("ctr_fPorch_u", "Framing — Porch", "Framing", "e"),
-        ("ctr_r612_u", "Roof Metal", "Roofing", "e"),
-        ("ctr_osb", "Roof Sheathing", "Roofing", "e"),
-        ("ctr_mWall_u", "Wall Metal", "Siding", "e"),
-        ("ctr_sof_u", "Soffit", "Ext Trim", "e"),
-        ("ctr_bw_u", "Beam Wrap", "Ext Trim", "e"),
-        ("ctr_sglD", "Ext Door Install", "D&W", "e"),
-        ("ctr_sglW", "Window Install", "D&W", "e"),
-    ]
     int_keys = [
         ("cabinets", "Cabinets", "Cabinets", "i"),
         ("countertops", "Countertops", "Cabinets", "i"),
@@ -621,21 +500,9 @@ def _build_simple_rate_card():
         ("dumpster", "Dumpster", "General", "i"),
     ]
 
-    ext_rate_map = {r.key: r for r in ExteriorRateCard.objects.filter(
-        key__in=[k[0] for k in ext_keys]
-    )}
     int_rate_map = {r.key: r for r in InteriorRateCard.objects.filter(
         key__in=[k[0] for k in int_keys]
     )}
-
-    for key, label, group, _ in ext_keys:
-        rc = ext_rate_map.get(key)
-        exterior.append({
-            "l": label,
-            "g": group,
-            "r": _to_number(rc.rate) if rc else 0,
-            "u": f"/{rc.unit}" if rc and rc.unit not in ("flat",) else "flat",
-        })
 
     for key, label, group, _ in int_keys:
         rc = int_rate_map.get(key)
@@ -646,7 +513,7 @@ def _build_simple_rate_card():
             "u": rc.unit if rc else "/SF",
         })
 
-    return {"exterior": exterior, "interior": interior}
+    return {"exterior": [], "interior": interior}
 
 
 def _build_app_seed_data():
@@ -827,12 +694,14 @@ def _build_project_ui_rows(projects):
         trade_rows = []
         total_bg = 0
         total_ac = 0
+        locked_map = project.get("lk") or {}
         for trade in trades:
             budget = int((project.get("bg") or {}).get(trade, 0) or 0)
             actual = int((project.get("ac") or {}).get(trade, 0) or 0)
             variance = budget - actual
             total_bg += budget
             total_ac += actual
+            is_paid = bool(locked_map.get(trade))
             trade_rows.append(
                 {
                     "trade": trade,
@@ -845,6 +714,10 @@ def _build_project_ui_rows(projects):
                     "variance_display": _format_money(variance),
                     "progress_pct": int(round((actual / budget) * 100)) if budget > 0 else 0,
                     "is_over": actual > budget,
+                    # Phase 2: True once a paid Bill in QB has stamped this row.
+                    # Template renders a "Paid" pill instead of the dim
+                    # "$0 / $budgeted" pair when set.
+                    "is_paid": is_paid,
                 }
             )
 
@@ -1501,271 +1374,6 @@ def owner_payments_panel_view(request):
     )
 
 
-def _build_seed_rates():
-    sales = {
-        "base": 12,
-        "crawl": 3,
-        "ssAdd": 2,
-        "sidingAdd": 1.5,
-        "steepAdd": 1.75,
-        "stoneW": 24,
-        "stoneO": 26,
-        "stoneLift": 1500,
-        "deck": 5,
-        "tg": 5,
-        "awning": 450,
-        "cupola": 250,
-        "bsmtWall": 10,
-    }
-    ctr = {
-        "fSlab": {"u": 5.5, "o": 6},
-        "fUp": {"u": 5.5, "o": 6},
-        "fAttic": {"u": 4, "o": 4.5},
-        "fPorch": {"u": 5.5, "o": 6},
-        "fRafter": {"u": 6, "o": 6.5},
-        "fBsmt": {"u": 7.5, "o": 8},
-        "bsmtLf": 10,
-        "deckRoof": {"u": 7, "o": 7.5},
-        "awnU": 350,
-        "awnO": 450,
-        "r612": {"u": 1.3, "o": 1.3},
-        "r812": {"u": 1.5, "o": 1.5},
-        "ss": {"u": 2.5, "o": 2.5},
-        "ss912": {"u": 2.8, "o": 2.8},
-        "shing": {"u": 0.75, "o": 0.75},
-        "osb": 0.5,
-        "mWall": {"u": 1.5, "o": 1.5},
-        "mCeil": {"u": 1.75, "o": 1.75},
-        "bb": {"u": 3, "o": 3},
-        "lph": {"u": 2, "o": 2},
-        "vinyl": {"u": 1.5, "o": 1.5},
-        "bw": {"u": 5.5, "o": 5.5},
-        "sof": {"u": 5.5, "o": 5.5},
-        "stone": {"u": 16, "o": 17},
-        "dblD": 150,
-        "sglD": 100,
-        "dblW": 100,
-        "sglW": 50,
-        "s2s": 75,
-        "s2d": 150,
-        "cup": 125,
-        "deckNR": 5.5,
-        "trex": 1,
-        "tgC": 2.25,
-    }
-    conc = {
-        "types": {
-            "4fiber": {1: 5, 2: 5.25, 3: 5.25},
-            "6fiber": {1: 6.25, 2: 6.5, 3: 6.5},
-            "4mono": {1: 8, 2: 8.5, 3: 9},
-            "6mono": {1: 8.5, 2: 9, 3: 9.5},
-        },
-        "minF": 3500,
-        "minM": 5500,
-        "lp": 1750,
-        "bp": 2500,
-        "wire": 0.85,
-        "rebar": 1.25,
-        "foam": 9,
-    }
-    punch = 2500
-
-    for rate in ExteriorRateCard.objects.all():
-        key = rate.key
-        value = _to_number(rate.rate)
-        if key.startswith("sales_"):
-            sales[key[6:]] = value
-            continue
-        if key.startswith("ctr_"):
-            suffix = key[4:]
-            if suffix.endswith("_u") or suffix.endswith("_o"):
-                base_key, tier = suffix.rsplit("_", 1)
-                if base_key not in ctr or not isinstance(ctr.get(base_key), dict):
-                    ctr[base_key] = {}
-                ctr[base_key][tier] = value
-            else:
-                ctr[suffix] = value
-            continue
-        if not key.startswith("conc_"):
-            continue
-
-        suffix = key[5:]
-        type_match = re.match(r"^(4fiber|6fiber|4mono|6mono)_z([123])$", suffix)
-        if type_match:
-            conc_type = type_match.group(1)
-            zone = int(type_match.group(2))
-            conc.setdefault("types", {}).setdefault(conc_type, {})[zone] = value
-            continue
-        if suffix == "minF":
-            conc["minF"] = value
-        elif suffix == "minM":
-            conc["minM"] = value
-        elif suffix == "lp":
-            conc["lp"] = value
-        elif suffix == "bp":
-            conc["bp"] = value
-        elif suffix == "wire":
-            conc["wire"] = value
-        elif suffix == "rebar":
-            conc["rebar"] = value
-        elif suffix == "foam":
-            conc["foam"] = value
-        elif suffix == "punch":
-            punch = value
-
-    interior_rate_card = {}
-    for rate in InteriorRateCard.objects.all():
-        interior_rate_card[rate.key] = {
-            "rate": _to_number(rate.rate),
-            "unit": rate.unit,
-            "driver": rate.driver,
-            "label": rate.label,
-        }
-
-    return {
-        "P": {"sales": sales, "ctr": ctr, "conc": conc, "punch": punch},
-        "INT_RC": interior_rate_card,
-    }
-
-
-def _build_contract_seed_data():
-    base = _build_seed_rates()
-
-    slab_area_options = [
-        "1st Floor Living Area",
-        "2nd Floor Area",
-        "Bonus Room",
-        "Garage Area",
-        "Carport Area",
-        "Front Porch Area",
-        "Back Porch Area",
-        "Custom",
-    ]
-
-    branches = {}
-    for branch in Branch.objects.all():
-        branches[branch.key] = {
-            "label": branch.label,
-            "concRate": _to_number(branch.conc_rate),
-            "miles": int(branch.default_miles),
-            "zone": int(branch.zone),
-        }
-
-    plans = FloorPlanModel.objects.prefetch_related(
-        "slab_presets",
-        "roof_presets",
-        "craftsman_presets",
-        "plan_metrics",
-    ).all()
-
-    pm = {}
-    md = {}
-    rd = {}
-    p10 = {}
-    plan_metrics = {}
-    int_contract = {}
-    base_costs = {}
-    models = {}
-    pdf_files = {}
-    craftsman = {}
-
-    for plan in plans:
-        name = plan.name
-        slabs = list(plan.slab_presets.all())
-        roofs = list(plan.roof_presets.all())
-
-        pm[name] = {
-            "st": _to_number(plan.stories),
-            "ew": int(plan.ext_wall_sf),
-            "dd": int(plan.dbl_doors),
-            "sd": int(plan.sgl_doors),
-            "dw": int(plan.dbl_windows),
-            "sw": int(plan.sgl_windows),
-        }
-        md[name] = {
-            "sqft": [{"n": row.area_name, "sf": int(row.sqft)} for row in slabs],
-        }
-        rd[name] = [{"n": row.area_name, "sf": int(row.sqft)} for row in roofs]
-        p10[name] = _to_number(plan.p10_material)
-        int_contract[name] = {"t": _to_number(plan.int_contract)}
-        base_costs[name] = {
-            "topLine": _to_number(plan.cabinet_top_line),
-            "intContract": _to_number(plan.int_contract),
-        }
-
-        island_depth = _to_number(plan.island_depth)
-        island_width = _to_number(plan.island_width)
-        island_label = plan.island_label or f"{island_depth}' x {island_width}'"
-        models[name] = {
-            "pages": int(plan.pdf_pages),
-            "cabinetryLF": plan.cabinetry_lf_display,
-            "cabinetryLFNum": _to_number(plan.cabinetry_lf_num),
-            "sqft": [{"area": int(row.sqft), "name": row.area_name} for row in slabs],
-            "island": {
-                "depth": island_depth,
-                "width": island_width,
-                "label": island_label,
-            },
-            "isCustom": bool(plan.is_custom),
-        }
-        if plan.pdf_filename:
-            pdf_files[name] = {
-                "filename": plan.pdf_filename,
-                "url": reverse("sales_floor_plan_pdf", kwargs={"filename": plan.pdf_filename}),
-            }
-
-        craft_entry = {"paint": {}, "stain": {}}
-        for row in plan.craftsman_presets.all():
-            craft_entry["paint"][row.area] = _to_number(row.paint_cost)
-            craft_entry["stain"][row.area] = _to_number(row.stain_cost)
-        craftsman[name] = craft_entry
-
-        metric_entry = {}
-        for metric in plan.plan_metrics.all():
-            metric_value = _to_number(metric.value)
-            if metric.key.startswith("Has ") or metric.key == "Power to Island":
-                metric_entry[metric.key] = "Yes" if metric_value >= 1 else "No"
-            else:
-                metric_entry[metric.key] = metric_value
-        plan_metrics[name] = metric_entry
-
-    appliance_labels = {}
-    appliance_costs = {}
-    for item in ApplianceConfig.objects.all():
-        appliance_labels[item.key] = item.label
-        appliance_costs[item.key] = _to_number(item.cost)
-
-    island_addon_labels = {}
-    for addon in IslandAddon.objects.all():
-        island_addon_labels[addon.key] = addon.label
-
-    return {
-        **base,
-        "SA": slab_area_options,
-        "MODEL_ALIASES": MODEL_ALIASES,
-        "ROOF_AREA_NAMES": WIZARD_ROOF_AREA_NAMES,
-        "ROOF_TYPES": WIZARD_ROOF_TYPES,
-        "CONC_TYPES": WIZARD_CONC_TYPES,
-        "INT_TRADE_GROUPS": _build_interior_trade_groups(),
-        "SEL_DEFS": _build_selection_defs(),
-        "CUSTOM_TRADE_CATS": _build_custom_trade_categories(),
-        "PM": pm,
-        "MD": md,
-        "RD": rd,
-        "P10": p10,
-        "BRANCHES": branches,
-        "PLAN_METRICS": plan_metrics,
-        "INT_CONTRACT": int_contract,
-        "BASE_COSTS": base_costs,
-        "MODELS": models,
-        "PDF_FILES": pdf_files,
-        "CRAFTSMAN": craftsman,
-        "APPLIANCE_LABELS": appliance_labels,
-        "APPLIANCE_COSTS": appliance_costs,
-        "ISLAND_ADDON_LABELS": island_addon_labels,
-    }
-
-
 def _load_editable_job(request, job_id):
     """Return the Job for the given id (demo scope: any sales/exec user may edit)."""
     if not job_id:
@@ -1801,46 +1409,29 @@ def _wizard_state_for_job(job):
 
     For committed contracts we use the saved ``wizard_state`` verbatim.
     For leads (which never ran the wizard) we synthesize a minimal state
-    pre-filling the Step-1 customer fields.
+    pre-filling the Step-1 customer fields the V10 wizard expects.
     """
     state = job.wizard_state or {}
     if job.is_lead and not state:
         return {
             "customer": {
-                "name": job.customer_name or "",
-                "addr": job.customer_addr or "",
+                "name":  job.customer_name or "",
+                "addr":  job.customer_addr or "",
                 "order": job.order_number or "",
                 "rep":   job.sales_rep or "",
                 "p10":   0,
+                "email": job.customer_email or "",
+                "phone": job.customer_phone or "",
             },
         }
     return state
 
 
 @role_required(AppUser.ROLE_SALES)
-def sales_shell_view(request, job_id=None):
-    existing_state = None
-    existing_job_id = None
-    if job_id:
-        job = _load_editable_job(request, job_id)
-        if job is None:
-            return redirect("sales_overview")
-        existing_state = _wizard_state_for_job(job)
-        existing_job_id = job.id
-    return render(
-        request,
-        "sales/shell/index.html",
-        {
-            "wizard_mode": "shell",
-            "wizard_seed_data": _build_contract_seed_data(),
-            "existing_state": existing_state,
-            "existing_job_id": existing_job_id,
-        },
-    )
-
-
-@role_required(AppUser.ROLE_SALES)
 def sales_turnkey_view(request, job_id=None):
+    """Render the unified Interior Contract Wizard. URL name kept for
+    backward-compat with the old turnkey-only route; the wizard is now
+    interior-only regardless of how it's reached."""
     existing_state = None
     existing_job_id = None
     if job_id:
@@ -1853,17 +1444,10 @@ def sales_turnkey_view(request, job_id=None):
         request,
         "sales/turnkey/index.html",
         {
-            "wizard_mode": "turnkey",
-            "wizard_seed_data": _build_contract_seed_data(),
             "existing_state": existing_state,
             "existing_job_id": existing_job_id,
         },
     )
-
-
-@role_required(AppUser.ROLE_SALES)
-def sales_contract_seed_data_view(request):
-    return JsonResponse(_build_contract_seed_data())
 
 
 @login_required
@@ -2517,19 +2101,53 @@ def save_contract_view(request):
 
     # ── Basic fields ──
     customer = body.get("customer") or {}
-    customer_name = (customer.get("name") or "").strip()
-    customer_addr = (customer.get("addr") or "").strip()
-    sales_rep     = (customer.get("rep")  or "").strip()
-    order_number  = (customer.get("order") or "").strip()
+    customer_name  = (customer.get("name") or "").strip()
+    customer_addr  = (customer.get("addr") or "").strip()
+    sales_rep      = (customer.get("rep")  or "").strip()
+    order_number   = (customer.get("order") or "").strip()
+    customer_email = (customer.get("email") or "").strip()
+    customer_phone = (customer.get("phone") or "").strip()
     model_name    = (body.get("model") or "").strip()
     branch_key    = (body.get("branch") or "").strip()
-    job_mode      = body.get("jobMode") or "shell"
     p10           = int(body.get("p10") or 0)
     shell_total   = int(body.get("shellTotal") or 0)
     turnkey_total = int(body.get("turnkeyTotal") or 0)
+    shell_contract = int(body.get("shellContract") or 0)
+    concrete_budget = int(body.get("concreteBudget") or 0)
+    labor_budget = int(body.get("laborBudget") or 0)
     draws_payload = body.get("draws") or []
     trade_budgets_payload = body.get("tradeBudgets") or []
     budget_total_payload = int(body.get("budgetTotal") or 0)
+    contract_meta = body.get("contractMeta") or {}
+
+    # Co-buyer + structured customer fields (V10)
+    co_buyer_name  = (customer.get("coBuyerName") or "").strip()
+    co_buyer_email = (customer.get("coBuyerEmail") or "").strip()
+    co_buyer_phone = (customer.get("coBuyerPhone") or "").strip()
+    customer_type  = (customer.get("customerType") or "individual").strip()
+    bill_street    = (customer.get("billStreet") or "").strip()
+    bill_city      = (customer.get("billCity") or "").strip()
+    bill_state     = (customer.get("billState") or "TN").strip()
+    bill_zip       = (customer.get("billZip") or "").strip()
+    site_street    = (customer.get("siteStreet") or "").strip()
+    site_city      = (customer.get("siteCity") or "").strip()
+    site_state     = (customer.get("siteState") or "TN").strip()
+    site_zip       = (customer.get("siteZip") or "").strip()
+    site_same      = bool(customer.get("siteSameAsBilling"))
+    bank_name      = (customer.get("bankName") or "").strip()
+    sm_order_secondary = (customer.get("smOrderSecondary") or "").strip()
+    contracts_rep  = (customer.get("contractsRep") or "").strip()
+    custom_rep_name = (customer.get("customRepName") or "").strip()
+
+    # contractMeta (V10) — supersedes / permit / site prep / detached shop / foundation
+    foundation_type = (contract_meta.get("foundationType") or "slab").strip()
+    permit_allowance = int(contract_meta.get("permitAllowance") or 2000)
+    site_prep_allowance = int(contract_meta.get("sitePrepAllowance") or 0)
+    det_shop_material = int(contract_meta.get("detShopMaterial") or 0)
+    det_shop_conc_labor = int(contract_meta.get("detShopConcLabor") or 0)
+    contract_notes = contract_meta.get("notes") or ""
+    supersedes = bool(contract_meta.get("supersedes"))
+    supersedes_reason = (contract_meta.get("supersedesReason") or "").strip()
 
     if not customer_name:
         return JsonResponse({"error": "customer.name is required"}, status=400)
@@ -2538,7 +2156,9 @@ def save_contract_view(request):
     branch_obj = Branch.objects.filter(key=branch_key).first()
     plan_obj   = FloorPlanModel.objects.filter(name__iexact=model_name).first()
 
-    contract_total = turnkey_total if job_mode == "turnkey" and turnkey_total else shell_total
+    # Interior-only tool — turnkey is the only mode now. Total contract value =
+    # sales-rep-entered shell + computed interior contract.
+    contract_total = turnkey_total or shell_total
     budget_total = budget_total_payload
     if budget_total <= 0 and trade_budgets_payload:
         budget_total = int(
@@ -2553,18 +2173,50 @@ def save_contract_view(request):
     # for brand-new contracts, keeping the existing idempotent save semantics.
     explicit_job_id = body.get("leadId") or body.get("jobId")
     job_defaults = {
-        "customer_addr": customer_addr,
-        "sales_rep":     sales_rep,
-        "order_number":  order_number,
-        "branch":        branch_obj,
-        "floor_plan":    plan_obj,
-        "job_mode":      job_mode if job_mode in ("shell", "turnkey") else "shell",
-        "p10_material":  p10,
+        "customer_addr":   customer_addr,
+        "customer_email":  customer_email,
+        "customer_phone":  customer_phone,
+        "sales_rep":       sales_rep,
+        "order_number":    order_number,
+        "branch":          branch_obj,
+        "floor_plan":      plan_obj,
+        "job_mode":        "turnkey",
+        "p10_material":    p10,
+        "shell_contract":  shell_contract,
+        "concrete_budget": concrete_budget,
+        "labor_budget":    labor_budget,
         "budget_total_amount": budget_total,
         "budget_spent_amount": 0,
-        "current_phase": "estimate",
+        "current_phase":   "estimate",
+        # New V10 customer fields
+        "co_buyer_name":   co_buyer_name,
+        "co_buyer_email":  co_buyer_email,
+        "co_buyer_phone":  co_buyer_phone,
+        "customer_type":   customer_type,
+        "bill_street":     bill_street,
+        "bill_city":       bill_city,
+        "bill_state":      bill_state,
+        "bill_zip":        bill_zip,
+        "site_street":     site_street,
+        "site_city":       site_city,
+        "site_state":      site_state,
+        "site_zip":        site_zip,
+        "site_same_as_billing": site_same,
+        "bank_name":       bank_name,
+        "order_number_secondary": sm_order_secondary,
+        "contracts_rep":   contracts_rep,
+        "custom_rep_name": custom_rep_name,
+        # contractMeta (V10)
+        "foundation_type": foundation_type,
+        "permit_allowance": permit_allowance,
+        "site_prep_allowance": site_prep_allowance,
+        "det_shop_material": det_shop_material,
+        "det_shop_conc_labor": det_shop_conc_labor,
+        "contract_notes":  contract_notes,
+        "supersedes_prev_contract": supersedes,
+        "supersedes_reason": supersedes_reason,
         # A saved wizard is never a lead — this flips the row to In Progress.
-        "is_lead":       False,
+        "is_lead":         False,
     }
 
     if explicit_job_id:
@@ -2638,6 +2290,16 @@ def save_contract_view(request):
                 actual=actual,
                 sort_order=idx,
             )
+
+    # Eager QB Customer push -- creates the QB Customer immediately so the
+    # accountant can find this job in the QB sandbox by SM Order # and start
+    # entering Bills against it before any draws have been pushed. Never
+    # raises and never blocks the contract save (returns None on failure).
+    from . import qb_invoice
+    try:
+        qb_invoice.ensure_qb_customer_for_job(job)
+    except Exception:  # noqa: BLE001
+        pass  # truly never break the save
 
     return JsonResponse({"ok": True, "job_id": job.id, "created": created})
 

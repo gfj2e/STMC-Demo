@@ -155,21 +155,7 @@ class PlanMetric(models.Model):
 # ═══════════════════════════════════════════════════════════════
 # RATE CARDS — Seeded, adjustable per branch/override
 # ═══════════════════════════════════════════════════════════════
-
-class ExteriorRateCard(models.Model):
-    """
-    Exterior pricing rates (from P object).
-    Stores sales rates (customer-facing) and contractor rates (under/over 100mi).
-    """
-    key = models.CharField(max_length=30, unique=True)  # e.g. "sales_base", "ctr_fSlab_u"
-    category = models.CharField(max_length=20)           # "sales", "contractor", "concrete"
-    label = models.CharField(max_length=100)
-    rate = models.DecimalField(max_digits=10, decimal_places=2)
-    unit = models.CharField(max_length=10)               # "SF", "LF", "ea", "flat"
-    miles_tier = models.CharField(max_length=10, blank=True)  # "u", "o", or "" for flat
-
-    def __str__(self):
-        return f"{self.label}: ${self.rate}/{self.unit}"
+# ExteriorRateCard was dropped when the wizard pivoted to interior-only.
 
 
 class InteriorRateCard(models.Model):
@@ -347,7 +333,21 @@ class Job(models.Model):
     A single barndominium project. Contains all state for one customer build.
     This is the central entity — everything else references back here.
     """
-    MODE_CHOICES = [('shell', 'Shell Only'), ('turnkey', 'Turnkey Interior')]
+    # job_mode is always 'turnkey' since the wizard pivoted to interior-only.
+    # 'shell' is retained as a choice only so legacy rows don't fail validation;
+    # nothing in the codebase writes it anymore.
+    MODE_CHOICES = [('shell', 'Shell Only (legacy)'), ('turnkey', 'Turnkey Interior')]
+    CUSTOMER_TYPE_CHOICES = [
+        ('individual', 'Individual'),
+        ('llc', 'LLC / Business'),
+        ('trust', 'Trust / Estate'),
+    ]
+    FOUNDATION_TYPE_CHOICES = [
+        ('slab', 'Monolithic Slab w/ Footers'),
+        ('crawlspace', 'Crawlspace'),
+        ('basement', 'Basement'),
+        ('blockfill', 'Block-and-Fill'),
+    ]
     PHASE_CHOICES = [
         ('estimate', 'Estimate'),
         ('framing', 'Framing'),
@@ -377,52 +377,61 @@ class Job(models.Model):
     customer_name = models.CharField(max_length=200, blank=True)
     customer_addr = models.CharField(max_length=300, blank=True)
     sales_rep = models.CharField(max_length=100, blank=True)
+    custom_rep_name = models.CharField(max_length=100, blank=True)
+    contracts_rep = models.CharField(max_length=50, blank=True)
     order_number = models.CharField(max_length=50, blank=True)
+    order_number_secondary = models.CharField(max_length=50, blank=True,
+        help_text="Secondary S/M order number for shop/detached garage builds")
+    bank_name = models.CharField(max_length=120, blank=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True)
     floor_plan = models.ForeignKey(FloorPlanModel, on_delete=models.SET_NULL, null=True, blank=True)
-    job_mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='shell')
+    job_mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='turnkey')
     miles_over_100 = models.BooleanField(default=False)
     p10_material = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                        help_text="Auto-filled from model P10 but editable")
+                                        help_text="Entered on Contract step once material quote returns")
 
-    # Step 2 — Foundation
-    foundation_type = models.CharField(max_length=10, default='concrete')  # "concrete" or "crawl"
-    basement_framing = models.BooleanField(default=False)
-    crawl_sf = models.IntegerField(default=0)
+    # Buyer + co-buyer (V10 — drives DocuSign and QB Customer record)
+    customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual')
+    co_buyer_name = models.CharField(max_length=200, blank=True)
+    co_buyer_email = models.EmailField(max_length=200, blank=True)
+    co_buyer_phone = models.CharField(max_length=40, blank=True)
+
+    # Billing + job-site addresses (V10)
+    bill_street = models.CharField(max_length=200, blank=True)
+    bill_city = models.CharField(max_length=100, blank=True)
+    bill_state = models.CharField(max_length=2, default='TN')
+    bill_zip = models.CharField(max_length=10, blank=True)
+    site_street = models.CharField(max_length=200, blank=True)
+    site_city = models.CharField(max_length=100, blank=True)
+    site_state = models.CharField(max_length=2, default='TN')
+    site_zip = models.CharField(max_length=10, blank=True)
+    site_same_as_billing = models.BooleanField(default=True)
+
+    # Sales-rep-entered shell budget (replaces the retired exterior calculator)
+    shell_contract = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text="Estimated total exterior shell contract — entered by sales rep on Step 1")
+    concrete_budget = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text="Concrete portion of the shell budget — flows to Draw 2")
+    labor_budget = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text="Exterior/framing labor portion of the shell budget — flows to Draw 3")
+    manual_living_sf = models.IntegerField(default=0,
+        help_text="Custom Floor Plan only — user-entered Living SF")
+
+    # Contract metadata (V10) — supersedes / permit / site prep / detached shop
+    foundation_type = models.CharField(max_length=20, choices=FOUNDATION_TYPE_CHOICES, default='slab',
+        help_text="Drives contract template wording (slab vs. crawlspace clauses)")
+    permit_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=2000)
+    site_prep_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    det_shop_material = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text="Detached shop material — flows to Draw 1 shop line")
+    det_shop_conc_labor = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text="Detached shop concrete + labor — flows to Draw 2 shop line")
+    contract_notes = models.TextField(blank=True,
+        help_text="Free-text spec notes appended to the contract")
+    supersedes_prev_contract = models.BooleanField(default=False)
+    supersedes_reason = models.CharField(max_length=200, blank=True)
+
     stories = models.DecimalField(max_digits=3, decimal_places=1, default=1)
-
-    # Step 3 — Exterior options
-    wall_type = models.CharField(max_length=30, default='Metal')
-    wall_tuff_sf = models.IntegerField(default=0)
-    wainscot_enabled = models.BooleanField(default=False)
-    wall_rock_sf = models.IntegerField(default=0)
-    wall_stone_sf = models.IntegerField(default=0)
-    stone_upgrade = models.BooleanField(default=False)
-    sheathing = models.BooleanField(default=False)
-    gauge_26 = models.BooleanField(default=False)
-    awning_qty = models.IntegerField(default=0)
-    cupola_qty = models.IntegerField(default=0)
-    chimney_qty = models.IntegerField(default=0)
-    punch_amount = models.DecimalField(max_digits=10, decimal_places=2, default=2500)
-    windows_above_12 = models.BooleanField(default=False)
-    sgl_windows = models.IntegerField(default=0)
-    dbl_windows = models.IntegerField(default=0)
-    s2s_windows = models.IntegerField(default=0)
-    s2d_windows = models.IntegerField(default=0)
-    sgl_doors = models.IntegerField(default=0)
-    dbl_doors = models.IntegerField(default=0)
-    detached_shop = models.BooleanField(default=False)
-    deck_shown = models.BooleanField(default=False)
-
-    # Step 4 — Concrete
-    conc_sqft = models.IntegerField(default=0)
-    conc_type = models.CharField(max_length=20, blank=True)  # "4fiber", "6fiber", "4mono", "6mono"
-    conc_zone = models.IntegerField(default=1)
-    conc_line_pump = models.BooleanField(default=False)
-    conc_boom_pump = models.BooleanField(default=False)
-    conc_wire = models.BooleanField(default=False)
-    conc_rebar = models.BooleanField(default=False)
-    conc_foam_lf = models.IntegerField(default=0)
 
     # Step 5 — Interior Selections
     bedrooms = models.IntegerField(default=3)
@@ -532,58 +541,10 @@ class Job(models.Model):
 # ═══════════════════════════════════════════════════════════════
 # JOB CHILD TABLES — Per-job editable schedules
 # ═══════════════════════════════════════════════════════════════
-
-class JobSlabRow(models.Model):
-    """Editable slab schedule row for a job (from Step 2)."""
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='slab_rows')
-    area_name = models.CharField(max_length=40)
-    sqft = models.IntegerField(default=0)
-    tg_ceiling = models.BooleanField(default=False)
-    sort_order = models.IntegerField(default=0)
-
-    class Meta:
-        ordering = ['sort_order']
-
-
-class JobRoofRow(models.Model):
-    """Editable roof schedule row for a job (from Step 3)."""
-    ROOF_TYPE_CHOICES = [('metal', 'Metal'), ('ss', 'Standing Seam'), ('shingles', 'Shingles')]
-
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='roof_rows')
-    area_name = models.CharField(max_length=40)
-    roof_type = models.CharField(max_length=10, choices=ROOF_TYPE_CHOICES, default='metal')
-    steep = models.BooleanField(default=False)  # True = 8/12 or greater
-    sqft = models.IntegerField(default=0)
-    sort_order = models.IntegerField(default=0)
-
-    class Meta:
-        ordering = ['sort_order']
-
-
-class JobCustomCharge(models.Model):
-    """Custom charges on Steps 3 and 4 (exterior + concrete)."""
-    CHARGE_TYPE_CHOICES = [('exterior', 'Exterior'), ('concrete', 'Concrete')]
-
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='custom_charges')
-    charge_type = models.CharField(max_length=10, choices=CHARGE_TYPE_CHOICES)
-    description = models.CharField(max_length=200, blank=True)
-    rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    unit = models.CharField(max_length=5, default='SF')  # "SF", "LF", "ea"
-    qty = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-
-    @property
-    def cost(self):
-        return self.rate * self.qty
-
-
-class JobContractorOverride(models.Model):
-    """PM overrides on the contractor calculator (Step 9 Part A)."""
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='contractor_overrides')
-    item_key = models.CharField(max_length=30)  # Matches buildCtrItems() key
-    override_qty = models.DecimalField(max_digits=10, decimal_places=2)
-
-    class Meta:
-        unique_together = ['job', 'item_key']
+# JobSlabRow / JobRoofRow / JobCustomCharge / JobContractorOverride were
+# dropped when the wizard pivoted to interior-only — they backed exterior
+# steps that no longer exist. The current wizard saves slab/roof scaffold
+# data in Job.wizard_state JSON if needed downstream.
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -711,16 +672,8 @@ class JobSelectionCustomLine(models.Model):
     budget_trade = models.ForeignKey(BudgetTrade, on_delete=models.SET_NULL, null=True, blank=True)
 
 
-class JobConcreteFinishLine(models.Model):
-    """Concrete floor finish custom lines (Pill 4, Section 5)."""
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='concrete_finish_lines')
-    description = models.CharField(max_length=200, blank=True)
-    rate_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    sqft = models.IntegerField(default=0)
-
-    @property
-    def cost(self):
-        return round(float(self.rate_per_sf) * self.sqft)
+# JobConcreteFinishLine was dropped along with the exterior steps; if the
+# wizard surfaces any finish lines they ride in Job.wizard_state JSON.
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -791,12 +744,33 @@ class JobBudgetLine(models.Model):
 # ═══════════════════════════════════════════════════════════════
 
 class JobTradeBudget(models.Model):
-    """Per-trade budget and actual amounts — used by manager/owner dashboards."""
+    """Per-trade budget and actual amounts — used by manager/owner dashboards.
+
+    `is_complete` flips to True the first time a paid Bill (Bill.Balance == 0)
+    in QuickBooks credits this trade. The row locks at that point — subsequent
+    Bills against the same trade are ignored by `qb_pull.refresh_actuals_for_job`
+    so partial / change-order spend doesn't quietly overwrite the original
+    paid amount. Anything beyond the first payment flows through the change-
+    order workflow instead.
+    """
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='demo_trade_budgets')
     trade_name = models.CharField(max_length=40)
     budgeted = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     actual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     sort_order = models.IntegerField(default=0)
+    # ── Phase 2: paid-from-QB tracking ──
+    is_complete = models.BooleanField(
+        default=False,
+        help_text="True once a paid Bill has credited this trade. Locks the row."
+    )
+    qb_bill_id = models.CharField(
+        max_length=32, blank=True, default="",
+        help_text="QB Bill.Id of the payment that locked this row (audit trail)."
+    )
+    paid_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Timestamp the puller observed Balance == 0 on the matching Bill."
+    )
 
     class Meta:
         ordering = ['sort_order', 'trade_name']
@@ -924,6 +898,33 @@ class QbCustomerMap(models.Model):
 
     def __str__(self):
         return f"Job {self.job_id} → QB Customer {self.qb_customer_id}"
+
+
+class QbItemMap(models.Model):
+    """Cache: trade-bucket name → QB Item Id + Account Id.
+
+    Populated by `python manage.py qb_seed_sandbox` after the QB connection
+    is live. The seed creates one Item per JobTradeBudget trade bucket
+    (Cabinets, Drywall, Electrical, ...) so the puller can match Bill lines
+    1:1 even when multiple buckets share an Account (Cabinets/Countertops
+    both → "Cabinets and Ctops"). Realm-aware so a QB company switch
+    invalidates stale entries — mirrors `QbCustomerMap`.
+    """
+    trade_name = models.CharField(
+        max_length=64, unique=True,
+        help_text="JobTradeBudget.trade_name (e.g. 'Cabinets')"
+    )
+    qb_item_id = models.CharField(max_length=32)
+    qb_account_id = models.CharField(max_length=32)
+    qb_account_name = models.CharField(
+        max_length=128,
+        help_text="QB Chart of Accounts name (e.g. 'Cabinets and Ctops')"
+    )
+    realm_id = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.trade_name} → Item {self.qb_item_id} / Acct {self.qb_account_name}"
 
 
 class QbInvoiceEvent(models.Model):

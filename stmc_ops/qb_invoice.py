@@ -31,7 +31,7 @@ from typing import Optional
 
 from django.utils import timezone
 
-from .models import Job, JobDraw, QbCustomerMap, QbInvoiceEvent
+from .models import Job, JobDraw, QbCustomerMap, QbInvoiceEvent, QbItemMap
 from . import qb_client
 
 logger = logging.getLogger(__name__)
@@ -210,8 +210,18 @@ class QbInvoiceError(Exception):
     the local-fallback path."""
 
 
-def _create_invoice_in_qb(qb, customer_id: str, item_id: str, draw: JobDraw, job: Job):
-    """Build and POST the QB Invoice. Returns the saved Invoice object."""
+def _create_invoice_in_qb(qb, customer_id: str, fallback_item_id: str, draw: JobDraw, job: Job):
+    """Build and POST the QB Invoice. Returns the saved Invoice object.
+
+    Strategy:
+      * If the Job has trade-budget rows AND every trade has a `QbItemMap`
+        cache entry, emit one `SalesItemLine` per trade, pro-rated to the
+        draw amount via each trade's share of the total budget. This gives
+        QB's P&L by Item a per-trade revenue split.
+      * Otherwise (legacy contract, missing seed): fall back to the
+        original single-line behavior using `fallback_item_id` so the
+        demo never breaks.
+    """
     from quickbooks.objects.invoice import Invoice
     from quickbooks.objects.detailline import SalesItemLine, SalesItemLineDetail
     from quickbooks.objects.base import Ref
@@ -222,23 +232,101 @@ def _create_invoice_in_qb(qb, customer_id: str, item_id: str, draw: JobDraw, job
     customer_ref.value = customer_id
     invoice.CustomerRef = customer_ref
 
-    line = SalesItemLine()
-    line.Amount = float(draw.amount or 0)
-    line.Description = f"{_phase_label_for(draw)} draw — {job.customer_name or 'STMC project'}"
-    line.DetailType = "SalesItemLineDetail"
-    detail = SalesItemLineDetail()
-    item_ref = Ref()
-    item_ref.value = item_id
-    detail.ItemRef = item_ref
-    detail.Qty = 1
-    detail.UnitPrice = float(draw.amount or 0)
-    line.SalesItemLineDetail = detail
-    invoice.Line.append(line)
+    draw_amount = float(draw.amount or 0)
+    phase_label = _phase_label_for(draw)
+    description_base = f"{phase_label} draw -- {job.customer_name or 'STMC project'}"
 
-    # Private memo for QB users — surfaces the internal draw ID for support.
+    # Try the multi-line path first.
+    multi_lines = _build_multiline_sales_items(job, draw_amount, phase_label, description_base)
+    if multi_lines:
+        for ln in multi_lines:
+            invoice.Line.append(ln)
+    else:
+        # Fallback: original single-line behavior.
+        line = SalesItemLine()
+        line.Amount = draw_amount
+        line.Description = description_base
+        line.DetailType = "SalesItemLineDetail"
+        detail = SalesItemLineDetail()
+        item_ref = Ref()
+        item_ref.value = fallback_item_id
+        detail.ItemRef = item_ref
+        detail.Qty = 1
+        detail.UnitPrice = draw_amount
+        line.SalesItemLineDetail = detail
+        invoice.Line.append(line)
+
     invoice.PrivateNote = f"STMC job {job.pk}, draw {draw.draw_number} ({draw.label})"
 
     return invoice.save(qb=qb)
+
+
+def _build_multiline_sales_items(job: Job, draw_amount: float, phase_label: str, description_base: str):
+    """Pro-rate the draw amount across the job's trade budgets, emitting one
+    SalesItemLine per trade with the matching ItemRef from QbItemMap.
+
+    Returns a list of SalesItemLine objects, or `[]` if multi-line emission
+    isn't possible (no trade rows, or any trade lacks a cached Item map).
+    Returning `[]` triggers the single-line fallback in the caller — keeps
+    the demo flowing for legacy contracts.
+    """
+    from quickbooks.objects.detailline import SalesItemLine, SalesItemLineDetail
+    from quickbooks.objects.base import Ref
+
+    trade_rows = list(job.demo_trade_budgets.all().order_by("sort_order", "trade_name"))
+    if not trade_rows:
+        return []
+
+    total_budget = sum(float(tb.budgeted or 0) for tb in trade_rows)
+    if total_budget <= 0:
+        return []
+
+    # Resolve every trade to a QbItemMap row up front. If any are missing,
+    # bail to single-line fallback rather than emit a partial invoice.
+    item_map = {m.trade_name: m for m in QbItemMap.objects.filter(
+        trade_name__in=[tb.trade_name for tb in trade_rows]
+    )}
+    if any(tb.trade_name not in item_map for tb in trade_rows):
+        logger.warning(
+            "QbItemMap missing entries for job=%s trades=%s -- run `python manage.py qb_seed_sandbox` "
+            "to seed Items. Falling back to single-line invoice.",
+            job.pk, [tb.trade_name for tb in trade_rows if tb.trade_name not in item_map],
+        )
+        return []
+
+    # Pro-rate via cents to avoid float drift; absorb the rounding remainder
+    # into the largest line so the lines sum exactly to draw_amount.
+    draw_cents = round(draw_amount * 100)
+    raw_cents = []
+    for tb in trade_rows:
+        share = float(tb.budgeted or 0) / total_budget
+        raw_cents.append(round(draw_cents * share))
+    diff = draw_cents - sum(raw_cents)
+    if diff != 0 and raw_cents:
+        # Push the remainder onto the largest line.
+        largest_idx = max(range(len(raw_cents)), key=lambda i: raw_cents[i])
+        raw_cents[largest_idx] += diff
+
+    lines = []
+    for tb, cents in zip(trade_rows, raw_cents):
+        if cents <= 0:
+            continue
+        amt = cents / 100.0
+        ln = SalesItemLine()
+        ln.Amount = amt
+        ln.Description = f"{description_base} -- {tb.trade_name}"
+        ln.DetailType = "SalesItemLineDetail"
+        detail = SalesItemLineDetail()
+        item_ref = Ref()
+        item_ref.value = item_map[tb.trade_name].qb_item_id
+        item_ref.name = tb.trade_name
+        detail.ItemRef = item_ref
+        detail.Qty = 1
+        detail.UnitPrice = amt
+        ln.SalesItemLineDetail = detail
+        lines.append(ln)
+
+    return lines
 
 
 # ─────────────────────────────────────────────────────────────
@@ -320,3 +408,34 @@ def _record_fallback_event(
         status=QbInvoiceEvent.STATUS_FAILED,
         error_message=error_message[:500],
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# EAGER CUSTOMER PUSH (for Phase 2 demo flow)
+# ─────────────────────────────────────────────────────────────
+
+
+def ensure_qb_customer_for_job(job: Job) -> Optional[str]:
+    """Ensure a QB Customer exists for `job` -- runs immediately on contract
+    save so the accountant can enter Bills against this job in QB before any
+    draws have been pushed. Returns the QB Customer.Id on success, or None on
+    any failure (matches the never-raise contract of the rest of this module).
+
+    Called from `views.py:save_contract_view` after the Job row is persisted.
+    Safe to call repeatedly; the underlying `_ensure_qb_customer` is idempotent
+    via the `QbCustomerMap` cache.
+    """
+    if not job or not job.customer_name:
+        return None  # nothing to push yet
+    connection = qb_client.get_connection()
+    if connection is None:
+        return None  # offline -- customer will be created lazily on first draw
+    try:
+        with qb_client.with_qb_client() as qb:
+            return _ensure_qb_customer(qb, job, connection)
+    except qb_client.QbNotConnected as exc:
+        logger.warning("QB not connected during eager customer push for job %s: %s", job.pk, exc)
+        return None
+    except Exception as exc:  # noqa: BLE001 -- never break contract save
+        logger.exception("Eager QB customer push failed for job %s", job.pk)
+        return None
