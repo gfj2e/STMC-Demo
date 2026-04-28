@@ -1,6 +1,3 @@
-{# Modal host — populated by HTMX when the PM clicks "Mark complete". #}
-<div id="co-modal-host"></div>
-
 {% comment %}
 Phase 4: Refresh button. Pulls QB to flip "Due" draws to "Paid" once
 the accountant records the Payment in QB sandbox. Focused pull, fast.
@@ -55,11 +52,11 @@ the accountant records the Payment in QB sandbox. Focused pull, fast.
 							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
 							<div style="font-size:10px;color:#3B82F6;opacity:.8">Marks invoice due</div>
 						</div>
-						{# GET-loads the confirm modal into #co-modal-host. The modal's #}
+						{# GET-loads the confirm modal into the shared manager modal host. #}
 						{# own form does the actual POST to manager_panel_complete. #}
 						<button type="button" class="btn-complete"
 						        hx-get="{% url 'manager_mark_complete_modal' %}?job_id={{ project.id }}&draw_number={{ project.current_draw.number }}&panel=draws"
-						        hx-target="#co-modal-host"
+						        hx-target="#manager-modal-host"
 						        hx-swap="innerHTML">
 							Mark complete
 						</button>

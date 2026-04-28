@@ -82,6 +82,12 @@ function bindHtmxFeedback() {
   document.body.addEventListener('htmx:afterRequest', function (event) {
     var elt = event.detail && event.detail.elt;
     if (!elt || !elt.matches('form[data-complete-form="1"]')) return;
+    if (event.detail.successful) {
+      // The draw panel is swapped via hx-target, so explicitly clear the
+      // shared modal host after a successful complete action.
+      closeChangeOrderModal();
+      return;
+    }
     if (!event.detail.successful) {
       showToast('Error saving - try again');
       // Restore the button label if the request failed. On success the
@@ -150,7 +156,7 @@ function initAuthHeader() {
 }
 
 function closeChangeOrderModal() {
-  var host = document.getElementById('co-modal-host');
+  var host = document.getElementById('manager-modal-host');
   if (host) host.innerHTML = '';
 }
 

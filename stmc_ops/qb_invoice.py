@@ -31,7 +31,7 @@ from typing import Optional
 
 from django.utils import timezone
 
-from .models import Job, JobDraw, QbCustomerMap, QbInvoiceEvent, QbItemMap
+from .models import Job, JobDraw, QbCustomerMap, QbInvoiceEvent, QbItemMap, JobChangeOrder
 from . import qb_client
 
 logger = logging.getLogger(__name__)
@@ -733,3 +733,6 @@ def ensure_qb_customer_for_job(job: Job) -> Optional[str]:
     except Exception as exc:  # noqa: BLE001 -- never break contract save
         logger.exception("Eager QB customer push failed for job %s", job.pk)
         return None
+
+def change_order_qb(change_order: JobChangeOrder):
+    pass
