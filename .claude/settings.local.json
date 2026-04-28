@@ -70,7 +70,10 @@
       "Bash(.venv/Scripts/python -c \"from stmc_ops import qb_cost_codes; print\\('accounts:', len\\(qb_cost_codes.STMC_QB_ACCOUNTS\\)\\); print\\('trades:', len\\(qb_cost_codes.TRADE_TO_QB_ACCOUNT\\)\\); print\\('reverse keys:', sorted\\(qb_cost_codes.QB_ACCOUNT_TO_TRADES.keys\\(\\)\\)[:5]\\)\")",
       "Bash(.venv/Scripts/python manage.py qb_seed_sandbox)",
       "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/python manage.py qb_seed_sandbox)",
-      "Bash(grep -n \"return JsonResponse\\({\\\\\"ok\\\\\": True, \\\\\"job_id\\\\\": job.id\" \"C:\\\\Users\\\\gfj2e\\\\OneDrive\\\\Documents\\\\GitHub\\\\STMC-Demo\\\\stmc_ops\\\\views.py\")"
+      "Bash(grep -n \"return JsonResponse\\({\\\\\"ok\\\\\": True, \\\\\"job_id\\\\\": job.id\" \"C:\\\\Users\\\\gfj2e\\\\OneDrive\\\\Documents\\\\GitHub\\\\STMC-Demo\\\\stmc_ops\\\\views.py\")",
+      "Bash(extract-text \"C:\\\\Users\\\\gfj2e\\\\Downloads\\\\STMC_QB_CostCode_Review NOTES.xlsx\")",
+      "Read(//c/Users/gfj2e/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/6bf92c88-b5b7-452b-b53f-885b714cbbb1/52fac8db-313e-4514-b993-1cf28b344dc1/skills/xlsx/scripts/**)",
+      "Read(//c/Users/gfj2e/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/6bf92c88-b5b7-452b-b53f-885b714cbbb1/52fac8db-313e-4514-b993-1cf28b344dc1/skills/xlsx/**)"
     ]
   }
 }
