@@ -539,6 +539,10 @@ def _build_app_seed_data():
 def _draw_status_pill_class(status_code):
     if status_code == JobDraw.STATUS_PAID:
         return "pill-success"
+    # INVOICED = PM marked complete, QB Invoice DueDate=today, awaiting bank
+    # Payment. Amber ("warning") signals "action expected from another party".
+    if status_code == JobDraw.STATUS_INVOICED:
+        return "pill-warning"
     if status_code == JobDraw.STATUS_CURRENT:
         return "pill-brand"
     return "pill-muted"
@@ -547,14 +551,18 @@ def _draw_status_pill_class(status_code):
 def _draw_status_label(status_code):
     if status_code == JobDraw.STATUS_PAID:
         return "Paid"
-    if status_code == JobDraw.STATUS_CURRENT:
+    if status_code == JobDraw.STATUS_INVOICED:
         return "Due"
+    if status_code == JobDraw.STATUS_CURRENT:
+        return "Current"
     return "Pending"
 
 
 def _draw_num_class(status_code):
     if status_code == JobDraw.STATUS_PAID:
         return "paid"
+    if status_code == JobDraw.STATUS_INVOICED:
+        return "invoiced"
     if status_code == JobDraw.STATUS_CURRENT:
         return "current"
     return ""
@@ -588,10 +596,18 @@ def _phase_label(phase_code):
 
 def _draw_timeline_row(draw):
     status = draw.get("s")
-    icon = "✓" if status == JobDraw.STATUS_PAID else ("►" if status == JobDraw.STATUS_CURRENT else ("D" if draw.get("n") == 0 else str(draw.get("n") or "")))
-    dot_class = "pdg" if status == JobDraw.STATUS_PAID else ("pdb" if status == JobDraw.STATUS_CURRENT else "pdx")
-    status_color = "var(--green)" if status == JobDraw.STATUS_PAID else ("#1D4ED8" if status == JobDraw.STATUS_CURRENT else "var(--g400)")
-    status_label = "Paid" + (f" {draw.get('t')}" if draw.get("t") else "") if status == JobDraw.STATUS_PAID else ("Current" if status == JobDraw.STATUS_CURRENT else "Pending")
+    if status == JobDraw.STATUS_PAID:
+        icon, dot_class, status_color = "✓", "pdg", "var(--green)"
+        status_label = "Paid" + (f" {draw.get('t')}" if draw.get("t") else "")
+    elif status == JobDraw.STATUS_INVOICED:
+        icon, dot_class, status_color = "$", "pdy", "var(--amber-dark)"
+        status_label = "Due"
+    elif status == JobDraw.STATUS_CURRENT:
+        icon, dot_class, status_color = "►", "pdb", "#1D4ED8"
+        status_label = "Current"
+    else:
+        icon = "D" if draw.get("n") == 0 else str(draw.get("n") or "")
+        dot_class, status_color, status_label = "pdx", "var(--g400)", "Pending"
     return {
         "icon": icon,
         "dot_class": dot_class,
@@ -1205,18 +1221,26 @@ def _build_sales_ui_context(request=None):
 
 
 def _mark_draw_complete(job_id, draw_number):
-    """Mark the specified draw as paid, advance the next pending draw to
-    current, and fire a QuickBooks invoice against the homeowner.
+    """Mark the specified draw as INVOICED ("due to be paid"), advance the
+    next pending draw to CURRENT, and update the corresponding QB Invoice's
+    DueDate to today.
 
-    Idempotent and race-safe. If the draw is already PAID (e.g. the PM
-    double-clicked faster than the first request could return), we return
-    the previously-recorded invoice event without creating a duplicate
-    QB invoice. The SQL UPDATE with a status predicate is atomic — only
-    one concurrent request wins the transition.
+    Phase 4 lifecycle:
+      CURRENT  -- waiting for PM action
+        |  PM clicks Mark Complete  (this function)
+        v
+      INVOICED -- "due to be paid"; QB Invoice DueDate=today
+        |  Accountant records Payment in QB; next qb_pull observes Balance=0
+        v
+      PAID     -- bank funds received; flipped by qb_pull, NOT here
 
-    Returns `(today, event)` where `event` is the QbInvoiceEvent row (real
-    or fallback) — callers use it to attach invoice details to their
-    HTMX response header so the manager-side toast can display them.
+    Idempotent and race-safe. If the draw is already INVOICED or PAID, the
+    SQL UPDATE filters on STATUS_CURRENT only, so a second click is a no-op.
+
+    Returns `(today, event)` -- `event` is the QbInvoiceEvent row (the one
+    created at sales_finalize_contract_view time, now stamped with
+    qb_due_marked_at). Callers attach it to HTMX response headers so the
+    manager-side toast can display invoice details.
     """
     from .models import QbInvoiceEvent
 
@@ -1226,22 +1250,18 @@ def _mark_draw_complete(job_id, draw_number):
     dt = timezone.now()
     today = dt.strftime("%b ") + str(dt.day)
 
-    # Atomic conditional update: flip status to PAID only if it isn't
-    # already. The row count tells us whether *this* request won the
-    # race. If it didn't (0 rows updated), the draw was already paid —
-    # return the existing event and skip the QB call to avoid duplicates.
+    # Atomic conditional update: flip status to INVOICED only if currently
+    # CURRENT. Spam clicks or concurrent tabs lose the race silently.
     won_race = JobDraw.objects.filter(
         pk=draw.pk,
-    ).exclude(status=JobDraw.STATUS_PAID).update(
-        status=JobDraw.STATUS_PAID,
-        paid_date=today,
+        status=JobDraw.STATUS_CURRENT,
+    ).update(
+        status=JobDraw.STATUS_INVOICED,
     )
 
     if not won_race:
-        # Someone else already paid this draw (spam click or concurrent
-        # tab). Return the most recent event for the draw if we have one;
-        # otherwise synthesize a fallback so the caller still gets a
-        # non-None event to attach to the HTMX response.
+        # Already advanced past CURRENT -- another tab beat us. Return
+        # the most recent event for the HTMX header; no QB writes.
         existing = (
             QbInvoiceEvent.objects.filter(draw_id=draw.pk)
             .order_by("-created_at")
@@ -1249,18 +1269,16 @@ def _mark_draw_complete(job_id, draw_number):
         )
         if existing is not None:
             return today, existing
-        # Draw was paid but no event exists (data from before Phase B).
-        # Fall through to create one via the normal path so the UI still
-        # has something sensible to render, but don't hit QB.
         from . import qb_invoice as _qi
         synthetic = _qi._record_fallback_event(
             job, draw, _qi._phase_label_for(draw),
             draw.amount or 0,
-            "Draw was already marked paid; no QB invoice was created.",
+            "Draw was already advanced; no QB write was performed.",
         )
         return today, synthetic
 
-    # We won the race — continue with the full transition.
+    # We won the race -- promote the next PENDING draw to CURRENT so the
+    # PM dashboard's "Mark Complete" button always has a target.
     next_draw = JobDraw.objects.filter(
         job_id=job_id, status=JobDraw.STATUS_PENDING
     ).order_by("draw_number").first()
@@ -1284,11 +1302,45 @@ def _mark_draw_complete(job_id, draw_number):
     if new_phase:
         Job.objects.filter(pk=job_id).update(current_phase=new_phase)
 
-    # Fire the QB invoice. send_invoice_for_draw never raises — it records
-    # a fallback event if QB is unavailable, so the demo toast/bell always
-    # get something to display.
-    from . import qb_invoice
-    event = qb_invoice.send_invoice_for_draw(job, draw)
+    # Phase 4: PM "Mark Complete" is a LOCAL status change only -- no
+    # synchronous QB write. The corresponding QB Invoice already exists
+    # (created at sales-finalize via push_draw_schedule_for_job). The
+    # accountant decides when to pay that Invoice in QB; qb_pull's
+    # refresh_draw_invoices_for_job is the path that flips the draw to
+    # PAID once Balance == 0.
+    #
+    # Why no DueDate update here? It would add 3-4 seconds of QB API
+    # round-trip to the HTMX response, which the user perceives as a
+    # "stuck loading" spinner. The accountant doesn't need a DueDate
+    # signal to know which invoice to pay -- they get that out-of-band
+    # from the PM (or by seeing the local manager dashboard show "Due").
+    #
+    # Surface the existing QbInvoiceEvent for the manager-toast HX-Trigger.
+    # If somehow no event exists (legacy finalize before Phase 4 wired
+    # up + no backfill yet), record a synthetic fallback so the toast
+    # still has something to render.
+    event = (
+        QbInvoiceEvent.objects
+        .filter(job=job, draw=draw, status=QbInvoiceEvent.STATUS_SENT)
+        .order_by("-created_at")
+        .first()
+    )
+    if event is None:
+        # No QbInvoiceEvent for this draw -- record a local fallback for the
+        # toast/bell. The actual QB write (creating the Invoice) is deferred
+        # to the next time qb_pull or finalize runs.
+        from . import qb_invoice as _qi
+        event = _qi._record_fallback_event(
+            job, draw, _qi._phase_label_for(draw),
+            draw.amount or 0,
+            "Draw marked complete locally; QB invoice will sync on next refresh.",
+        )
+    # Best-effort timestamp: stamp qb_due_marked_at on the existing event so
+    # the manager dashboard knows when the PM clicked Mark Complete, even
+    # though we didn't touch QB. (No QB API call -- pure DB UPDATE.)
+    elif not event.qb_due_marked_at:
+        event.qb_due_marked_at = dt
+        event.save(update_fields=["qb_due_marked_at"])
 
     return today, event
 
@@ -1510,6 +1562,99 @@ def manager_draws_panel_view(request):
             "draws_closed": context["draws_closed"],
         },
     )
+
+
+@role_required(AppUser.ROLE_PM)
+@require_POST
+@csrf_protect
+def manager_qb_draws_refresh_view(request):
+    """Pull draw-invoice paid status from QuickBooks, then re-render the
+    Draws panel.
+
+    Phase 4 lifecycle: PM clicks Mark Complete -> draw is INVOICED.
+    Accountant records a Payment in the QB sandbox. THIS endpoint walks
+    every INVOICED draw across active jobs, queries the corresponding
+    QB Invoice's Balance, and flips draws to PAID where QB shows
+    Balance == 0. Then returns the refreshed Draws panel HTML so the
+    PM can see updates without leaving their dashboard.
+
+    Focused (only INVOICED draws) so it's fast (~1-2s for a typical
+    sandbox), unlike the full owner-dashboard refresh which also pulls
+    Bills + Payments aggregates.
+    """
+    if not request.htmx:
+        return redirect("manager")
+
+    from . import qb_client, qb_pull
+    totals = {"paid_now": 0, "still_open": 0, "skipped": 0}
+    error_msg = ""
+
+    connection = qb_client.get_connection()
+    if connection is None:
+        error_msg = "QuickBooks is not connected. Have an exec connect via the owner dashboard."
+    else:
+        try:
+            with qb_client.with_qb_client() as qb:
+                # Active jobs with a cached QB Customer mapping. Bound the loop
+                # so a sandbox with hundreds of jobs doesn't burn the request.
+                active_jobs = (
+                    Job.objects
+                    .exclude(current_phase="closed")
+                    .filter(qb_customer_map__isnull=False)
+                    .select_related("qb_customer_map")[:50]
+                )
+                for job in active_jobs:
+                    try:
+                        counts = qb_pull.refresh_draw_invoices_for_job(qb, job)
+                        for k, v in counts.items():
+                            totals[k] += v
+                    except Exception as job_exc:  # noqa: BLE001
+                        # One job's failure shouldn't kill the whole refresh.
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "manager_qb_draws_refresh_view: job=%s error: %s",
+                            job.pk, job_exc,
+                        )
+        except qb_client.QbNotConnected as exc:
+            error_msg = str(exc)
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception("manager_qb_draws_refresh_view failed")
+            error_msg = f"{type(exc).__name__}: {exc}"
+
+    # Re-render Draws panel with the updated state.
+    context = _build_manager_ui_context()
+    response = render(
+        request,
+        "manager/draws.html",
+        {
+            "draws_active": context["draws_active"],
+            "draws_closed": context["draws_closed"],
+        },
+    )
+
+    # Toast feedback via HX-Trigger. Picked up by manager.js's existing
+    # qb-invoice-sent listener (we reuse it to avoid adding a new listener).
+    if error_msg:
+        toast = f"Refresh failed: {error_msg}"
+    elif totals["paid_now"] > 0:
+        n = totals["paid_now"]
+        toast = f"{n} draw{'s' if n != 1 else ''} marked Paid from QuickBooks"
+    else:
+        toast = "Refresh complete -- no new payments in QuickBooks"
+    import json as _json
+    response["HX-Trigger"] = _json.dumps({
+        "manager-refresh": {},
+        "qb-invoice-sent": {
+            "invoice_number": "",
+            "team": "",
+            "amount": "",
+            "status": "sent" if not error_msg else "failed_fallback",
+            "url": "",
+            "message": toast,
+        },
+    })
+    return response
 
 
 @role_required(AppUser.ROLE_PM)
@@ -1871,6 +2016,21 @@ def sales_finalize_contract_view(request, job_id):
         if next_current and next_current.status != JobDraw.STATUS_CURRENT:
             next_current.status = JobDraw.STATUS_CURRENT
             next_current.save(update_fields=["status"])
+
+    # ── Phase 4: bulk-push draw schedule to QuickBooks ──
+    # Loan is now closed on the sales-rep side. Write the entire draw
+    # schedule to QB as Invoices (one per draw, multi-line cost-coded
+    # per Phase 1). For draws 0+1 -- which are PAID locally because the
+    # deposit + loan close clear at signing -- the helper also records
+    # a Payment in QB so they show up Paid in QB right away. Wrapped
+    # in try/except to honor the qb_invoice never-raise contract; the
+    # local close above has already committed and won't roll back on
+    # QB hiccups.
+    from . import qb_invoice
+    try:
+        qb_invoice.push_draw_schedule_for_job(job)
+    except Exception:  # noqa: BLE001 -- never break finalize on QB error
+        pass
 
     if request.htmx:
         context = _build_sales_ui_context(request)

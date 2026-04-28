@@ -32,6 +32,7 @@ urlpatterns = [
     path("manager/builds-panel/", views.manager_builds_panel_view, name="manager_builds_panel"),
     path("manager/budgets-panel/", views.manager_budgets_panel_view, name="manager_budgets_panel"),
     path("manager/draws-panel/", views.manager_draws_panel_view, name="manager_draws_panel"),
+    path("manager/draws-panel/qb-refresh/", views.manager_qb_draws_refresh_view, name="manager_qb_draws_refresh"),
     path("manager/panel/complete/", views.manager_panel_mark_complete_view, name="manager_panel_complete"),
     path("manager/draw/confirm-modal/", views.manager_mark_complete_modal_view, name="manager_mark_complete_modal"),
     path("manager/change-order/modal/", views.manager_change_order_modal_view, name="manager_change_order_modal"),

@@ -823,12 +823,23 @@ class JobChangeOrder(models.Model):
 
 
 class JobDraw(models.Model):
-    """Individual draw entry — used by manager/owner draw-schedule views."""
+    """Individual draw entry — used by manager/owner draw-schedule views.
+
+    Phase 4 lifecycle (3-state):
+      PENDING -> CURRENT (when prior draw paid; this draw becomes the next
+                          one PM should mark complete)
+      CURRENT -> INVOICED (PM clicks Mark Complete; QB Invoice DueDate is
+                           updated to today)
+      INVOICED -> PAID (qb_pull.refresh_draw_invoices_for_job observes
+                        Balance == 0 on the QB Invoice; bank funds released)
+    """
     STATUS_PAID = 'p'
+    STATUS_INVOICED = 'i'
     STATUS_CURRENT = 'c'
     STATUS_PENDING = 'x'
     STATUS_CHOICES = [
         ('p', 'Paid'),
+        ('i', 'Invoiced (Due)'),
         ('c', 'Current'),
         ('x', 'Pending'),
     ]
@@ -952,6 +963,14 @@ class QbInvoiceEvent(models.Model):
     qb_invoice_url = models.URLField(blank=True, default="")
     status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_SENT)
     error_message = models.CharField(max_length=500, blank=True, default="")
+    # ── Phase 4: 3-state draw invoice lifecycle ──
+    # PM "Mark Complete" updates the QB Invoice DueDate to today and stamps
+    # qb_due_marked_at. Later, when an accountant records a Payment in QB
+    # against the invoice, the next qb_pull.refresh_snapshot() observes
+    # Balance == 0 and stamps paid_at (also flipping the JobDraw to PAID).
+    # Both fields stay null until the corresponding lifecycle event fires.
+    qb_due_marked_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
     # Notification read-state (shared across all exec users for demo simplicity).
     created_at = models.DateTimeField(default=timezone.now)
     read_at = models.DateTimeField(null=True, blank=True)

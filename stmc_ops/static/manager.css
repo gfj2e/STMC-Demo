@@ -384,6 +384,14 @@
   border: 2px solid #93C5FD;
 }
 
+/* Phase 4: INVOICED draw -- PM marked complete, awaiting QB Payment.
+   Amber matches the warning pill rendered alongside in the timeline. */
+.pdy {
+  background: var(--amber-light);
+  color: var(--amber-dark);
+  border: 2px solid #FCD34D;
+}
+
 .pdx {
   background: var(--g100);
   color: var(--g500);

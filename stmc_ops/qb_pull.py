@@ -29,7 +29,7 @@ from typing import Optional
 
 from django.utils import timezone
 
-from .models import Job, JobTradeBudget, QbCustomerMap, QbSyncSnapshot
+from .models import Job, JobDraw, JobTradeBudget, QbCustomerMap, QbInvoiceEvent, QbSyncSnapshot
 from . import qb_client
 from .qb_cost_codes import QB_ACCOUNT_TO_TRADES
 
@@ -211,6 +211,87 @@ def _extract_line_target(line):
     return None, None
 
 
+# ─────────────────────────────────────────────────────────────
+# PHASE 4 — DRAW INVOICE PAID-STATUS PULL
+# ─────────────────────────────────────────────────────────────
+
+
+def refresh_draw_invoices_for_job(qb, job: Job) -> dict:
+    """For every draw on `job` that's currently INVOICED, query its QB
+    Invoice's Balance. If Balance == 0 (accountant recorded a Payment in
+    QB), flip the local JobDraw status to PAID, set paid_date, and stamp
+    QbInvoiceEvent.paid_at.
+
+    This is the ONLY path that flips a draw to PAID. PM "Mark Complete"
+    only gets us to INVOICED -- the bank's release of funds (recorded as
+    a QB Payment by the accountant) is the source of truth for PAID.
+
+    Returns `{paid_now, still_open, skipped}` for logging.
+
+    Raises on QB error -- caller in `refresh_snapshot` wraps in try/except.
+    """
+    from quickbooks.objects.invoice import Invoice
+    counts = {"paid_now": 0, "still_open": 0, "skipped": 0}
+
+    # Only walk INVOICED draws (the lifecycle says PM has clicked Mark
+    # Complete, the QB Invoice's DueDate is today, but no Payment has
+    # been recorded yet). PENDING + CURRENT haven't reached due-state;
+    # PAID is already terminal.
+    invoiced_draws = (
+        JobDraw.objects.filter(job=job, status=JobDraw.STATUS_INVOICED)
+        .order_by("draw_number")
+    )
+
+    for draw in invoiced_draws:
+        # Find the SENT QbInvoiceEvent for this draw -- it carries the
+        # qb_invoice_id we need to query.
+        event = (
+            QbInvoiceEvent.objects
+            .filter(job=job, draw=draw, status=QbInvoiceEvent.STATUS_SENT)
+            .order_by("-created_at")
+            .first()
+        )
+        if event is None or not event.qb_invoice_id:
+            counts["skipped"] += 1
+            continue
+
+        try:
+            results = Invoice.query(
+                f"SELECT Id, Balance FROM Invoice WHERE Id = '{event.qb_invoice_id}'",
+                qb=qb,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "refresh_draw_invoices_for_job: lookup failed for invoice %s on draw %s",
+                event.qb_invoice_id, draw.pk,
+            )
+            counts["skipped"] += 1
+            continue
+
+        if not results:
+            counts["skipped"] += 1
+            continue
+
+        invoice = results[0]
+        balance = Decimal(str(getattr(invoice, "Balance", 0) or 0))
+        if balance > Decimal("0"):
+            counts["still_open"] += 1
+            continue
+
+        # Balance == 0 -> bank paid this draw. Flip locally + stamp event.
+        now = timezone.now()
+        today_str = now.strftime("%b ") + str(now.day)
+        JobDraw.objects.filter(pk=draw.pk).update(
+            status=JobDraw.STATUS_PAID,
+            paid_date=today_str,
+        )
+        event.paid_at = now
+        event.save(update_fields=["paid_at"])
+        counts["paid_now"] += 1
+
+    return counts
+
+
 def fetch_unpaid_payments(qb) -> Decimal:
     
     from quickbooks.objects.invoice import Invoice
@@ -281,6 +362,30 @@ def refresh_snapshot() -> QbSyncSnapshot:
                 logger.info(
                     "QB actuals refresh: matched=%d skipped=%d ambiguous=%d",
                     totals["matched"], totals["skipped"], totals["ambiguous"],
+                )
+
+            # ── Phase 4: refresh draw-invoice paid status ──
+            # Walks JobDraws in INVOICED state for each active job. If
+            # the corresponding QB Invoice's Balance hits 0 (accountant
+            # recorded a Payment in QB), the draw flips to PAID locally
+            # and the QbInvoiceEvent gets paid_at stamped. This is the
+            # ONLY path that flips a draw to PAID -- PM mark-complete
+            # only takes us to INVOICED.
+            draw_totals = {"paid_now": 0, "still_open": 0, "skipped": 0}
+            for job in active_jobs:
+                try:
+                    counts = refresh_draw_invoices_for_job(qb, job)
+                    for k, v in counts.items():
+                        draw_totals[k] += v
+                except Exception as job_exc:  # noqa: BLE001
+                    logger.warning(
+                        "refresh_draw_invoices_for_job failed for job=%s: %s",
+                        job.pk, job_exc,
+                    )
+            if draw_totals["paid_now"]:
+                logger.info(
+                    "QB draws refresh: paid_now=%d still_open=%d skipped=%d",
+                    draw_totals["paid_now"], draw_totals["still_open"], draw_totals["skipped"],
                 )
     except qb_client.QbNotConnected as exc:
         logger.warning("QB not connected during snapshot refresh: %s", exc)

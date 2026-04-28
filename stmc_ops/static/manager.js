@@ -125,6 +125,12 @@ function bindQbInvoiceToast() {
   // status is "sent" (real QB invoice) or "failed_fallback" (local only).
   document.body.addEventListener('qb-invoice-sent', function (event) {
     var d = (event && event.detail) || {};
+    // Phase 4 refresh path supplies a pre-formatted `message`; prefer that
+    // over the per-event invoice_number/team format used by mark-complete.
+    if (d.message) {
+      showToast(d.message);
+      return;
+    }
     var prefix = d.status === 'failed_fallback'
       ? 'Draw complete (QB unavailable - recorded locally)'
       : 'QuickBooks Invoice ' + (d.invoice_number || '');

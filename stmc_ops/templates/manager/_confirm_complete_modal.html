@@ -17,8 +17,10 @@
         </div>
       </div>
       <p class="confirm-note">
-        This will create a QuickBooks invoice for the amount above and update the
-        draw schedule. This action can't be undone from the dashboard.
+        Marks this draw as <strong>Due</strong> on the manager dashboard. The
+        QuickBooks invoice for this draw was created at loan-close; the
+        accountant will record the bank&rsquo;s payment in QB to complete the
+        cycle.
       </p>
     </div>
     <div class="modal-ftr">
@@ -37,8 +39,8 @@
         <input type="hidden" name="job_id" value="{{ job.id }}">
         <input type="hidden" name="draw_number" value="{{ draw.draw_number }}">
         <button class="modal-btn confirm-modal-submit btn-complete" type="submit"
-                data-busy-label="Sending invoice...">
-          <span class="btn-complete-label">Confirm &amp; Send</span>
+                data-busy-label="Marking due...">
+          <span class="btn-complete-label">Confirm &amp; Mark Due</span>
         </button>
       </form>
     </div>

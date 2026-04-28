@@ -1,6 +1,30 @@
 {# Modal host — populated by HTMX when the PM clicks "Mark complete". #}
 <div id="co-modal-host"></div>
 
+{% comment %}
+Phase 4: Refresh button. Pulls QB to flip "Due" draws to "Paid" once
+the accountant records the Payment in QB sandbox. Focused pull, fast.
+{% endcomment %}
+<div style="display:flex;justify-content:flex-end;align-items:center;margin:8px 0 4px">
+	<form
+		method="post"
+		hx-post="{% url 'manager_qb_draws_refresh' %}"
+		hx-target="#tab-draws-panel"
+		hx-swap="innerHTML"
+		hx-disabled-elt="find button"
+		style="margin:0"
+	>
+		{% csrf_token %}
+		<button type="submit"
+		        class="btn-complete"
+		        data-busy-label="Refreshing..."
+		        style="font-size:12px;padding:6px 14px;background:#fff;border:1.5px solid var(--g300);color:var(--g700);border-radius:6px;cursor:pointer;font-weight:500"
+		        title="Pull paid status for any 'Due' draws from QuickBooks">
+			<span class="btn-complete-label">Refresh from QuickBooks</span>
+		</button>
+	</form>
+</div>
+
 {% if draws_active %}
 	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active <span style="font-weight:400">({{ draws_active|length }})</span></div>
 	{% for project in draws_active %}
@@ -29,7 +53,7 @@
 					<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
 						<div>
 							<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
-							<div style="font-size:10px;color:#3B82F6;opacity:.8">Creates QB invoice</div>
+							<div style="font-size:10px;color:#3B82F6;opacity:.8">Marks invoice due</div>
 						</div>
 						{# GET-loads the confirm modal into #co-modal-host. The modal's #}
 						{# own form does the actual POST to manager_panel_complete. #}
