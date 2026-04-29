@@ -110,6 +110,34 @@ function bindProjectToggles() {
   });
 }
 
+function setFinalizeButtonsDisabled(isDisabled) {
+  document.querySelectorAll('button[data-finalize-contract="1"]').forEach(function (btn) {
+    btn.disabled = !!isDisabled;
+  });
+}
+
+function bindFinalizeContractReload() {
+  if (!window.htmx) return;
+
+  document.body.addEventListener('htmx:beforeRequest', function (event) {
+    var elt = event.detail && event.detail.elt;
+    if (!elt || !elt.matches('button[data-finalize-contract="1"]')) return;
+    setFinalizeButtonsDisabled(true);
+  });
+
+  document.body.addEventListener('htmx:afterRequest', function (event) {
+    var elt = event.detail && event.detail.elt;
+    if (!elt || !elt.matches('button[data-finalize-contract="1"]')) return;
+    if (event.detail.successful) {
+      // Force a hard refresh so In Progress/Closed lists and loan/deposit
+      // status pills reflect the latest server state before another action.
+      window.location.reload();
+      return;
+    }
+    setFinalizeButtonsDisabled(false);
+  });
+}
+
 function initAuthHeader() {
   var user = window.STMC_USER || {};
   var nameEl = document.getElementById('hN');
@@ -122,6 +150,7 @@ function init() {
   bindTabs();
   bindLogout();
   bindProjectToggles();
+  bindFinalizeContractReload();
   initAuthHeader();
 }
 

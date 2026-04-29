@@ -2676,6 +2676,16 @@ function renderStep5(){
   var pm = PLAN_METRICS[m] || {};
   var isCustom = isCustomFloorPlan();
   var pdfFile = PDF_FILES[m];
+  var pdfUrl = "";
+  if(pdfFile){
+    var pdfRouteTemplate = window.SALES_FLOOR_PLAN_PDF_URL_TMPL || "";
+    if(pdfRouteTemplate && pdfRouteTemplate.indexOf("__FILENAME__") !== -1){
+      pdfUrl = pdfRouteTemplate.replace("__FILENAME__", encodeURIComponent(pdfFile));
+    } else {
+      // Fallback for stale templates that don't inject SALES_FLOOR_PLAN_PDF_URL_TMPL.
+      pdfUrl = "/stmc_ops/sales/floor-plan-pdfs/" + encodeURIComponent(pdfFile) + "/";
+    }
+  }
   var I = STATE.int;
   var h = '';
 
@@ -2718,13 +2728,13 @@ function renderStep5(){
   h += '</div>';
 
   // ── PDF VIEWER (top) ──────────────────────────────
-  if(pdfFile){
+  if(pdfFile && pdfUrl){
     h += '<div class="card">';
     h +=   '<div class="section-hdr"><span>Floor Plan — '+esc(m)+'</span>';
-    h +=     '<button class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff" onclick="window.open(\'pdfs/'+esc(pdfFile)+'\',\'_blank\')">Open in New Window ↗</button>';
+    h +=     '<a class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff;text-decoration:none" href="'+esc(pdfUrl)+'" target="_blank" rel="noopener">Open in New Window ↗</a>';
     h +=   '</div>';
-    h +=   '<iframe src="pdfs/'+esc(pdfFile)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
-    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, confirm a <code>pdfs/</code> folder sits alongside this HTML file containing <code>'+esc(pdfFile)+'</code>.</div>';
+    h +=   '<iframe src="'+esc(pdfUrl)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
+    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, make sure you are signed in and the file exists in <code>pdf-plans/</code>: <code>'+esc(pdfFile)+'</code>.</div>';
     h += '</div>';
   }
 

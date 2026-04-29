@@ -1982,6 +1982,29 @@ def sales_rates_panel_view(request):
     )
 
 
+def _push_draw_schedule_for_job_async(job_id):
+    """Best-effort background QB push after sales finalize.
+
+    Keeps the HTMX finalize response fast so the UI updates immediately,
+    even if QuickBooks is slow/unavailable.
+    """
+    from threading import Thread
+
+    def _worker(target_job_id):
+        from . import qb_invoice
+        try:
+            target_job = Job.objects.get(pk=target_job_id)
+        except Job.DoesNotExist:
+            return
+        try:
+            qb_invoice.push_draw_schedule_for_job(target_job)
+        except Exception:
+            # Never break sales finalize on QB transport/API errors.
+            pass
+
+    Thread(target=_worker, args=(job_id,), daemon=True).start()
+
+
 @role_required(AppUser.ROLE_SALES)
 @require_POST
 @csrf_protect
@@ -2017,20 +2040,9 @@ def sales_finalize_contract_view(request, job_id):
             next_current.status = JobDraw.STATUS_CURRENT
             next_current.save(update_fields=["status"])
 
-    # ── Phase 4: bulk-push draw schedule to QuickBooks ──
-    # Loan is now closed on the sales-rep side. Write the entire draw
-    # schedule to QB as Invoices (one per draw, multi-line cost-coded
-    # per Phase 1). For draws 0+1 -- which are PAID locally because the
-    # deposit + loan close clear at signing -- the helper also records
-    # a Payment in QB so they show up Paid in QB right away. Wrapped
-    # in try/except to honor the qb_invoice never-raise contract; the
-    # local close above has already committed and won't roll back on
-    # QB hiccups.
-    from . import qb_invoice
-    try:
-        qb_invoice.push_draw_schedule_for_job(job)
-    except Exception:  # noqa: BLE001 -- never break finalize on QB error
-        pass
+    # ── Phase 4: bulk-push draw schedule to QuickBooks (async) ──
+    # Dispatch after commit so UI isn't blocked on QB API latency.
+    transaction.on_commit(lambda: _push_draw_schedule_for_job_async(job.id))
 
     if request.htmx:
         context = _build_sales_ui_context(request)

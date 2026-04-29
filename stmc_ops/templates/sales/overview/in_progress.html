@@ -70,6 +70,7 @@
         </a>
         <button type="button"
                 class="sales-btn sales-btn-primary"
+          data-finalize-contract="1"
                 hx-post="{{ project.finalize_url }}"
                 hx-target="#tab-in-progress-panel"
                 hx-swap="innerHTML"
@@ -79,6 +80,7 @@
         </button>
         <button type="button"
                 class="sales-btn sales-btn-dark"
+          data-finalize-contract="1"
                 hx-post="{{ project.finalize_url }}"
                 hx-target="#tab-in-progress-panel"
                 hx-swap="innerHTML"

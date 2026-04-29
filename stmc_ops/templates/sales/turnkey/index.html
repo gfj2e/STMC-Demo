@@ -101,6 +101,7 @@
   window.STMC_EDIT_JOB_ID = {% if existing_job_id %}{{ existing_job_id }}{% else %}null{% endif %};
   window.SAVE_CONTRACT_URL = "{% url 'save_contract' %}";
   window.SALES_OVERVIEW_URL = "{% url 'sales_overview' %}";
+  window.SALES_FLOOR_PLAN_PDF_URL_TMPL = "{% url 'sales_floor_plan_pdf' '__FILENAME__' %}";
   window.LOGIN_URL = "{% url 'login' %}";
   window.LOGOUT_URL = "{% url 'logout' %}";
   window.CSRF_TOKEN = "{{ csrf_token }}";
