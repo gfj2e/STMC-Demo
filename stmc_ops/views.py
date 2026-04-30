@@ -274,7 +274,7 @@ def _estimate_job_contract(job):
 
     int_part = 0
     if job.job_mode == "turnkey":
-        int_part = _to_number(job.adjusted_int_contract) or _to_number(job.int_contract)
+        int_part = _to_number(job.adjusted_int_contract)
         if not int_part and job.floor_plan:
             int_part = _to_number(job.floor_plan.int_contract)
     return material + int_part
