@@ -1,105 +1,256 @@
 {% if builds_active %}
 	<div class="group-section-title">Active Builds <span class="group-section-count">({{ builds_active|length }})</span></div>
-	{% for group in builds_active_by_branch %}
-		<details class="project-group">
-			<summary class="project-group-summary">
-				<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
-				<span class="project-group-count">{{ group.count }}</span>
-			</summary>
-			<div class="project-group-body">
-				{% for project in group.projects %}
-					<div class="proj-card" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
-						<div class="proj-hdr">
-							<div class="proj-hdr-top">
-								<div>
-									<p class="proj-name">{{ project.name }}</p>
-									<p class="proj-sub">{{ project.subtitle }}</p>
-								</div>
-								<div style="display:flex;align-items:center;gap:8px">
-									{% if project.change_order_count %}
-										<span class="pill pill-warning" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO x{{ project.change_order_count }}</span>
-									{% endif %}
-									{% if project.current_draw and project.current_draw.step_label %}
-										<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
-									{% else %}
-										<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
-									{% endif %}
-									<span class="chevron">⌄</span>
-								</div>
-							</div>
-							<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
-							</div>
-							<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
-						</div>
 
-						<div class="proj-body">
-							{% for draw in project.timeline_draws %}
-								<div class="ph">
-									<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
-									<div style="flex:1">
-										<div style="font-weight:500">{{ draw.label }}</div>
-										{% if draw.paid_date %}
-											<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+	{# Cards view — branch-grouped collapsible sections (existing layout). #}
+	<div class="cards-view">
+		{% for group in builds_active_by_branch %}
+			<details class="project-group">
+				<summary class="project-group-summary">
+					<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
+					<span class="project-group-count">{{ group.count }}</span>
+				</summary>
+				<div class="project-group-body">
+					{% for project in group.projects %}
+						<div class="proj-card" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
+							<div class="proj-hdr">
+								<div class="proj-hdr-top">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }}</p>
+									</div>
+									<div style="display:flex;align-items:center;gap:8px">
+										{% if project.change_order_count %}
+											<span class="pill pill-warning" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO x{{ project.change_order_count }}</span>
+										{% endif %}
+										{% if project.current_draw and project.current_draw.step_label %}
+											<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
+										{% else %}
+											<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+										{% endif %}
+										<span class="chevron">⌄</span>
+									</div>
+								</div>
+								<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
+								</div>
+								<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
+							</div>
+
+							<div class="proj-body">
+								{% for draw in project.timeline_draws %}
+									<div class="ph">
+										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+										<div style="flex:1">
+											<div style="font-weight:500">{{ draw.label }}</div>
+											{% if draw.paid_date %}
+												<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+											{% endif %}
+										</div>
+										<div style="text-align:right;min-width:55px">
+											<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+											<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+										</div>
+									</div>
+								{% endfor %}
+
+								<div class="co-section">
+									<div class="co-section-hdr">
+										<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
+										{% if project.loan_closed %}
+											<button
+												type="button"
+												class="co-add-btn"
+												hx-get="{% url 'manager_change_order_modal' %}?job_id={{ project.id }}"
+												hx-target="#manager-modal-host"
+												hx-swap="innerHTML"
+											>+ New Change Order</button>
+										{% else %}
+											<button
+												type="button"
+												class="co-add-btn co-add-btn-locked"
+												disabled
+												title="Available after the sales rep closes the loan (1st Home Draw paid)"
+											>Locked</button>
 										{% endif %}
 									</div>
-									<div style="text-align:right;min-width:55px">
-										<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
-										<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
-									</div>
-								</div>
-							{% endfor %}
-
-							<div class="co-section">
-								<div class="co-section-hdr">
-									<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
-									{% if project.loan_closed %}
-										<button
-											type="button"
-											class="co-add-btn"
-											hx-get="{% url 'manager_change_order_modal' %}?job_id={{ project.id }}"
-											hx-target="#manager-modal-host"
-											hx-swap="innerHTML"
-										>+ New Change Order</button>
+									{% if project.change_orders %}
+										{% for co in project.change_orders %}
+											<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
+												<div class="co-row-num">CO #{{ co.number }}</div>
+												<div class="co-row-body">
+													<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
+													<div class="co-row-meta">
+														{% if co.created %}<span>{{ co.created }}</span>{% endif %}
+														{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
+														{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
+													</div>
+												</div>
+												<div class="co-row-amt">{{ co.amount_display }}</div>
+											</div>
+										{% endfor %}
+									{% elif project.loan_closed %}
+										<div class="co-empty">No change orders on this contract yet.</div>
 									{% else %}
-										<button
-											type="button"
-											class="co-add-btn co-add-btn-locked"
-											disabled
-											title="Available after the sales rep closes the loan (1st Home Draw paid)"
-										>Locked</button>
+										<div class="co-empty">Change orders unlock after the sales rep closes the loan.</div>
 									{% endif %}
 								</div>
-								{% if project.change_orders %}
-									{% for co in project.change_orders %}
-										<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
-											<div class="co-row-num">CO #{{ co.number }}</div>
-											<div class="co-row-body">
-												<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
-												<div class="co-row-meta">
-													{% if co.created %}<span>{{ co.created }}</span>{% endif %}
-													{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
-													{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
-												</div>
-											</div>
-											<div class="co-row-amt">{{ co.amount_display }}</div>
-										</div>
-									{% endfor %}
-								{% elif project.loan_closed %}
-									<div class="co-empty">No change orders on this contract yet.</div>
-								{% else %}
-									<div class="co-empty">Change orders unlock after the sales rep closes the loan.</div>
-								{% endif %}
 							</div>
 						</div>
-					</div>
+					{% endfor %}
+				</div>
+			</details>
+		{% endfor %}
+	</div>
+
+	<!-- Table view — flat sortable + expandable. Each project is a summary
+	   <tr> + paired hidden detail <tr> (full card content beneath). Same
+	   data-* attributes mirror the cards so the existing client-side
+	   filter (manager.js) works on either rendering. -->
+	<div class="table-view">
+		<table class="job-table job-table-expandable">
+			<thead>
+				<tr>
+					<th class="row-toggle-col" aria-hidden="true"></th>
+					<th>Build</th>
+					<th>Order #</th>
+					<th>Branch</th>
+					<th>Phase / Draw</th>
+					<th class="num">Contract</th>
+					<th class="num">Collected</th>
+					<th class="num">Progress</th>
+					<th class="num">Balance</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for project in builds_active %}
+					{# Summary row — clicking it toggles the detail row below #}
+					<tr class="job-table-row"
+					    data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+					    data-branch="{{ project.branch_label|default:'' }}"
+					    data-plan="{{ project.model_name|default:'' }}"
+					    data-phase="{{ project.phase_label|default:'' }}"
+					    data-year="{{ project.closed_at|date:'Y'|default:'' }}"
+					    data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}"
+					    data-order="{{ project.order_number|default:'' }}"
+					    tabindex="0"
+					    role="button"
+					    aria-expanded="false">
+						<td class="row-toggle-col"><span class="row-chevron" aria-hidden="true">▸</span></td>
+						<td>
+							<div style="font-weight:600;">{{ project.name }}</div>
+							<div class="muted" style="font-size:11px;">{{ project.subtitle }}</div>
+						</td>
+						<td class="muted">{% if project.order_number %}{{ project.order_number }}{% else %}—{% endif %}</td>
+						<td class="muted">{{ project.branch_label }}</td>
+						<td>
+							{% if project.current_draw and project.current_draw.step_label %}
+								<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
+							{% else %}
+								<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+							{% endif %}
+							{% if project.change_order_count %}
+								<span class="pill pill-warning" style="margin-left:4px;" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO x{{ project.change_order_count }}</span>
+							{% endif %}
+						</td>
+						<td class="num">{{ project.total_display }}</td>
+						<td class="num" style="color:var(--green);">{{ project.paid_display }}</td>
+						<td class="num">{{ project.pct }}%</td>
+						<td class="num" style="color:var(--green);">{{ project.remaining_display }}</td>
+					</tr>
+
+					{# Detail row — same content as the card view (draws + change orders). #}
+					<tr class="job-table-detail" hidden>
+						<td colspan="9">
+							<div class="job-detail-card">
+								<div class="proj-hdr-top" style="margin-bottom:10px;">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }}</p>
+									</div>
+									<div style="display:flex;align-items:center;gap:8px">
+										{% if project.current_draw and project.current_draw.step_label %}
+											<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
+										{% else %}
+											<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+										{% endif %}
+									</div>
+								</div>
+
+								<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
+								</div>
+								<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
+
+								{% for draw in project.timeline_draws %}
+									<div class="ph">
+										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+										<div style="flex:1">
+											<div style="font-weight:500">{{ draw.label }}</div>
+											{% if draw.paid_date %}
+												<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+											{% endif %}
+										</div>
+										<div style="text-align:right;min-width:55px">
+											<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+											<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+										</div>
+									</div>
+								{% endfor %}
+
+								<div class="co-section">
+									<div class="co-section-hdr">
+										<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
+										{% if project.loan_closed %}
+											<button
+												type="button"
+												class="co-add-btn"
+												hx-get="{% url 'manager_change_order_modal' %}?job_id={{ project.id }}"
+												hx-target="#manager-modal-host"
+												hx-swap="innerHTML"
+											>+ New Change Order</button>
+										{% else %}
+											<button
+												type="button"
+												class="co-add-btn co-add-btn-locked"
+												disabled
+												title="Available after the sales rep closes the loan (1st Home Draw paid)"
+											>Locked</button>
+										{% endif %}
+									</div>
+									{% if project.change_orders %}
+										{% for co in project.change_orders %}
+											<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
+												<div class="co-row-num">CO #{{ co.number }}</div>
+												<div class="co-row-body">
+													<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
+													<div class="co-row-meta">
+														{% if co.created %}<span>{{ co.created }}</span>{% endif %}
+														{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
+														{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
+													</div>
+												</div>
+												<div class="co-row-amt">{{ co.amount_display }}</div>
+											</div>
+										{% endfor %}
+									{% elif project.loan_closed %}
+										<div class="co-empty">No change orders on this contract yet.</div>
+									{% else %}
+										<div class="co-empty">Change orders unlock after the sales rep closes the loan.</div>
+									{% endif %}
+								</div>
+							</div>
+						</td>
+					</tr>
 				{% endfor %}
-			</div>
-		</details>
-	{% endfor %}
+			</tbody>
+		</table>
+	</div>
 {% else %}
 	<div class="banner banner-empty">No active builds.</div>
 {% endif %}

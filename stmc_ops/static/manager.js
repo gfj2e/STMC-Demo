@@ -39,6 +39,7 @@ function activateTab(button, tab, options) {
   if (target) target.style.display = '';
   if (button) button.classList.add('active');
   setManagerSearchVisibility(tab);
+  setManagerViewToggleVisibility((tab))
 
   if (shouldRefresh) {
     document.body.dispatchEvent(new CustomEvent('manager-' + tab + '-refresh'));
@@ -53,6 +54,16 @@ function setManagerSearchVisibility(tab) {
     'builds-closed': true,
   };
   searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
+}
+
+function setManagerViewToggleVisibility(tab) {
+  var toggle = document.querySelector('.job-view-toggle');
+  if (!toggle) return;
+  var visibleTabs = {
+    'builds-active': true,
+    'builds-closed': true
+  }
+  toggle.style.display = visibleTabs[tab] ? 'inline-flex' : 'none';
 }
 
 function bindTabs() {
@@ -221,6 +232,13 @@ function clearJobHit() {
 }
 
 function findManagerJobMatch(query) {
+  // Search whichever rendering is currently visible. In cards mode look
+  // at .proj-card; in table mode look at .job-table-row. Both carry the
+  // same data-job-search so the lookup is identical.
+  var inTableMode = document.body.classList.contains('view-mode-table');
+  var selector = inTableMode
+    ? '.table-view tr.job-table-row[data-job-search]'
+    : '.cards-view .proj-card[data-job-search]';
   var targets = [
     { tab: 'builds-active', panelId: 'tab-builds-active-panel' },
     { tab: 'builds-closed', panelId: 'tab-builds-closed-panel' },
@@ -231,24 +249,34 @@ function findManagerJobMatch(query) {
     var panel = document.getElementById(target.panelId);
     if (!panel) continue;
 
-    var cards = panel.querySelectorAll('.proj-card');
-    for (var j = 0; j < cards.length; j++) {
-      var card = cards[j];
-      var haystack = (card.getAttribute('data-job-search') || card.textContent || '').toLowerCase();
+    var nodes = panel.querySelectorAll(selector);
+    for (var j = 0; j < nodes.length; j++) {
+      var node = nodes[j];
+      var haystack = (node.getAttribute('data-job-search') || node.textContent || '').toLowerCase();
       if (haystack.indexOf(query) !== -1) {
-        return { target: target, card: card };
+        return { target: target, card: node };
       }
     }
   }
   return null;
 }
 
-function openManagerFoundCard(card) {
-  var details = card.closest('details');
+function openManagerFoundCard(node) {
+  // node may be either a .proj-card (cards view) or a .job-table-row
+  // (table view). Each has its own "expand" affordance.
+  if (node.classList.contains('job-table-row')) {
+    var detail = node._detailRow || node.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail') && detail.hasAttribute('hidden')) {
+      _toggleManagerTableRowDetail(node);
+    }
+    return;
+  }
+
+  var details = node.closest('details');
   if (details) details.open = true;
 
-  var body = card.querySelector('.proj-body');
-  var chevron = card.querySelector('.chevron');
+  var body = node.querySelector('.proj-body');
+  var chevron = node.querySelector('.chevron');
   if (body) body.classList.add('open');
   if (chevron) chevron.classList.add('open');
 }
@@ -304,15 +332,19 @@ function _managerFilterPanels() {
 }
 
 function _managerFilterCards() {
-  var cards = [];
+  // Returns ALL filterable elements: card view (.proj-card) AND table
+  // rows (.job-table-row). Both carry the same data-* attributes so the
+  // same filter logic works against either rendering. The view toggle
+  // just hides whichever view isn't active via body class.
+  var nodes = [];
   _managerFilterPanels().forEach(function (panelId) {
     var panel = document.getElementById(panelId);
     if (!panel) return;
-    panel.querySelectorAll('.proj-card[data-job-search]').forEach(function (card) {
-      cards.push(card);
+    panel.querySelectorAll('[data-job-search]').forEach(function (node) {
+      nodes.push(node);
     });
   });
-  return cards;
+  return nodes;
 }
 
 function _managerPopulateFilterSelect(selectId, values, emptyLabel) {
@@ -373,6 +405,110 @@ function _managerSortGroupCards(group, sortMode) {
   cards.forEach(function (card) { body.appendChild(card); });
 }
 
+function _managerSortTableRows(panel, sortMode) {
+  // Each project is TWO rows (summary + detail). Sort moves them as a
+  // pair so an expanded detail row stays beneath its own summary.
+  var tbody = panel.querySelector('.table-view tbody');
+  if (!tbody) return;
+  var rows = Array.from(tbody.querySelectorAll('tr.job-table-row'));
+  rows.sort(function (a, b) {
+    var av = _managerCardSortValue(a);
+    var bv = _managerCardSortValue(b);
+    return sortMode === 'oldest' ? av - bv : bv - av;
+  });
+  rows.forEach(function (row) {
+    tbody.appendChild(row);
+    if (row._detailRow) tbody.appendChild(row._detailRow);
+  });
+}
+
+function _bindManagerRowDetailRefs() {
+  // Stash each summary row's paired detail row so sort can move the pair
+  // together (since appendChild changes sibling relationships).
+  document.querySelectorAll('.table-view tr.job-table-row').forEach(function (row) {
+    var detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail')) {
+      row._detailRow = detail;
+    }
+  });
+}
+
+function _toggleManagerTableRowDetail(summary) {
+  var detail = summary._detailRow || summary.nextElementSibling;
+  if (!detail || !detail.classList.contains('job-table-detail')) return;
+  var willExpand = detail.hasAttribute('hidden');
+  if (willExpand) {
+    detail.removeAttribute('hidden');
+    detail.style.display = '';
+  } else {
+    detail.setAttribute('hidden', '');
+    detail.style.display = 'none';
+  }
+  summary.setAttribute('aria-expanded', String(willExpand));
+  summary.classList.toggle('is-expanded', willExpand);
+  var chev = summary.querySelector('.row-chevron');
+  if (chev) chev.textContent = willExpand ? '▾' : '▸';
+}
+
+function bindManagerTableRowToggle() {
+  // Delegate so newly-swapped panels work without re-binding. Click or
+  // keyboard (Enter/Space) on a summary row toggles its detail row.
+  // Clicks on actual interactive elements inside the row (a, button,
+  // <input>, etc.) are NOT treated as a row-toggle so links/buttons
+  // still work normally.
+  document.addEventListener('click', function (event) {
+    var summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    if (event.target.closest('a, button, input, select, label')) return;
+    _toggleManagerTableRowDetail(summary);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    var summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    event.preventDefault();
+    _toggleManagerTableRowDetail(summary);
+  });
+}
+
+// ── View toggle (Cards / Table) ──────────────────────────────────────
+// Persists across navigation via localStorage. CSS controls visibility
+// based on body class `view-mode-table`.
+var MANAGER_VIEW_KEY = 'stmc-manager-view-mode';
+
+function _applyManagerViewMode(mode) {
+  var isTable = mode === 'table';
+  document.body.classList.toggle('view-mode-table', isTable);
+  var cardsBtn = document.getElementById('job-view-cards');
+  var tableBtn = document.getElementById('job-view-table');
+  if (cardsBtn) {
+    cardsBtn.classList.toggle('active', !isTable);
+    cardsBtn.setAttribute('aria-pressed', String(!isTable));
+  }
+  if (tableBtn) {
+    tableBtn.classList.toggle('active', isTable);
+    tableBtn.setAttribute('aria-pressed', String(isTable));
+  }
+}
+
+function bindManagerViewToggle() {
+  var cardsBtn = document.getElementById('job-view-cards');
+  var tableBtn = document.getElementById('job-view-table');
+  if (!cardsBtn || !tableBtn) return;
+  var saved = null;
+  try { saved = localStorage.getItem(MANAGER_VIEW_KEY); } catch (e) { /* private mode */ }
+  _applyManagerViewMode(saved === 'table' ? 'table' : 'cards');
+
+  cardsBtn.addEventListener('click', function () {
+    _applyManagerViewMode('cards');
+    try { localStorage.setItem(MANAGER_VIEW_KEY, 'cards'); } catch (e) {}
+  });
+  tableBtn.addEventListener('click', function () {
+    _applyManagerViewMode('table');
+    try { localStorage.setItem(MANAGER_VIEW_KEY, 'table'); } catch (e) {}
+  });
+}
+
 function applyManagerFilters() {
   var branch = _managerNormalize(document.getElementById('job-filter-branch') && document.getElementById('job-filter-branch').value);
   var plan = _managerNormalize(document.getElementById('job-filter-plan') && document.getElementById('job-filter-plan').value);
@@ -404,6 +540,27 @@ function applyManagerFilters() {
       panelVisibleCount += visibleCount;
     });
 
+    // Mirror the same filter on the flat table view (if present). Each
+    // job has TWO <tr>s: the summary row and a paired detail row hidden
+    // by default. Hide both in lockstep when a filter excludes the job.
+    _managerSortTableRows(panel, sortMode);
+    panel.querySelectorAll('.table-view tr.job-table-row').forEach(function (row) {
+      var matches = true;
+      if (branch && _managerNormalize(row.dataset.branch) !== branch) matches = false;
+      if (plan && _managerNormalize(row.dataset.plan) !== plan) matches = false;
+      if (phase && _managerNormalize(row.dataset.phase) !== phase) matches = false;
+      if (year && _managerNormalize(row.dataset.year) !== year) matches = false;
+      row.style.display = matches ? '' : 'none';
+      var detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('job-table-detail')) {
+        if (!matches) {
+          detail.style.display = 'none';
+        } else {
+          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
+        }
+      }
+    });
+
     var sectionCount = panel.querySelector('.group-section-title .group-section-count');
     if (sectionCount) sectionCount.textContent = '(' + panelVisibleCount + ')';
   });
@@ -426,6 +583,7 @@ function bindManagerFilterRefreshOnSwap() {
     if (target.id !== 'tab-builds-active-panel' && target.id !== 'tab-builds-closed-panel') return;
     rebuildManagerFilterOptions();
     bindManagerFilters();
+    _bindManagerRowDetailRefs();
     applyManagerFilters();
   });
 }
@@ -441,10 +599,14 @@ function init() {
   bindJobSearch();
   bindManagerFilters();
   bindManagerFilterRefreshOnSwap();
+  bindManagerViewToggle();
+  bindManagerTableRowToggle();
+  _bindManagerRowDetailRefs();
   rebuildManagerFilterOptions();
   applyManagerFilters();
   initAuthHeader();
   setManagerSearchVisibility('builds-active');
+  setManagerViewToggleVisibility('builds-active');
 }
 
 init();

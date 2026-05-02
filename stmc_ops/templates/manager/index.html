@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
-<link rel="stylesheet" href="{% static 'manager.css' %}">
+<link rel="stylesheet" href="{% static 'manager.css' %}?v=2">
 </head>
 <body>
 
@@ -85,6 +85,11 @@
       </select>
     </div>
   </div>
+  
+  <div class="job-view-toggle" role="group" aria-label="View mode">
+    <button id="job-view-cards" type="button" class="job-view-btn active" aria-pressed="true">Cards</button>
+    <button id="job-view-table" type="button" class="job-view-btn" aria-pressed="false">Table</button>
+  </div>
 
   <!-- Active Builds -->
   <div id="tab-builds-active" class="tab-panel">
@@ -147,6 +152,6 @@
   };
 </script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="{% static 'manager.js' %}"></script>
+<script src="{% static 'manager.js' %}?v=2"></script>
 </body>
 </html>

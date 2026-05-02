@@ -1,46 +1,127 @@
 {% if builds_closed %}
 	<div class="group-section-title">Closed Builds <span class="group-section-count">({{ builds_closed|length }})</span></div>
-	{% for group in builds_closed_by_month %}
-		<details class="project-group">
-			<summary class="project-group-summary">
-				<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
-				<span class="project-group-count">{{ group.count }}</span>
-			</summary>
-			<div class="project-group-body">
-				{% for project in group.projects %}
-					<div class="proj-card proj-card-closed" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
-						<div class="proj-hdr">
-							<div class="proj-hdr-top">
-								<div>
-									<p class="proj-name">{{ project.name }}</p>
-									<p class="proj-sub">{{ project.subtitle }}</p>
+
+	{# Cards view — month-grouped collapsible sections (existing layout). #}
+	<div class="cards-view">
+		{% for group in builds_closed_by_month %}
+			<details class="project-group">
+				<summary class="project-group-summary">
+					<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
+					<span class="project-group-count">{{ group.count }}</span>
+				</summary>
+				<div class="project-group-body">
+					{% for project in group.projects %}
+						<div class="proj-card proj-card-closed" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
+							<div class="proj-hdr">
+								<div class="proj-hdr-top">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }}</p>
+									</div>
+									<div style="display:flex;align-items:center;gap:8px">
+										<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+										<span class="chevron">⌄</span>
+									</div>
 								</div>
-								<div style="display:flex;align-items:center;gap:8px">
+								<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
+								</div>
+							</div>
+							<div class="proj-body">
+								{% for draw in project.timeline_draws %}
+									<div class="ph">
+										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+										<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+										<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+									</div>
+								{% endfor %}
+							</div>
+						</div>
+					{% endfor %}
+				</div>
+			</details>
+		{% endfor %}
+	</div>
+
+	{# Table view — flat sortable + expandable. #}
+	<div class="table-view">
+		<table class="job-table job-table-expandable">
+			<thead>
+				<tr>
+					<th class="row-toggle-col" aria-hidden="true"></th>
+					<th>Build</th>
+					<th>Order #</th>
+					<th>Branch</th>
+					<th>Phase</th>
+					<th class="num">Contract</th>
+					<th class="num">Collected</th>
+					<th class="num">Progress</th>
+					<th class="num">Balance</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for project in builds_closed %}
+					<tr class="job-table-row"
+					    data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+					    data-branch="{{ project.branch_label|default:'' }}"
+					    data-plan="{{ project.model_name|default:'' }}"
+					    data-phase="{{ project.phase_label|default:'' }}"
+					    data-year="{{ project.closed_at|date:'Y'|default:'' }}"
+					    data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}"
+					    data-order="{{ project.order_number|default:'' }}"
+					    tabindex="0"
+					    role="button"
+					    aria-expanded="false">
+						<td class="row-toggle-col"><span class="row-chevron" aria-hidden="true">▸</span></td>
+						<td>
+							<div style="font-weight:600;">{{ project.name }}</div>
+							<div class="muted" style="font-size:11px;">{{ project.subtitle }}</div>
+						</td>
+						<td class="muted">{% if project.order_number %}{{ project.order_number }}{% else %}—{% endif %}</td>
+						<td class="muted">{{ project.branch_label }}</td>
+						<td><span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span></td>
+						<td class="num">{{ project.total_display }}</td>
+						<td class="num" style="color:var(--green);">{{ project.paid_display }}</td>
+						<td class="num">{{ project.pct }}%</td>
+						<td class="num" style="color:var(--green);">{{ project.remaining_display }}</td>
+					</tr>
+
+					<tr class="job-table-detail" hidden>
+						<td colspan="9">
+							<div class="job-detail-card">
+								<div class="proj-hdr-top" style="margin-bottom:10px;">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }}</p>
+									</div>
 									<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
-									<span class="chevron">⌄</span>
 								</div>
-							</div>
-							<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
-								<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
-							</div>
-						</div>
-						<div class="proj-body">
-							{% for draw in project.timeline_draws %}
-								<div class="ph">
-									<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
-									<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
-									<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+
+								<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--g200)">
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Contract</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.total_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Collected</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.paid_display }}</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Progress</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px">{{ project.pct }}%</div></div>
+									<div><div style="font-size:9px;color:var(--g400);text-transform:uppercase">Balance</div><div style="font-family:var(--font-mono);font-size:12px;font-weight:500;margin-top:1px;color:var(--green)">{{ project.remaining_display }}</div></div>
 								</div>
-							{% endfor %}
-						</div>
-					</div>
+								<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
+
+								{% for draw in project.timeline_draws %}
+									<div class="ph">
+										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+										<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+										<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+									</div>
+								{% endfor %}
+							</div>
+						</td>
+					</tr>
 				{% endfor %}
-			</div>
-		</details>
-	{% endfor %}
+			</tbody>
+		</table>
+	</div>
 {% else %}
 	<div class="banner banner-empty">No closed builds.</div>
 {% endif %}
