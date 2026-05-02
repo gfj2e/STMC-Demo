@@ -111,17 +111,6 @@
     </div>
   </div>
 
-  <!-- Rate Card -->
-  <div id="tab-rates" class="tab-panel" style="display:none">
-    <div
-      id="tab-rates-panel"
-      hx-get="{% url 'sales_rates_panel' %}"
-      hx-trigger="load, sales-rates-refresh from:body, sales-refresh from:body"
-      hx-swap="innerHTML"
-    >
-      <div class="banner banner-empty">Loading rate card...</div>
-    </div>
-  </div>
 
 </div>
 

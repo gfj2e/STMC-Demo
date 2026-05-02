@@ -514,7 +514,7 @@ def _build_simple_rate_card():
             "u": rc.unit if rc else "/SF",
         })
 
-    return {"exterior": [], "interior": interior}
+    return {"interior": interior}
 
 
 def _build_app_seed_data():
@@ -1013,6 +1013,20 @@ def _build_owner_ui_context():
         "qb_sync_error": qb_sync_error,
         "budget_total": _format_money(budget_total),
     }
+    
+    rate_card = _build_simple_rate_card()
+    interior_rates = []
+    for rate in rate_card.get("interior", []):
+        interior_rates.append(
+            {
+                "group": rate.get("g", ""),
+                "label": rate.get("l", ""),
+                "rate_display": "--"
+                if not rate.get("r")
+                else f"${float(rate.get('r', 0)):,.2f}",
+                "unit": rate.get("u", "--"),
+            }
+        )
 
     return {
         "kpis": kpis,
@@ -1030,6 +1044,7 @@ def _build_owner_ui_context():
         "all_projects_closed_by_month": closed_projects_by_month,
         "active_projects": active_projects,
         "closed_projects": closed_projects,
+        "interior_rates" : interior_rates
     }
 
 
@@ -1107,15 +1122,11 @@ def _contract_total_for_job(job):
 def _build_sales_value_breakdown(job, p10_amount):
     """Shared contract-value block used on both In Progress and Closed rows."""
     contract_total = _contract_total_for_job(job)
-    commission_amount = int(round(p10_amount * SALES_COMMISSION_RATE))
     p10_pct = round((p10_amount / contract_total) * 100, 1) if contract_total > 0 else 0.0
     return {
         "contract_total_amount": contract_total,
         "contract_total_display": _format_money(contract_total) if contract_total else "--",
         "p10_pct_display": f"{p10_pct:.1f}%" if contract_total > 0 else "--",
-        "commission_amount": commission_amount,
-        "commission_display": _format_money(commission_amount),
-        "commission_rate_display": f"{int(SALES_COMMISSION_RATE * 100)}% of P10",
     }
 
 
@@ -1324,19 +1335,6 @@ def _build_sales_ui_context(request=None):
     )
 
     rate_card = _build_simple_rate_card()
-    exterior_rates = []
-    for rate in rate_card.get("exterior", []):
-        exterior_rates.append(
-            {
-                "group": rate.get("g", ""),
-                "label": rate.get("l", ""),
-                "rate_display": "--"
-                if not rate.get("r")
-                else f"${float(rate.get('r', 0)):,.2f}",
-                "unit": rate.get("u", "--"),
-            }
-        )
-
     interior_rates = []
     for rate in rate_card.get("interior", []):
         interior_rates.append(
@@ -1371,7 +1369,6 @@ def _build_sales_ui_context(request=None):
         "in_progress_count": len(in_progress_rows),
         "closed_count": len(closed_rows),
         "leads_count": len(lead_rows),
-        "exterior_rates": exterior_rates,
         "interior_rates": interior_rates,
     }
 
@@ -2087,6 +2084,7 @@ def owner_view(request):
     # session, return 401 + HX-Redirect=login, and yank the user to the
     # login page seemingly out of nowhere.
     context = _build_owner_ui_context()
+    rate_card = _build_simple_rate_card()
     # Unified QB card context — same shape as qb_status_view / qb_sync_refresh_view
     # so the {% include "owner/_qb_status.html" %} in owner/index.html hydrates
     # identically on first load and on every HTMX refresh.
@@ -2097,6 +2095,7 @@ def owner_view(request):
         {
             "kpis": context["kpis"],
             "owner_total": context["owner_total"],
+            "interior_rates": context["interior_rates"],
             **qb_ctx,
         },
     )
@@ -2169,16 +2168,15 @@ def sales_header_panel_view(request):
     )
 
 
-@role_required(AppUser.ROLE_SALES)
+@role_required(AppUser.ROLE_EXEC)
 def sales_rates_panel_view(request):
     if not request.htmx:
         return redirect("sales_overview")
     context = _build_sales_ui_context(request)
     return render(
         request,
-        "sales/overview/rates.html",
+        "owner/rates.html",
         {
-            "exterior_rates": context["exterior_rates"],
             "interior_rates": context["interior_rates"],
         },
     )

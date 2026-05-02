@@ -5,7 +5,6 @@
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_new_lead' or request.resolver_match.url_name == 'sales_edit_lead' %}active{% endif %}" data-mv-tab="leads" href="{% url 'sales_overview' %}?tab=leads">Leads</a>
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_overview' %}active{% endif %}" data-mv-tab="in-progress" href="{% url 'sales_overview' %}">In Progress</a>
     <a class="app-nav-link" data-mv-tab="closed" href="{% url 'sales_overview' %}?tab=closed">Closed</a>
-    <a class="app-nav-link" data-mv-tab="rates" href="{% url 'sales_overview' %}?tab=rates">Rate Card</a>
   </div>
   <div class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
     <span class="nav-user-name" id="hN" style="font-size:11px;color:#4b5563"></span>

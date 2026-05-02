@@ -22,6 +22,7 @@ function switchTab(btn, tab, options) {
   if (target) target.style.display = '';
   if (btn) btn.classList.add('active');
   setOwnerSearchVisibility(tab);
+  placeOwnerViewToggle(tab);
 
   if (shouldRefresh) {
     document.body.dispatchEvent(new CustomEvent('owner-' + tab + '-refresh'));
@@ -30,11 +31,48 @@ function switchTab(btn, tab, options) {
 
 function setOwnerSearchVisibility(tab) {
   const searchWrap = document.getElementById('job-search-wrap');
-  if (!searchWrap) return;
-  const visibleTabs = {
-    'projects-closed': true,
-  };
-  searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
+  if (searchWrap) {
+    const searchTabs = { 'projects-closed': true };
+    searchWrap.style.display = searchTabs[tab] ? 'flex' : 'none';
+  }
+  const toggle = document.querySelector('.job-view-toggle');
+  if (toggle) {
+    const toggleTabs = { 'dashboard': true, 'projects-closed': true };
+    toggle.style.display = toggleTabs[tab] ? 'inline-flex' : 'none';
+  }
+}
+
+function _ownerActiveTab() {
+  const active = document.querySelector('.app-nav-link.active[data-tab]');
+  return active ? active.dataset.tab : 'dashboard';
+}
+
+function parkOwnerViewToggle() {
+  const toggle = document.querySelector('.job-view-toggle');
+  const home = document.getElementById('owner-view-toggle-home');
+  if (!toggle || !home) return;
+  if (toggle.parentNode !== home) {
+    home.appendChild(toggle);
+  }
+}
+
+function placeOwnerViewToggle(tab) {
+  const toggle = document.querySelector('.job-view-toggle');
+  if (!toggle) return;
+
+  const activeTab = tab || _ownerActiveTab();
+  const anchorId = activeTab === 'projects-closed'
+    ? 'owner-closed-view-toggle-anchor'
+    : 'owner-dashboard-view-toggle-anchor';
+  const anchor = document.getElementById(anchorId);
+  if (!anchor || !anchor.parentNode) {
+    parkOwnerViewToggle();
+    return;
+  }
+
+  // Keep a single toggle instance in the DOM and move it right under
+  // the current panel's anchor (above the section header).
+  anchor.insertAdjacentElement('afterend', toggle);
 }
 
 function bindTabNavigation() {
@@ -138,11 +176,20 @@ function initExecDashboard() {
 function bindHtmxFeedback() {
   if (!window.htmx) return;
 
+  document.body.addEventListener('htmx:beforeSwap', event => {
+    const target = event.detail && event.detail.target;
+    if (!target) return;
+    if (target.id === 'tab-dashboard-panel' || target.id === 'tab-projects-closed-panel') {
+      parkOwnerViewToggle();
+    }
+  });
+
   document.body.addEventListener('htmx:afterSwap', event => {
     const target = event.detail && event.detail.target;
     if (!target) return;
     if (target.id === 'tab-dashboard-panel') {
       initExecDashboard();
+      placeOwnerViewToggle('dashboard');
     }
     // When the bell button reloads (30s poll OR explicit refresh), compare
     // the unread count to the previous tick. A bump = a new invoice landed
@@ -243,6 +290,13 @@ function clearJobHit() {
 }
 
 function findOwnerJobMatch(query) {
+  // Search whichever rendering is currently visible. In cards mode look
+  // at .card; in table mode look at .job-table-row. Both carry the same
+  // data-job-search so the lookup is identical.
+  const inTableMode = document.body.classList.contains('view-mode-table');
+  const selector = inTableMode
+    ? '.table-view tr.job-table-row[data-job-search]'
+    : '.cards-view .card[data-job-search]';
   const targets = [
     { tab: 'projects-closed', panelId: 'tab-projects-closed-panel' },
   ];
@@ -250,8 +304,8 @@ function findOwnerJobMatch(query) {
   for (const target of targets) {
     const panel = document.getElementById(target.panelId);
     if (!panel) continue;
-    const cards = panel.querySelectorAll('.card');
-    for (const card of cards) {
+    const nodes = panel.querySelectorAll(selector);
+    for (const card of nodes) {
       const haystack = (card.getAttribute('data-job-search') || card.textContent || '').toLowerCase();
       if (haystack.includes(query)) {
         return { target, card };
@@ -281,8 +335,15 @@ function runOwnerJobSearch() {
   const button = document.querySelector('.app-nav-link[data-tab="' + match.target.tab + '"]');
   switchTab(button, match.target.tab, { refresh: false });
 
-  const details = match.card.closest('details');
-  if (details) details.open = true;
+  if (match.card.classList.contains('job-table-row')) {
+    const detail = match.card._detailRow || match.card.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail') && detail.hasAttribute('hidden')) {
+      _toggleOwnerTableRowDetail(match.card);
+    }
+  } else {
+    const details = match.card.closest('details');
+    if (details) details.open = true;
+  }
 
   match.card.classList.add('job-search-hit');
   match.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -384,6 +445,23 @@ function _ownerSortGroupCards(group, sortMode) {
   cards.forEach(card => body.appendChild(card));
 }
 
+function _ownerSortTableRows(panel, sortMode) {
+  // Each project is TWO rows (summary + detail). Sort moves them as a
+  // pair so an expanded detail row stays beneath its own summary.
+  const tbody = panel.querySelector('.table-view tbody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr.job-table-row'));
+  rows.sort((a, b) => {
+    const av = _ownerCardSortValue(a);
+    const bv = _ownerCardSortValue(b);
+    return sortMode === 'oldest' ? av - bv : bv - av;
+  });
+  rows.forEach(row => {
+    tbody.appendChild(row);
+    if (row._detailRow) tbody.appendChild(row._detailRow);
+  });
+}
+
 function applyOwnerFilters() {
   const branch = _ownerNormalize(document.getElementById('job-filter-branch') && document.getElementById('job-filter-branch').value);
   const plan = _ownerNormalize(document.getElementById('job-filter-plan') && document.getElementById('job-filter-plan').value);
@@ -415,8 +493,118 @@ function applyOwnerFilters() {
       panelVisibleCount += visibleCount;
     });
 
+    // Mirror the same filter on the flat table view. Each job has TWO
+    // <tr>s (summary + paired detail hidden by default). Hide both
+    // together when a filter excludes the job.
+    _ownerSortTableRows(panel, sortMode);
+    panel.querySelectorAll('.table-view tr.job-table-row').forEach(row => {
+      let matches = true;
+      if (branch && _ownerNormalize(row.dataset.branch) !== branch) matches = false;
+      if (plan && _ownerNormalize(row.dataset.plan) !== plan) matches = false;
+      if (phase && _ownerNormalize(row.dataset.phase) !== phase) matches = false;
+      if (year && _ownerNormalize(row.dataset.year) !== year) matches = false;
+      row.style.display = matches ? '' : 'none';
+      const detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('job-table-detail')) {
+        if (!matches) {
+          detail.style.display = 'none';
+        } else {
+          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
+        }
+      }
+    });
+
     const sectionCount = panel.querySelector('.group-section-title .group-section-count');
     if (sectionCount) sectionCount.textContent = '(' + panelVisibleCount + ')';
+  });
+}
+
+// ── Table-row expand / collapse (delegated) ─────────────────────────
+function _bindOwnerRowDetailRefs() {
+  document.querySelectorAll('.table-view tr.job-table-row').forEach(row => {
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail')) {
+      row._detailRow = detail;
+    }
+  });
+}
+
+function _toggleOwnerTableRowDetail(summary) {
+  const detail = summary._detailRow || summary.nextElementSibling;
+  if (!detail || !detail.classList.contains('job-table-detail')) return;
+  const willExpand = detail.hasAttribute('hidden');
+  if (willExpand) {
+    detail.removeAttribute('hidden');
+    detail.style.display = '';
+  } else {
+    detail.setAttribute('hidden', '');
+    detail.style.display = 'none';
+  }
+  summary.setAttribute('aria-expanded', String(willExpand));
+  summary.classList.toggle('is-expanded', willExpand);
+  const chev = summary.querySelector('.row-chevron');
+  if (chev) chev.textContent = willExpand ? '▾' : '▸';
+
+  // The expanded detail card may contain widths driven by data-width-pct
+  // (budget bars). Apply now that the row is visible.
+  if (willExpand && typeof applyExecDataWidths === 'function') {
+    applyExecDataWidths(detail);
+  }
+}
+
+function bindOwnerTableRowToggle() {
+  document.addEventListener('click', event => {
+    const summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    if (event.target.closest('a, button, input, select, label, .exec-tab')) return;
+    _toggleOwnerTableRowDetail(summary);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    event.preventDefault();
+    _toggleOwnerTableRowDetail(summary);
+  });
+}
+
+// ── View toggle (Table / Cards) ─────────────────────────────────────
+// Persists across navigation via localStorage. CSS controls visibility
+// based on body class `view-mode-table`. Default for the owner role is
+// table mode (matches the rest of the suite's expected behavior).
+const OWNER_VIEW_KEY = 'stmc-owner-view-mode';
+
+function _applyOwnerViewMode(mode) {
+  const isTable = mode === 'table';
+  document.body.classList.toggle('view-mode-table', isTable);
+  const cardsBtn = document.getElementById('job-view-cards');
+  const tableBtn = document.getElementById('job-view-table');
+  if (cardsBtn) {
+    cardsBtn.classList.toggle('active', !isTable);
+    cardsBtn.setAttribute('aria-pressed', String(!isTable));
+  }
+  if (tableBtn) {
+    tableBtn.classList.toggle('active', isTable);
+    tableBtn.setAttribute('aria-pressed', String(isTable));
+  }
+}
+
+function bindOwnerViewToggle() {
+  const cardsBtn = document.getElementById('job-view-cards');
+  const tableBtn = document.getElementById('job-view-table');
+  if (!cardsBtn || !tableBtn) return;
+
+  // Owner default: always land on table mode when opening the page.
+  _applyOwnerViewMode('table');
+  try { localStorage.setItem(OWNER_VIEW_KEY, 'table'); } catch (e) { /* private mode */ }
+
+  cardsBtn.addEventListener('click', () => {
+    _applyOwnerViewMode('cards');
+    try { localStorage.setItem(OWNER_VIEW_KEY, 'cards'); } catch (e) {}
+  });
+  tableBtn.addEventListener('click', () => {
+    _applyOwnerViewMode('table');
+    try { localStorage.setItem(OWNER_VIEW_KEY, 'table'); } catch (e) {}
   });
 }
 
@@ -434,10 +622,22 @@ function bindOwnerFilterRefreshOnSwap() {
   document.body.addEventListener('htmx:afterSwap', event => {
     const target = event.detail && event.detail.target;
     if (!target) return;
-    if (target.id !== 'tab-projects-closed-panel') return;
-    rebuildOwnerFilterOptions();
-    bindOwnerFilters();
-    applyOwnerFilters();
+    if (target.id === 'tab-projects-closed-panel') {
+      rebuildOwnerFilterOptions();
+      bindOwnerFilters();
+      // Cache summary→detail refs BEFORE applyOwnerFilters runs, because
+      // its internal _ownerSortTableRows uses row._detailRow to keep each
+      // detail row paired with its summary during reorder. Without this,
+      // sort moves only summary rows and the pairing breaks — clicking
+      // a row then expands the wrong sibling.
+      _bindOwnerRowDetailRefs();
+      applyOwnerFilters();
+      placeOwnerViewToggle('projects-closed');
+    }
+    if (target.id === 'tab-dashboard-panel') {
+      _bindOwnerRowDetailRefs();
+      placeOwnerViewToggle('dashboard');
+    }
   });
 }
 
@@ -459,11 +659,14 @@ function init() {
   bindJobSearch();
   bindOwnerFilters();
   bindOwnerFilterRefreshOnSwap();
+  bindOwnerTableRowToggle();
+  bindOwnerViewToggle();
   rebuildOwnerFilterOptions();
   applyOwnerFilters();
   initAuthHeader();
   initExecDashboard();
   setOwnerSearchVisibility('dashboard');
+  placeOwnerViewToggle('dashboard');
 }
 
 init();

@@ -18,8 +18,7 @@ function updateHeaderTitle(tab) {
   var titles = {
     leads: 'Leads',
     'in-progress': 'In Progress',
-    closed: 'Closed',
-    rates: 'Rate Card'
+    closed: 'Closed'
   };
   var titleEl = document.querySelector('.header-title');
   // Don't overwrite the P10 header — leave the default Django-rendered label alone.
@@ -43,8 +42,7 @@ function activateTab(tab) {
   var navMap = {
     leads: 'leads',
     'in-progress': 'in-progress',
-    closed: 'closed',
-    rates: 'rates'
+    closed: 'closed'
   };
   var navLink = document.querySelector('.app-nav-link[data-mv-tab="' + navMap[tab] + '"]');
   if (navLink) navLink.classList.add('active');
@@ -71,8 +69,7 @@ function bindTabs() {
   var tabByNav = {
     leads: 'leads',
     'in-progress': 'in-progress',
-    closed: 'closed',
-    rates: 'rates'
+    closed: 'closed'
   };
 
   document.querySelectorAll('.app-nav-link[data-mv-tab]').forEach(function (link) {
