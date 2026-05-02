@@ -588,8 +588,30 @@ function bindManagerFilterRefreshOnSwap() {
   });
 }
 
+function activateExecTab(jobId, tabName) {
+  var tabs = document.querySelectorAll('.exec-tab[data-job-id="' + jobId + '"]');
+  var panels = document.querySelectorAll('.exec-tab-panel[data-job-id="' + jobId + '"]');
+  tabs.forEach(function (tab) {
+    tab.classList.toggle('is-active', tab.dataset.jobTab === tabName);
+  });
+  panels.forEach(function (panel) {
+    panel.hidden = panel.dataset.jobPanel !== tabName;
+  });
+}
+
+function bindExecTabs() {
+  if (bindExecTabs._bound) return;
+  bindExecTabs._bound = true;
+  document.addEventListener('click', function (event) {
+    var tab = event.target.closest('.exec-tab');
+    if (!tab) return;
+    activateExecTab(tab.dataset.jobId, tab.dataset.jobTab);
+  });
+}
+
 function init() {
   bindTabs();
+  bindExecTabs();
   bindLogout();
   bindProjectToggles();
   bindHtmxFeedback();

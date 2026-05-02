@@ -767,6 +767,18 @@ class JobTradeBudget(models.Model):
         max_length=32, blank=True, default="",
         help_text="QB Bill.Id of the payment that locked this row (audit trail)."
     )
+    qb_bill_doc_number = models.CharField(
+        max_length=50, blank=True, default="",
+        help_text="Human-readable DocNumber from the matching QB Bill (the real invoice number a person reads in QuickBooks)."
+    )
+    qb_bill_vendor = models.CharField(
+        max_length=120, blank=True, default="",
+        help_text="VendorRef.name from the matching QB Bill."
+    )
+    qb_bill_txn_date = models.DateField(
+        null=True, blank=True,
+        help_text="TxnDate of the matching QB Bill."
+    )
     paid_at = models.DateTimeField(
         null=True, blank=True,
         help_text="Timestamp the puller observed Balance == 0 on the matching Bill."

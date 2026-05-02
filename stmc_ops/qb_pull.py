@@ -23,7 +23,7 @@ Design principles
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -161,7 +161,21 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
             tb.is_complete = True
             tb.qb_bill_id = str(bill.Id)
             tb.paid_at = timezone.now()
-            tb.save(update_fields=["actual", "is_complete", "qb_bill_id", "paid_at"])
+            # Capture human-readable bill metadata for the owner Bills tab.
+            # DocNumber is the user-facing invoice number on the QB Bill;
+            # VendorRef.name + TxnDate round out the row.
+            tb.qb_bill_doc_number = str(getattr(bill, "DocNumber", "") or "")
+            vendor_ref = getattr(bill, "VendorRef", None)
+            tb.qb_bill_vendor = (getattr(vendor_ref, "name", "") or "") if vendor_ref else ""
+            txn_date = getattr(bill, "TxnDate", None)
+            try:
+                tb.qb_bill_txn_date = datetime.strptime(txn_date, "%Y-%m-%d").date() if txn_date else None
+            except (TypeError, ValueError):
+                tb.qb_bill_txn_date = None
+            tb.save(update_fields=[
+                "actual", "is_complete", "qb_bill_id", "paid_at",
+                "qb_bill_doc_number", "qb_bill_vendor", "qb_bill_txn_date",
+            ])
             counts["matched"] += 1
 
     return counts

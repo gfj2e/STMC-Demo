@@ -1,0 +1,30 @@
+<div class="budget-bar-track" style="margin-top:4px">
+	<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin:6px 0 12px">
+	<span>{{ project.paid_display }} collected</span>
+	<span>{{ project.remaining_display }} remaining</span>
+</div>
+
+{% for trade in project.trades %}
+	<div class="rw">
+		<span class="rl">{{ trade.trade }}</span>
+		{% if trade.is_paid %}
+			<span class="rd" style="color:var(--g500)">Paid {{ trade.actual_display }}</span>
+			<span class="rv" style="display:inline-flex;align-items:center;gap:4px;background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">&#10003; Paid</span>
+		{% else %}
+			<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }} / {{ trade.budget_display }}</span>
+			<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+		{% endif %}
+	</div>
+{% empty %}
+	<div class="co-empty">No trade budgets recorded for this contract yet.</div>
+{% endfor %}
+
+{% if project.trades %}
+	<div class="rw rt">
+		<span class="rl">Total</span>
+		<span class="rd">{{ project.total_ac_display }} / {{ project.total_bg_display }}</span>
+		<span class="rv" style="color:{% if project.total_rem_negative %}#DC2626{% else %}var(--green){% endif %}">{{ project.total_rem_display }}</span>
+	</div>
+{% endif %}

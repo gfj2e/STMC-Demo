@@ -46,10 +46,6 @@
                     <div class="metric-label">P10 % of Contract</div>
                     <div class="metric-value metric-value-muted">{{ project.p10_pct_display }}</div>
                   </div>
-                  <div title="Estimated at {{ project.commission_rate_display }}">
-                    <div class="metric-label">Est. Commission</div>
-                    <div class="metric-value metric-value-brand">{{ project.commission_display }}</div>
-                  </div>
                 </div>
 
                 <!-- Status pills -->
@@ -124,7 +120,6 @@
           <th>Status</th>
           <th class="num">Contract</th>
           <th class="num">P10</th>
-          <th class="num">Commission</th>
         </tr>
       </thead>
       <tbody>
@@ -160,7 +155,6 @@
             </td>
             <td class="num">{{ project.contract_total_display }}</td>
             <td class="num" style="color:var(--green);">{{ project.p10_display }}</td>
-            <td class="num" title="{{ project.commission_rate_display }}">{{ project.commission_display }}</td>
           </tr>
 
           {# Detail row — same content as the card view, hidden until expanded #}
@@ -189,10 +183,6 @@
                   <div>
                     <div class="metric-label">P10 % of Contract</div>
                     <div class="metric-value metric-value-muted">{{ project.p10_pct_display }}</div>
-                  </div>
-                  <div title="Estimated at {{ project.commission_rate_display }}">
-                    <div class="metric-label">Est. Commission</div>
-                    <div class="metric-value metric-value-brand">{{ project.commission_display }}</div>
                   </div>
                 </div>
 

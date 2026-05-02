@@ -738,40 +738,54 @@ def _build_project_ui_rows(projects):
                 }
             )
 
+        # Bills tab data. Paid rows pull their identity from the matching
+        # QB Bill (cached on JobTradeBudget by qb_pull.refresh_actuals_for_job).
+        # Unpaid trades render as a "pending" placeholder with no invoice number,
+        # so the column never shows a fabricated identifier.
         bills = []
-        bill_seq = 1
+        project_id = project.get("id")
+        if project_id:
+            tb_by_trade = {
+                tb.trade_name: tb
+                for tb in JobTradeBudget.objects.filter(job_id=project_id)
+            }
+        else:
+            tb_by_trade = {}
         for trade in trade_rows:
             trade_name = trade["trade"]
             budget = trade["budget_amount"]
             actual = trade["actual_amount"]
             remaining_budget = max(0, budget - actual)
-            invoice_id = f"INV-{timezone.now().year}-{project.get('id', 0):04d}-{bill_seq:03d}"
+            tb = tb_by_trade.get(trade_name)
 
-            if actual > 0:
+            if tb is not None and tb.is_complete and tb.qb_bill_id:
+                # Paid in QB — show real invoice metadata.
+                invoice_id = tb.qb_bill_doc_number or f"#{tb.qb_bill_id}"
+                vendor = tb.qb_bill_vendor or f"{trade_name} Vendor"
+                date_text = tb.qb_bill_txn_date.strftime("%b %d, %Y") if tb.qb_bill_txn_date else ""
                 actual_status = "review" if actual > budget else "paid"
                 bills.append(
                     {
                         "invoice_id": invoice_id,
-                        "vendor": f"{trade_name} Vendor",
+                        "vendor": vendor,
                         "description": f"{trade_name} actual cost entry",
                         "cost_code": trade["cost_code"],
                         "qb_account": trade_name,
                         "amount": actual,
                         "amount_display": _format_money(actual),
-                        "date": current_draw.get("t") if current_draw and current_draw.get("t") else "",
+                        "date": date_text,
                         "branch": branch_label,
                         "branch_class": _branch_badge_class(branch_label),
                         "status": actual_status,
                         "status_label": _bill_status_label(actual_status),
                     }
                 )
-                bill_seq += 1
-
-            if remaining_budget > 0:
+            elif remaining_budget > 0:
+                # No paid QB bill yet — placeholder row, no fabricated invoice #.
                 bills.append(
                     {
-                        "invoice_id": f"INV-{timezone.now().year}-{project.get('id', 0):04d}-{bill_seq:03d}",
-                        "vendor": f"{trade_name} Vendor",
+                        "invoice_id": "—",
+                        "vendor": "",
                         "description": f"{trade_name} budgeted remaining",
                         "cost_code": trade["cost_code"],
                         "qb_account": trade_name,
@@ -784,7 +798,6 @@ def _build_project_ui_rows(projects):
                         "status_label": _bill_status_label("pending"),
                     }
                 )
-                bill_seq += 1
 
         bills_total = sum(row["amount"] for row in bills)
         bills_paid = sum(row["amount"] for row in bills if row["status"] == "paid")
@@ -1044,8 +1057,6 @@ def _build_manager_ui_context():
         "builds_closed": closed_projects,
         "builds_active_by_branch": active_projects_by_branch,
         "builds_closed_by_month": closed_projects_by_month,
-        "budgets_active": active_projects,
-        "budgets_closed": closed_projects,
         "draws_active": active_projects,
         "draws_closed": closed_projects,
     }
@@ -1710,16 +1721,25 @@ def manager_builds_closed_panel_view(request):
 
 
 @role_required(AppUser.ROLE_PM)
-def manager_budgets_panel_view(request):
-    if not request.htmx:
+def manager_budget_print_view(request, job_id):
+    """Generate the PM Budget PDF for an in-progress job.
+
+    Rather than reimplementing the multi-page PDF layout the wizard
+    already produces (Step 9 — "PM Budget PDF"), this view loads the
+    wizard's JS+CSS in a stripped-down host page, rehydrates STATE from
+    the job's saved ``wizard_state``, and invokes the wizard's existing
+    ``printPMBudgetPDF()`` function so the PM gets the exact same PDF
+    a sales rep would print from the wizard's final step.
+    """
+    job = Job.objects.filter(pk=job_id).first()
+    if job is None or not job.wizard_state:
         return redirect("manager")
-    context = _build_manager_ui_context()
     return render(
         request,
-        "manager/budgets.html",
+        "manager/budget_print.html",
         {
-            "budgets_active": context["budgets_active"],
-            "budgets_closed": context["budgets_closed"],
+            "job": job,
+            "wizard_state": job.wizard_state,
         },
     )
 
@@ -2016,7 +2036,6 @@ def manager_panel_mark_complete_view(request):
             "builds": "manager/my_builds.html",
             "builds-active": "manager/active_builds.html",
             "builds-closed": "manager/closed_builds.html",
-            "budgets": "manager/budgets.html",
             "draws": "manager/draws.html",
         }
         template_name = template_map.get(panel, "manager/draws.html")
@@ -2032,10 +2051,6 @@ def manager_panel_mark_complete_view(request):
             "manager/closed_builds.html": {
                 "builds_closed": context["builds_closed"],
                 "builds_closed_by_month": context["builds_closed_by_month"],
-            },
-            "manager/budgets.html": {
-                "budgets_active": context["budgets_active"],
-                "budgets_closed": context["budgets_closed"],
             },
             "manager/draws.html": {
                 "draws_active": context["draws_active"],

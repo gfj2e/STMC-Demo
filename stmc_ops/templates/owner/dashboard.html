@@ -146,8 +146,20 @@
 								<tbody>
 									{% for bill in job.bills %}
 										<tr class="{% if bill.status == 'paid' %}is-paid{% endif %}">
-											<td><span class="exec-invoice-id">{{ bill.invoice_id }}</span></td>
-											<td class="is-medium">{{ bill.vendor }}</td>
+											<td>
+												{% if bill.invoice_id == "—" %}
+													<span class="exec-mute">—</span>
+												{% else %}
+													<span class="exec-invoice-id">{{ bill.invoice_id }}</span>
+												{% endif %}
+											</td>
+											<td class="is-medium">
+												{% if bill.vendor %}
+													{{ bill.vendor }}
+												{% else %}
+													<span class="exec-mute">—</span>
+												{% endif %}
+											</td>
 											<td class="is-small">{{ bill.description }}</td>
 											<td><span class="exec-cost-code">{{ bill.cost_code }}</span></td>
 											<td class="is-small">{{ bill.qb_account }}</td>

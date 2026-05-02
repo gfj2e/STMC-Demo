@@ -1207,3 +1207,64 @@ body.view-mode-table .table-view { display: block; }
 .job-detail-card .proj-name { font-size: 15px; font-weight: 600; margin: 0; color: var(--g900); }
 .job-detail-card .proj-sub { font-size: 12px; color: var(--g500); margin: 2px 0 0; }
 .job-detail-card .co-section { margin-top: 12px; }
+
+/* PM Budget print link — appears in the Change Orders header inside each
+   active build's expanded dropdown. Opens a print-friendly snapshot in a
+   new tab and triggers window.print(). */
+.budget-print-btn {
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--g600);
+  background: #fff;
+  border: 1px solid var(--g300);
+  padding: 4px 10px;
+  border-radius: 999px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.budget-print-btn:hover {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+/* Inline tabs that live inside each active build's expanded dropdown.
+   Mirrors the .exec-tab pattern from owner.css so the visual treatment
+   stays consistent across roles. Toggled by activateExecTab() in
+   manager.js. */
+.exec-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--g200);
+  background: var(--g50);
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.exec-tab {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g500);
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: inherit;
+}
+
+.exec-tab:hover {
+  color: var(--g900);
+}
+
+.exec-tab.is-active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.exec-tab-panel {
+  overflow-x: auto;
+}

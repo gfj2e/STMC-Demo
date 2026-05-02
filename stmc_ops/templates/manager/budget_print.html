@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>PM Budget — {{ job.customer_name|default:"Job" }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}?v=11">
+  <style>
+    /* Hide every wizard surface — only the print sheet that
+       printPMBudgetPDF() injects should be visible. */
+    body { background: #fff; }
+    .header, .progress-wrap, .container, .nav-wrap, .footer, .toast,
+    .modal-overlay { display: none !important; }
+    #printSheet { display: block !important; }
+    #pm-print-status {
+      position: fixed; inset: 0; display: flex; align-items: center;
+      justify-content: center; font-family: 'DM Sans', sans-serif;
+      color: #6B7280; font-size: 13px; z-index: 100;
+    }
+    /* Once the wizard injects content into #printSheet, drop the loading shim. */
+    #printSheet:not(:empty) ~ #pm-print-status { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Wizard scaffolding the JS expects to find. Hidden via CSS above. -->
+<div class="header">
+  <div class="header-sub"></div>
+  <div class="header-title"></div>
+  <div class="header-total" id="hdrTotal"></div>
+  <div class="header-subtotal-note" id="hdrSub"></div>
+  <div class="header-split" id="hdrSplit" style="display:none"></div>
+  <div id="hdrStatus" class="hdr-status"></div>
+</div>
+<div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="container" id="stepContainer"></div>
+<div class="nav-wrap">
+  <div class="nav">
+    <button class="nav-btn nav-prev" id="navPrev"></button>
+    <div class="nav-status" id="navStatus"></div>
+    <button class="nav-btn nav-next" id="navNext"></button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- The wizard's printPMBudgetPDF() writes its multi-page HTML into this node. -->
+<div id="printSheet" style="display:none"></div>
+<div id="pm-print-status">Preparing PM Budget PDF&hellip;</div>
+
+{{ wizard_state|json_script:"stmc-wizard-edit-state" }}
+<script>
+  (function () {
+    var el = document.getElementById("stmc-wizard-edit-state");
+    try { window.STMC_EDIT_STATE = el ? JSON.parse(el.textContent) : null; }
+    catch (e) { window.STMC_EDIT_STATE = null; }
+  })();
+  window.STMC_EDIT_JOB_ID = {{ job.id }};
+  // Sentinel URLs — the PM print page never POSTs to Django; values exist
+  // only to satisfy lookups inside buildwizard.js.
+  window.SAVE_CONTRACT_URL = "";
+  window.SALES_OVERVIEW_URL = "";
+  window.SALES_FLOOR_PLAN_PDF_URL_TMPL = "";
+  window.LOGIN_URL = "";
+  window.LOGOUT_URL = "";
+  window.CSRF_TOKEN = "";
+  window.STMC_USER = {
+    name: "{{ user.name|default:user.email|escapejs }}",
+    initials: "{{ user.initials|default:''|escapejs }}",
+    role: "{{ user.role|escapejs }}"
+  };
+</script>
+
+<!-- CDNs the wizard's PDF helpers reference. Loaded for parity with the
+     real wizard host so downstream code paths stay identical. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="{% static 'contracts/buildwizard.js' %}?v=11" defer></script>
+<script>
+  // After the wizard's deferred init runs (defer scripts execute before
+  // DOMContentLoaded), invoke the same PM Budget PDF flow Step 9 exposes.
+  window.addEventListener("DOMContentLoaded", function () {
+    setTimeout(function () {
+      try {
+        if (typeof printPMBudgetPDF === "function") {
+          printPMBudgetPDF();
+        } else {
+          console.error("[PM Budget print] printPMBudgetPDF not defined");
+        }
+      } catch (e) {
+        console.error("[PM Budget print] failed:", e);
+      }
+    }, 250);
+  });
+</script>
+</body>
+</html>
