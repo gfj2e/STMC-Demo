@@ -51,6 +51,7 @@ function activateTab(tab) {
 
   updateHeaderTitle(tab);
   setSalesSearchVisibility(tab);
+  setSalesViewToggleVisibility(tab);
   // Re-apply filters so a search query typed on Closed gets immediately
   // honored when switching back to Closed (and is correctly ignored
   // on other tabs).
@@ -185,6 +186,16 @@ function setSalesSearchVisibility(tab) {
       ? 'Filter by customer, order #, branch…'
       : 'customer, order #, branch';
   }
+}
+
+function setSalesViewToggleVisibility(tab) {
+  var toggle = document.querySelector('.job-view-toggle');
+  if (!toggle) return;
+  var visibleTabs = {
+    'in-progress': true,
+    closed: true
+  }
+  toggle.style.display = visibleTabs[tab] ? 'inline-flex' : 'none';
 }
 
 function _salesFilterTargets() {
@@ -611,9 +622,9 @@ function bindSalesViewToggle() {
   var cardsBtn = document.getElementById('job-view-cards');
   var tableBtn = document.getElementById('job-view-table');
   if (!cardsBtn || !tableBtn) return;
-  var saved = null;
-  try { saved = localStorage.getItem(SALES_VIEW_KEY); } catch (e) { /* private mode */ }
-  _applySalesViewMode(saved === 'table' ? 'table' : 'cards');
+  var saved = 'table';
+  try { saved = localStorage.getItem(SALES_VIEW_KEY) || 'table'; } catch (e) { /* private mode */ }
+  _applySalesViewMode(saved === 'cards' ? 'cards' : 'table');
 
   cardsBtn.addEventListener('click', function () {
     _applySalesViewMode('cards');
@@ -666,6 +677,7 @@ function init() {
   rebuildSalesFilterOptions();
   applySalesFilters();
   initAuthHeader();
+  setSalesViewToggleVisibility(tab);
 }
 
 init();

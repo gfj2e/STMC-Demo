@@ -825,6 +825,8 @@ def _build_project_ui_rows(projects):
                 "id": project.get("id"),
                 "name": project.get("nm", ""),
                 "model_name": project.get("md", ""),
+                "customer_display": project.get("cu", ""),
+                "pm_name": project.get("pm", ""),
                 "branch_label": branch_label,
                 "order_number": order_number_display,
                 "phase": project.get("ph", "estimate"),

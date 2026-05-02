@@ -495,9 +495,9 @@ function bindManagerViewToggle() {
   var cardsBtn = document.getElementById('job-view-cards');
   var tableBtn = document.getElementById('job-view-table');
   if (!cardsBtn || !tableBtn) return;
-  var saved = null;
-  try { saved = localStorage.getItem(MANAGER_VIEW_KEY); } catch (e) { /* private mode */ }
-  _applyManagerViewMode(saved === 'table' ? 'table' : 'cards');
+  var saved = 'table';
+  try { saved = localStorage.getItem(MANAGER_VIEW_KEY) || 'table'; } catch (e) { /* private mode */ }
+  _applyManagerViewMode(saved === 'cards' ? 'cards' : 'table');
 
   cardsBtn.addEventListener('click', function () {
     _applyManagerViewMode('cards');
