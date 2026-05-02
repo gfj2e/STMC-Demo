@@ -51,6 +51,10 @@ function activateTab(tab) {
 
   updateHeaderTitle(tab);
   setSalesSearchVisibility(tab);
+  // Re-apply filters so a search query typed on Closed gets immediately
+  // honored when switching back to Closed (and is correctly ignored
+  // on other tabs).
+  applySalesFilters();
   document.body.dispatchEvent(new CustomEvent('sales-' + tab + '-refresh'));
 
   var url = new URL(window.location.href);
@@ -169,6 +173,18 @@ function setSalesSearchVisibility(tab) {
     'closed': true,
   };
   searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
+
+  // Closed tab uses live filter mode; the "Find Job" button is redundant
+  // there. In Progress + Leads keep the navigate-to-match button.
+  var input = document.getElementById('job-search-input');
+  var button = document.getElementById('job-search-btn');
+  var isClosed = tab === 'closed';
+  if (button) button.style.display = isClosed ? 'none' : '';
+  if (input) {
+    input.placeholder = isClosed
+      ? 'Filter by customer, order #, branch…'
+      : 'customer, order #, branch';
+  }
 }
 
 function _salesFilterTargets() {
@@ -202,31 +218,54 @@ function clearJobHit() {
 }
 
 function findSalesJobMatch(query) {
+  // Search whichever rendering is currently visible. In cards mode we
+  // only consider .proj-card; in table mode we only consider table rows.
+  // Both carry data-job-search so the haystack lookup is identical.
+  var inTableMode = document.body.classList.contains('view-mode-table');
+  var selector = inTableMode
+    ? '.table-view tr.job-table-row[data-job-search]'
+    : '.cards-view .proj-card[data-job-search]';
   var targets = _salesFilterTargets();
   for (var i = 0; i < targets.length; i++) {
     var target = targets[i];
     var panel = document.getElementById(target.panelId);
     if (!panel) continue;
-    var cards = panel.querySelectorAll('.proj-card');
-    for (var j = 0; j < cards.length; j++) {
-      var card = cards[j];
-      var haystack = (card.getAttribute('data-job-search') || card.textContent || '').toLowerCase();
+    var nodes = panel.querySelectorAll(selector);
+    for (var j = 0; j < nodes.length; j++) {
+      var node = nodes[j];
+      var haystack = (node.getAttribute('data-job-search') || node.textContent || '').toLowerCase();
       if (haystack.indexOf(query) !== -1) {
-        return { target: target, card: card };
+        return { target: target, card: node };
       }
     }
   }
   return null;
 }
 
-function openSalesFoundCard(card) {
-  var details = card.closest('details');
+function openSalesFoundCard(node) {
+  // node may be either a .proj-card (cards view) or a .job-table-row
+  // (table view). Each has its own "expand" affordance:
+  //   - card: open the surrounding <details> and the card's .proj-body
+  //   - table row: expand its paired detail <tr> via the existing toggle
+  if (node.classList.contains('job-table-row')) {
+    var detail = node._detailRow || node.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail') && detail.hasAttribute('hidden')) {
+      _toggleTableRowDetail(node);
+    }
+    return;
+  }
+
+  var details = node.closest('details');
   if (details) details.open = true;
 
-  var body = card.querySelector('.proj-body');
-  var chevron = card.querySelector('.chevron');
+  var body = node.querySelector('.proj-body');
+  var chevron = node.querySelector('.chevron');
   if (body) body.classList.add('open');
   if (chevron) chevron.classList.add('open');
+}
+
+function _currentSalesTab() {
+  return new URLSearchParams(window.location.search).get('tab') || 'in-progress';
 }
 
 function runSalesJobSearch() {
@@ -243,14 +282,37 @@ function runSalesJobSearch() {
     showToast('No matching contract or lead found');
     return;
   }
-  activateTab(match.target.tab);
-  openSalesFoundCard(match.card);
-  match.card.classList.add('job-search-hit');
-  match.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  setTimeout(function () {
-    match.card.classList.remove('job-search-hit');
-  }, 2200);
+
+  // If the match is on a different tab, switching tabs triggers an HTMX
+  // refresh of the destination panel, which would wipe our match
+  // reference. Re-find the row AFTER the swap settles before highlighting.
+  if (match.target.tab !== _currentSalesTab()) {
+    activateTab(match.target.tab);
+    // Wait for the panel swap to complete, then re-find and highlight.
+    var panel = document.getElementById(match.target.panelId);
+    if (window.htmx && panel) {
+      var onSwap = function (event) {
+        if (!event.detail || event.detail.target !== panel) return;
+        document.body.removeEventListener('htmx:afterSwap', onSwap);
+        var fresh = findSalesJobMatch(query);
+        if (fresh) _highlightSalesMatch(fresh.card);
+      };
+      document.body.addEventListener('htmx:afterSwap', onSwap);
+    }
+  } else {
+    // Same tab, no refresh — highlight the existing node directly.
+    _highlightSalesMatch(match.card);
+  }
   showToast('Match found');
+}
+
+function _highlightSalesMatch(node) {
+  openSalesFoundCard(node);
+  node.classList.add('job-search-hit');
+  node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(function () {
+    node.classList.remove('job-search-hit');
+  }, 2200);
 }
 
 function bindSalesJobSearch() {
@@ -258,9 +320,25 @@ function bindSalesJobSearch() {
   var input = document.getElementById('job-search-input');
   if (!button || !input) return;
   button.addEventListener('click', runSalesJobSearch);
+
+  // Closed tab: live filter as you type (debounced ~250ms). Other tabs:
+  // Enter triggers the navigate-to-match flow. The placeholder + button
+  // visibility set in setSalesSearchVisibility() signal which mode is
+  // active per tab.
+  var liveTimer;
+  input.addEventListener('input', function () {
+    if (_currentSalesTab() !== 'closed') return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(applySalesFilters, 250);
+  });
   input.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (_currentSalesTab() === 'closed') {
+      // Already live-filtered; Enter just commits any pending debounce.
+      clearTimeout(liveTimer);
+      applySalesFilters();
+    } else {
       runSalesJobSearch();
     }
   });
@@ -415,9 +493,18 @@ function applySalesFilters() {
   var year = _salesNormalize(document.getElementById('job-filter-year') && document.getElementById('job-filter-year').value);
   var sortMode = _salesNormalize(document.getElementById('job-filter-sort') && document.getElementById('job-filter-sort').value) || 'newest';
 
+  // Search query — live-filter on the Closed tab only. Other panels
+  // (In Progress, Leads) ignore the query box; their "Find Job" button
+  // does navigate-to-match instead.
+  var searchInput = document.getElementById('job-search-input');
+  var searchQuery = _salesNormalize(searchInput && searchInput.value);
+
   _salesFilterTargets().forEach(function (target) {
     var panel = document.getElementById(target.panelId);
     if (!panel) return;
+
+    // Search query gates the closed panel only.
+    var panelQuery = (target.tab === 'closed') ? searchQuery : '';
 
     var panelVisibleCount = 0;
     panel.querySelectorAll('.project-group').forEach(function (group) {
@@ -429,6 +516,7 @@ function applySalesFilters() {
         if (plan && _salesNormalize(card.dataset.plan) !== plan) matches = false;
         if (phase && _salesNormalize(card.dataset.phase) !== phase) matches = false;
         if (year && _salesNormalize(card.dataset.year) !== year) matches = false;
+        if (panelQuery && (card.getAttribute('data-job-search') || '').indexOf(panelQuery) === -1) matches = false;
         card.style.display = matches ? '' : 'none';
         if (matches) visibleCount += 1;
       });
@@ -450,6 +538,7 @@ function applySalesFilters() {
       if (plan && _salesNormalize(row.dataset.plan) !== plan) matches = false;
       if (phase && _salesNormalize(row.dataset.phase) !== phase) matches = false;
       if (year && _salesNormalize(row.dataset.year) !== year) matches = false;
+      if (panelQuery && (row.getAttribute('data-job-search') || '').indexOf(panelQuery) === -1) matches = false;
       row.style.display = matches ? '' : 'none';
       var detail = row.nextElementSibling;
       if (detail && detail.classList.contains('job-table-detail')) {
@@ -466,7 +555,36 @@ function applySalesFilters() {
 
     var sectionCount = panel.querySelector('.group-section-title .group-section-count');
     if (sectionCount) sectionCount.textContent = '(' + panelVisibleCount + ')';
+
+    // Empty state for the Closed tab when search yields zero matches.
+    // We render an inline banner so the user knows their query ran but
+    // matched nothing — otherwise they just see a blank panel.
+    _updateClosedEmptyState(panel, target.tab, panelQuery, panelVisibleCount);
   });
+}
+
+function _updateClosedEmptyState(panel, tab, query, visibleCount) {
+  if (tab !== 'closed') return;
+  var existing = panel.querySelector('.search-empty-state');
+  var shouldShow = query && visibleCount === 0;
+  if (shouldShow) {
+    if (!existing) {
+      var msg = document.createElement('div');
+      msg.className = 'banner banner-empty search-empty-state';
+      msg.textContent = '';
+      // Insert right after the section title (or at the top if missing)
+      var sectionTitle = panel.querySelector('.group-section-title');
+      if (sectionTitle && sectionTitle.nextSibling) {
+        sectionTitle.parentNode.insertBefore(msg, sectionTitle.nextSibling);
+      } else {
+        panel.insertBefore(msg, panel.firstChild);
+      }
+      existing = msg;
+    }
+    existing.textContent = 'No closed contracts match "' + query + '".';
+  } else if (existing) {
+    existing.remove();
+  }
 }
 
 // ── View toggle (Cards / Table) ──────────────────────────────────────

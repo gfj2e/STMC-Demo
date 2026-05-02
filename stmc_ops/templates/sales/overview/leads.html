@@ -3,7 +3,7 @@
     Leads <span class="group-section-count">({{ leads|length }})</span>
   </div>
   {% for group in leads_by_branch %}
-    <details class="project-group" open>
+    <details class="project-group">
       <summary class="project-group-summary">
         <span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
         <span class="project-group-count">{{ group.count }}</span>

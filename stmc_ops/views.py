@@ -1119,6 +1119,40 @@ def _sales_in_progress_phase_label(deposit_paid, loan_closed):
     return "Awaiting Deposit"
 
 
+def _job_display_address(job):
+    """Best-effort customer/site address for display in lists.
+
+    The wizard saves to TWO separate address representations:
+      - `customer_addr` — legacy single-line field (Step 1 "Address")
+      - `site_street/city/state/zip` and `bill_street/city/state/zip` —
+        structured V10 fields (filled in on the wizard's Customer step)
+
+    Wizard-created contracts often have `customer_addr` blank but the
+    structured site/bill fields populated. Fall back to those so the
+    table/card row still shows an address.
+    """
+    if job.customer_addr:
+        return job.customer_addr
+    parts = []
+    if job.site_street:
+        parts.append(job.site_street)
+    site_locality = ", ".join(p for p in (job.site_city, job.site_state) if p)
+    if site_locality:
+        parts.append(site_locality)
+    if job.site_zip:
+        parts.append(job.site_zip)
+    if not parts:
+        # No site address either — fall back to billing address.
+        if job.bill_street:
+            parts.append(job.bill_street)
+        bill_locality = ", ".join(p for p in (job.bill_city, job.bill_state) if p)
+        if bill_locality:
+            parts.append(bill_locality)
+        if job.bill_zip:
+            parts.append(job.bill_zip)
+    return " ".join(parts).strip()
+
+
 def _build_sales_in_progress_row(job):
     plan_name = job.floor_plan.name if job.floor_plan else "Custom"
     branch_label = job.branch.label if job.branch else "Unassigned"
@@ -1127,9 +1161,10 @@ def _build_sales_in_progress_row(job):
     deposit_paid = _job_deposit_paid(job)
     loan_closed = _job_loan_closed(job)
     phase_label = _sales_in_progress_phase_label(deposit_paid, loan_closed)
+    address = _job_display_address(job)
     subtitle_parts = [plan_name]
-    if job.customer_addr:
-        subtitle_parts.append(job.customer_addr)
+    if address:
+        subtitle_parts.append(address)
     if job.order_number:
         subtitle_parts.append(f"#{job.order_number}")
     row = {
@@ -1140,7 +1175,7 @@ def _build_sales_in_progress_row(job):
         "phase_label": phase_label,
         "subtitle": " · ".join(subtitle_parts),
         "created_at": job.created_at,
-        "address": job.customer_addr or "",
+        "address": address,
         "order_number": job.order_number or "",
         "p10_amount": p10_amount,
         "p10_display": _format_money(p10_amount),
@@ -1167,11 +1202,12 @@ def _build_sales_lead_row(job):
         stale = age_days >= 21
     branch_label = job.branch.label if job.branch else "Unassigned"
     phase_label = "Stale Lead" if stale else "Active Lead"
+    address = _job_display_address(job)
     subtitle_parts = []
     if source_display:
         subtitle_parts.append(source_display)
-    if job.customer_addr:
-        subtitle_parts.append(job.customer_addr)
+    if address:
+        subtitle_parts.append(address)
     if created_display:
         subtitle_parts.append(f"Added {created_display}")
     return {
@@ -1179,7 +1215,7 @@ def _build_sales_lead_row(job):
         "name": job.customer_name or f"Lead #{job.id}",
         "phone": job.customer_phone or "",
         "email": job.customer_email or "",
-        "address": job.customer_addr or "",
+        "address": address,
         "branch_label": branch_label,
         "phase_label": phase_label,
         "subtitle": " · ".join(subtitle_parts),
@@ -1205,7 +1241,10 @@ def _build_sales_closed_row(job):
     if closed_at:
         local_closed = timezone.localtime(closed_at) if timezone.is_aware(closed_at) else closed_at
         closed_display = local_closed.strftime("%b %d, %Y")
+    address = _job_display_address(job)
     subtitle_parts = [plan_name]
+    if address:
+        subtitle_parts.append(address)
     if job.order_number:
         subtitle_parts.append(f"#{job.order_number}")
     if closed_display:
@@ -1217,6 +1256,7 @@ def _build_sales_closed_row(job):
         "branch_label": branch_label,
         "phase_label": "Closed",
         "subtitle": " · ".join(subtitle_parts),
+        "address": address,
         "closed_at": closed_at,
         "order_number": job.order_number or "",
         "p10_amount": p10_amount,

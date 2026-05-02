@@ -929,11 +929,17 @@
   color: #9ca3af;
   font-size: 13px;
   line-height: 1;
-  transition: transform 0.2s ease, color 0.2s ease;
+  display: inline-block;
+  /* Default: collapsed — chevron glyph (▾) rotated to point right (▸).
+     No transition: the rotate transform animates inconsistently with
+     <details> toggle (animation starts mid-flight and gets stuck). An
+     instant flip looks fine for a chevron and avoids the bug. */
+  transform: rotate(-90deg);
 }
 
 .project-group[open] .project-group-chevron {
-  transform: rotate(180deg);
+  /* Open: chevron points down. */
+  transform: rotate(0deg);
   color: #b91c1c;
 }
 
@@ -970,6 +976,14 @@
 .job-search-hit {
   box-shadow: 0 0 0 3px #fee2e2;
   border-color: #fca5a5 !important;
+}
+
+/* Table rows can't take a box-shadow ring (border-collapse strips it),
+   so highlight the cells directly with a soft background + left accent. */
+tr.job-table-row.job-search-hit > td {
+  background: #fef2f2 !important;
+  box-shadow: inset 3px 0 0 var(--red);
+  transition: background 0.2s ease;
 }
 
 /* ── Toast (search feedback) ── */
