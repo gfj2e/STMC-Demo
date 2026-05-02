@@ -16,9 +16,7 @@
 <nav class="app-nav">
   <div class="app-nav-left">
     <button class="app-nav-link active" data-tab="dashboard" type="button">Dashboard</button>
-    <button class="app-nav-link" data-tab="projects-active" type="button">Active Projects</button>
     <button class="app-nav-link" data-tab="projects-closed" type="button">Closed Projects</button>
-    <button class="app-nav-link" data-tab="payments" type="button">Payments</button>
   </div>
   <div class="app-nav-right">
     <!-- Bell: polls the unread count every 30s. The inner dropdown is
@@ -116,18 +114,6 @@
     </div>
   </div>
 
-  <!-- Active Projects -->
-  <div id="tab-projects-active" class="tab-panel" style="display:none">
-    <div
-      id="tab-projects-active-panel"
-      hx-get="{% url 'owner_active_projects_panel' %}"
-      hx-trigger="load, owner-projects-active-refresh from:body, owner-projects-refresh from:body"
-      hx-swap="innerHTML"
-    >
-      <div class="banner banner-empty">Loading active projects...</div>
-    </div>
-  </div>
-
   <!-- Closed Projects -->
   <div id="tab-projects-closed" class="tab-panel" style="display:none">
     <div
@@ -137,18 +123,6 @@
       hx-swap="innerHTML"
     >
       <div class="banner banner-empty">Loading closed projects...</div>
-    </div>
-  </div>
-
-  <!-- Payments -->
-  <div id="tab-payments" class="tab-panel" style="display:none">
-    <div
-      id="tab-payments-panel"
-      hx-get="{% url 'owner_payments_panel' %}"
-      hx-trigger="load, owner-payments-refresh from:body"
-      hx-swap="innerHTML"
-    >
-      <div class="banner banner-empty">Loading payments...</div>
     </div>
   </div>
 

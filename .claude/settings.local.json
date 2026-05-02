@@ -75,7 +75,8 @@
       "Read(//c/Users/gfj2e/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/6bf92c88-b5b7-452b-b53f-885b714cbbb1/52fac8db-313e-4514-b993-1cf28b344dc1/skills/xlsx/scripts/**)",
       "Read(//c/Users/gfj2e/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/6bf92c88-b5b7-452b-b53f-885b714cbbb1/52fac8db-313e-4514-b993-1cf28b344dc1/skills/xlsx/**)",
       "Bash(.venv/Scripts/python manage.py showmigrations stmc_ops)",
-      "Bash(grep -nA3 \"Phase 4: PM \\\\\"Mark Complete\\\\\" is a LOCAL\\\\|status=JobDraw.STATUS_INVOICED\\\\|won_race = JobDraw\" stmc_ops/views.py)"
+      "Bash(grep -nA3 \"Phase 4: PM \\\\\"Mark Complete\\\\\" is a LOCAL\\\\|status=JobDraw.STATUS_INVOICED\\\\|won_race = JobDraw\" stmc_ops/views.py)",
+      "Bash(.venv/Scripts/python)"
     ]
   }
 }

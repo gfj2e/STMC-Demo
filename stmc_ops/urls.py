@@ -42,9 +42,7 @@ urlpatterns = [
     path("owner/", views.owner_view, name="owner"),
     path("owner/dashboard-panel/", views.owner_dashboard_panel_view, name="owner_dashboard_panel"),
     path("owner/all-projects-panel/", views.owner_all_projects_panel_view, name="owner_all_projects_panel"),
-    path("owner/active-projects-panel/", views.owner_active_projects_panel_view, name="owner_active_projects_panel"),
     path("owner/closed-projects-panel/", views.owner_closed_projects_panel_view, name="owner_closed_projects_panel"),
-    path("owner/payments-panel/", views.owner_payments_panel_view, name="owner_payments_panel"),
     # ── QuickBooks Online (Intuit) OAuth ──
     path("qb/connect/", views.qb_connect_view, name="qb_connect"),
     path("qb/callback/", views.qb_callback_view, name="qb_callback"),

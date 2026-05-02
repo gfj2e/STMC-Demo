@@ -272,7 +272,7 @@ var STMC_CTR_MAP = {
   "ssStd": { section: "Roof", label: "Standing seam \u22647/12", btCode: "Roof Labor", qbAccount: "Framing of Home" },
   "ssSteep": { section: "Roof", label: "Standing seam \u22658/12", btCode: "Roof Labor", qbAccount: "Framing of Home" },
   "stoneLbr": { section: "Stone", label: "Stone labor", btCode: "Siding", qbAccount: "Metal Walls" },
-  "tgC": { section: "Other", label: "T&G porch ceiling", btCode: "Interior Trim & Doors", qbAccount: "Interior Trim & Doors" },
+  "tgC": { section: "Other", label: "T&G porch ceiling", btCode: "Whole House Framing", qbAccount: "Framing of Home" },
   "trex": { section: "Other", label: "TREX decking", btCode: "Whole House Framing", qbAccount: "Framing of Home" },
   "vinyl": { section: "Walls", label: "Vinyl siding", btCode: "Siding", qbAccount: "Metal Walls" },
 };
@@ -574,6 +574,70 @@ var INT_TRADE_GROUPS = [
   {key:"general",         name:"Permits & General",    rates:["permits","cleaning","dumpster"]},
   {key:"customSelections",name:"Custom Selections",    rates:[]}
 ];
+
+/* ═══════════════════════════════════════════════════════════════
+   CT_BASE_SF — base countertop data from Excel (33 models)
+   baseSF: total countertop SF for standard layout
+   stdLowersLF: standard cabinet LF (lowers only) — BUDGET USE ONLY
+   ═══════════════════════════════════════════════════════════════ */
+var CT_BASE_SF = {
+  "ARROWHEAD LODGE":{baseSF:89.75,stdLowersLF:39},"BLUEWATER":{baseSF:92.75,stdLowersLF:41},"BROOKSIDE":{baseSF:65.5,stdLowersLF:32},"BUFFALO RUN":{baseSF:79.375,stdLowersLF:35},"CAJUN":{baseSF:89.75,stdLowersLF:40},"CEDAR RIDGE":{baseSF:123.1875,stdLowersLF:57.5},"COTTONWOOD BEND":{baseSF:75.5625,stdLowersLF:33.5},"CREEKSIDE SPECIAL":{baseSF:97.5,stdLowersLF:44},"DAUGHERTY":{baseSF:135.875,stdLowersLF:61},"EAST FORK DELUXE":{baseSF:85.375,stdLowersLF:33},"FRANKS BARNDOMINIUM":{baseSF:145.0625,stdLowersLF:69.5},"HUNTLEY":{baseSF:146.375,stdLowersLF:67},"HUNTLEY 2.0":{baseSF:109.125,stdLowersLF:49},"JOHNSON":{baseSF:96.875,stdLowersLF:47},"MAPLE GROVE":{baseSF:112.25,stdLowersLF:52},"MARTIN LODGE":{baseSF:105.875,stdLowersLF:55},"MEADOWS END":{baseSF:125.5,stdLowersLF:57},"MINI PETTUS":{baseSF:116,stdLowersLF:54},"NORTHVIEW LODGE":{baseSF:91.5,stdLowersLF:42},"PETTUS":{baseSF:197,stdLowersLF:92},"PINEY CREEK":{baseSF:96.75,stdLowersLF:44},"ROBERTSON":{baseSF:73.9375,stdLowersLF:32.5},"ROCKY TOP":{baseSF:97.625,stdLowersLF:47},"SOUTHERN MONITOR":{baseSF:152.75,stdLowersLF:70},"SUMMER BREEZE":{baseSF:123.875,stdLowersLF:58},"THE BERKLEY":{baseSF:73.375,stdLowersLF:33},"THE HADLEY":{baseSF:113.25,stdLowersLF:46},"THOMPSON":{baseSF:117.75,stdLowersLF:54},"TIMBER CREST":{baseSF:85.875,stdLowersLF:39},"WESTVIEW MANOR":{baseSF:124,stdLowersLF:56},"WHISPERING PINES":{baseSF:92.1875,stdLowersLF:42.5},"WILLOW CREEK":{baseSF:75.5,stdLowersLF:28},"WOODSIDE SPECIAL":{baseSF:97.5,stdLowersLF:44}
+};
+
+var CT_AREA_LABELS = {kitchen:"Kitchen",island:"Island",laundry:"Laundry",masterBath:"Master Bath",guestBath:"Guest Bath",halfBath:"Half Bath",butlersPantry:"Butler's Pantry",jackJill:"Jack & Jill",bonusBath:"Bonus Bath",powder:"Powder / Upstairs"};
+var CT_AREA_KEYS = ["kitchen","island","laundry","masterBath","guestBath","halfBath","butlersPantry","jackJill","bonusBath","powder"];
+
+/* CT_TIER_DATA — per-area tier upgrade costs + SF + estimated LF (33 models)
+   Only areas with non-zero tier costs are included per model. */
+var CT_TIER_DATA = {
+  "ARROWHEAD LODGE":{kitchen:{sf:36.125,t2:1083.75,t3:2059.125,estLF:18.1},island:{sf:33,t2:990,t3:1881,estLF:11},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8},bonusBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "BLUEWATER":{kitchen:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},island:{sf:27,t2:810,t3:1539,estLF:9},masterBath:{sf:12.1875,t2:365.625,t3:694.6875,estLF:6.1},guestBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3}},
+  "BROOKSIDE":{kitchen:{sf:46.75,t2:1402.5,t3:2664.75,estLF:23.4},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "BUFFALO RUN":{kitchen:{sf:40.375,t2:1211.25,t3:2301.375,estLF:20.2},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "CAJUN":{kitchen:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "CEDAR RIDGE":{kitchen:{sf:47.8125,t2:1434.375,t3:2725.3125,estLF:23.9},island:{sf:18,t2:540,t3:1026,estLF:6},laundry:{sf:25.5,t2:765,t3:1453.5,estLF:12.8},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8},halfBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8},jackJill:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "COTTONWOOD BEND":{kitchen:{sf:31.875,t2:956.25,t3:1816.875,estLF:15.9},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8},halfBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3}},
+  "CREEKSIDE SPECIAL":{kitchen:{sf:51,t2:1530,t3:2907,estLF:25.5},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "DAUGHERTY":{kitchen:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},island:{sf:36,t2:1080,t3:2052,estLF:12},laundry:{sf:19.125,t2:573.75,t3:1090.125,estLF:9.6},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:15,t2:450,t3:855,estLF:7.5},halfBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "EAST FORK DELUXE":{kitchen:{sf:38.25,t2:1147.5,t3:2180.25,estLF:19.1},island:{sf:18,t2:540,t3:1026,estLF:6},laundry:{sf:8.5,t2:255,t3:484.5,estLF:4.2},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6}},
+  "FRANKS BARNDOMINIUM":{kitchen:{sf:68,t2:2040,t3:3876,estLF:34},island:{sf:18,t2:540,t3:1026,estLF:6},masterBath:{sf:35.625,t2:1068.75,t3:2030.625,estLF:17.8},halfBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8},jackJill:{sf:14.0625,t2:421.875,t3:801.5625,estLF:7},bonusBath:{sf:3.75,t2:112.5,t3:213.75,estLF:1.9}},
+  "HUNTLEY":{kitchen:{sf:51,t2:1530,t3:2907,estLF:25.5},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6}},
+  "HUNTLEY 2.0":{kitchen:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:21.25,t2:637.5,t3:1211.25,estLF:10.6},masterBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "JOHNSON":{kitchen:{sf:74.375,t2:2231.25,t3:4239.375,estLF:37.2},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8},bonusBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "MAPLE GROVE":{kitchen:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:18.75,t2:562.5,t3:1068.75,estLF:9.4},guestBath:{sf:15,t2:450,t3:855,estLF:7.5},halfBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "MARTIN LODGE":{kitchen:{sf:63.75,t2:1912.5,t3:3633.75,estLF:31.9},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:10.625,t2:318.75,t3:605.625,estLF:5.3},masterBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "MEADOWS END":{kitchen:{sf:72.25,t2:2167.5,t3:4118.25,estLF:36.1},island:{sf:27,t2:810,t3:1539,estLF:9},masterBath:{sf:16.875,t2:506.25,t3:961.875,estLF:8.4},guestBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3},halfBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3}},
+  "MINI PETTUS":{kitchen:{sf:55.25,t2:1657.5,t3:3149.25,estLF:27.6},island:{sf:18,t2:540,t3:1026,estLF:6},laundry:{sf:12.75,t2:382.5,t3:726.75,estLF:6.4},masterBath:{sf:17.8125,t2:534.375,t3:1015.3125,estLF:8.9},guestBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3},halfBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "NORTHVIEW LODGE":{kitchen:{sf:51,t2:1530,t3:2907,estLF:25.5},island:{sf:18,t2:540,t3:1026,estLF:6},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "PETTUS":{kitchen:{sf:72.25,t2:2167.5,t3:4118.25,estLF:36.1},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:44.625,t2:1338.75,t3:2543.625,estLF:22.3},masterBath:{sf:18.75,t2:562.5,t3:1068.75,estLF:9.4},halfBath:{sf:3.75,t2:112.5,t3:213.75,estLF:1.9},butlersPantry:{sf:14.875,t2:446.25,t3:847.875,estLF:7.4},jackJill:{sf:18.75,t2:562.5,t3:1068.75,estLF:9.4}},
+  "PINEY CREEK":{kitchen:{sf:38.25,t2:1147.5,t3:2180.25,estLF:19.1},island:{sf:18,t2:540,t3:1026,estLF:6},laundry:{sf:25.5,t2:765,t3:1453.5,estLF:12.8},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "ROBERTSON":{kitchen:{sf:34,t2:1020,t3:1938,estLF:17},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3}},
+  "ROCKY TOP":{kitchen:{sf:80.75,t2:2422.5,t3:4602.75,estLF:40.4},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "SOUTHERN MONITOR":{kitchen:{sf:57.375,t2:1721.25,t3:3270.375,estLF:28.7},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:48.875,t2:1466.25,t3:2785.875,estLF:24.4},masterBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},guestBath:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6}},
+  "SUMMER BREEZE":{kitchen:{sf:42.5,t2:1275,t3:2422.5,estLF:21.2},island:{sf:21,t2:630,t3:1197,estLF:7},laundry:{sf:19.125,t2:573.75,t3:1090.125,estLF:9.6},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8},jackJill:{sf:11.25,t2:337.5,t3:641.25,estLF:5.6},bonusBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "THE BERKLEY":{kitchen:{sf:40.375,t2:1211.25,t3:2301.375,estLF:20.2},island:{sf:18,t2:540,t3:1026,estLF:6},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "THE HADLEY":{kitchen:{sf:76.5,t2:2295,t3:4360.5,estLF:38.2},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:12.75,t2:382.5,t3:726.75,estLF:6.4}},
+  "THOMPSON":{kitchen:{sf:44.625,t2:1338.75,t3:2543.625,estLF:22.3},island:{sf:24,t2:720,t3:1368,estLF:8},laundry:{sf:19.125,t2:573.75,t3:1090.125,estLF:9.6},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},halfBath:{sf:4.6875,t2:140.625,t3:267.1875,estLF:2.3},jackJill:{sf:10.3125,t2:309.375,t3:587.8125,estLF:5.2}},
+  "TIMBER CREST":{kitchen:{sf:51,t2:1530,t3:2907,estLF:25.5},island:{sf:18,t2:540,t3:1026,estLF:6},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}},
+  "WESTVIEW MANOR":{kitchen:{sf:36.125,t2:1083.75,t3:2059.125,estLF:18.1},island:{sf:36,t2:1080,t3:2052,estLF:12},laundry:{sf:10.625,t2:318.75,t3:605.625,estLF:5.3},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8},jackJill:{sf:15,t2:450,t3:855,estLF:7.5},powder:{sf:3.75,t2:112.5,t3:213.75,estLF:1.9}},
+  "WHISPERING PINES":{kitchen:{sf:47.8125,t2:1434.375,t3:2725.3125,estLF:23.9},island:{sf:15,t2:450,t3:855,estLF:5},laundry:{sf:10.625,t2:318.75,t3:605.625,estLF:5.3},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},jackJill:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7}},
+  "WILLOW CREEK":{kitchen:{sf:42.5,t2:1275,t3:2422.5,estLF:21.2},island:{sf:18,t2:540,t3:1026,estLF:6},masterBath:{sf:9.375,t2:281.25,t3:534.375,estLF:4.7},guestBath:{sf:5.625,t2:168.75,t3:320.625,estLF:2.8}},
+  "WOODSIDE SPECIAL":{kitchen:{sf:51,t2:1530,t3:2907,estLF:25.5},island:{sf:24,t2:720,t3:1368,estLF:8},masterBath:{sf:15,t2:450,t3:855,estLF:7.5},guestBath:{sf:7.5,t2:225,t3:427.5,estLF:3.8}}
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   SHOWER PRICING — derived from benchmark prices, NEVER hardcoded
+   Acrylic benchmark ($3,000) = wall tile only for std 3×5×8
+   Tile benchmark ($3,200) = wall tile + tile floor for std 3×5×8
+   ═══════════════════════════════════════════════════════════════ */
+var SHOWER_BENCHMARKS = {acrylic:3000, tile:3200};
+var SHOWER_STD = {w:3, d:5, h:8};
+var SHOWER_STD_WALL_SF = ((SHOWER_STD.w*2)+(SHOWER_STD.d*2))*SHOWER_STD.h; // 128
+var SHOWER_STD_FLOOR_SF = SHOWER_STD.w * SHOWER_STD.d; // 15
+var SHOWER_WALL_RATE = SHOWER_BENCHMARKS.acrylic / SHOWER_STD_WALL_SF; // $23.4375/SF
+var SHOWER_FLOOR_RATE = (SHOWER_BENCHMARKS.tile - SHOWER_BENCHMARKS.acrylic) / SHOWER_STD_FLOOR_SF; // $13.3333/SF
+var SHOWER_BENCH_PRICE = 484;
+var SHOWER_NICHE_PRICE = 459;
 
 /* EXT_TRADE_GROUPS — per spec §3c */
 var EXT_TRADE_GROUPS = [
@@ -930,7 +994,7 @@ function applyModelAliases(){
   // turnkey returned $0 interior contract silently.
   [P10, PM, MD, RD, PRESET_LABOR, MFT_PCT,
    PLAN_METRICS, INT_CONTRACT, INT_CONTRACT_REMOTE, BASE_COSTS,
-   MODELS, CRAFTSMAN, PDF_FILES].forEach(normalizeObjectKeys);
+   MODELS, CRAFTSMAN, PDF_FILES, CT_BASE_SF, CT_TIER_DATA].forEach(normalizeObjectKeys);
   // LIBERTY GROVE exists only in INT_CONTRACTS_APP data — no exterior data — drop it.
   // (User directive: canonical list is 40 names = 39 preset from PM + CUSTOM FLOOR PLAN)
   ["LIBERTY GROVE"].forEach(function(m){
@@ -1296,6 +1360,146 @@ function cloudLoadJobById(jobId){
   BACKEND.jobs.load(jobId).then(function(){ closeCloudJobs(); });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   DJANGO SAVE — POST contract to /stmc_ops/app/save-contract/
+
+   Called by wizNext() when the rep clicks "Save & Submit" on the final
+   step. Builds the payload save_contract_view expects, includes the full
+   STATE in `rawState` for rehydration on Edit, and redirects on success.
+   ═══════════════════════════════════════════════════════════════ */
+function saveContract(){
+  if(!STATE.model){
+    showToast("Select a model on Step 1 before submitting.");
+    return;
+  }
+  // Pre-flight checklist — same one shown on Step 8. Refuse to save until
+  // every item passes so the manager dashboard always gets a complete row.
+  if(typeof buildSubmissionChecklist === "function"){
+    var checklist = buildSubmissionChecklist();
+    var failed = checklist.filter(function(it){ return !it.ok; });
+    if(failed.length > 0){
+      var first = failed[0].label;
+      showToast("Pre-flight checklist incomplete: " + first +
+                (failed.length > 1 ? " (+ " + (failed.length - 1) + " more)" : ""));
+      return;
+    }
+  }
+  var c = STATE.customer || {};
+  var p10WithMFT = pn(c.p10) + (typeof getMFTMarkup === "function" ? getMFTMarkup() : 0);
+  var intContract = (typeof computeInteriorContractPrice === "function") ? computeInteriorContractPrice() : 0;
+  var shellTotal  = pn(STATE.shellContract);
+  var turnkeyTotal = shellTotal + Math.max(0, intContract);
+
+  // Build draws array — the Django side expects [{n, l, a}, ...]
+  var draws = [];
+  try {
+    var d = computeDrawAmounts({
+      isShell:false,
+      p10WithMFT:p10WithMFT,
+      concTotal:pn(STATE.concreteBudget),
+      custLabor:pn(STATE.laborBudget),
+      intContract:intContract,
+      shellTotal:shellTotal
+    });
+    draws = [
+      {n:0, l:"Good Faith Deposit",          a:Math.round(d.deposit)},
+      {n:1, l:"1st Home Draw (Loan Closing)", a:Math.round(d.draw1)},
+      {n:2, l:"2nd Home Draw (Concrete)",     a:Math.round(d.draw2)},
+      {n:3, l:"3rd Home Draw (Framing/Labor)",a:Math.round(d.draw3)},
+      {n:4, l:"4th Home Draw (Interior)",     a:Math.round(d.draw4)},
+      {n:5, l:"5th Home Draw (Finishes)",     a:Math.round(d.draw5)},
+      {n:6, l:"Final Draw (Punch)",           a:Math.round(d.draw6)}
+    ];
+  } catch(e){ console.warn("[saveContract] draw build failed:", e); }
+
+  // Build trade budgets for the manager/owner dashboards. Aggregates the
+  // ~25 granular PO lines from buildPMBudgetRows() into ~14 trade buckets,
+  // adds the sales-rep-entered labor lump as "Contractor Labor", and skips
+  // any zero-dollar trades.
+  var TITLE_TO_TRADE = {
+    "Cabinets":"Cabinets", "Countertops":"Countertops",
+    "Flooring Materials":"Flooring", "Flooring Installation":"Flooring", "Tile":"Flooring",
+    "Drywall Material":"Drywall", "Drywall Installation":"Drywall",
+    "Painting":"Paint",
+    "Trim and Door Materials":"Trim & Doors", "Trim and Door Installation":"Trim & Doors",
+    "Electrical":"Electrical",
+    "Plumbing Installation":"Plumbing",
+    "Insulation":"Insulation",
+    "HVAC":"HVAC",
+    "Plumbing & Light Fixtures":"Light Fixtures",
+    "Fireplace":"Fireplaces",
+    "Permits":"Permits & General",
+    "Final Clean":"Permits & General",
+    "Contract Allowance Expense":"Permits & General",
+    "Dumpster Allowance":"Permits & General"
+  };
+  var TRADE_ORDER = [
+    "Contractor Labor","Cabinets","Countertops","Flooring","Drywall","Paint",
+    "Trim & Doors","Electrical","Plumbing","Insulation","HVAC",
+    "Light Fixtures","Fireplaces","Permits & General"
+  ];
+  var tradeMap = {};
+  if(pn(STATE.laborBudget) > 0) tradeMap["Contractor Labor"] = pn(STATE.laborBudget);
+  try {
+    if(typeof buildPMBudgetRows === "function"){
+      var rows = buildPMBudgetRows() || [];
+      rows.forEach(function(r){
+        var trade = TITLE_TO_TRADE[r.title];
+        if(!trade) return;
+        var amt = pn(r.cost);
+        if(amt <= 0) return;
+        tradeMap[trade] = (tradeMap[trade] || 0) + amt;
+      });
+    }
+  } catch(e){ console.warn("[saveContract] PM budget aggregation failed:", e); }
+  var tradeBudgets = [];
+  TRADE_ORDER.forEach(function(name, idx){
+    if(tradeMap[name] && tradeMap[name] > 0){
+      tradeBudgets.push({trade:name, budgeted:Math.round(tradeMap[name]), actual:0, sort_order:idx});
+    }
+  });
+
+  var payload = {
+    leadId: window.STMC_EDIT_JOB_ID || null,
+    jobId:  window.STMC_EDIT_JOB_ID || null,
+    customer: c,
+    model: STATE.model,
+    branch: STATE.branch,
+    jobMode: "turnkey",
+    p10: pn(c.p10),
+    shellTotal: shellTotal,
+    turnkeyTotal: turnkeyTotal,
+    shellContract: shellTotal,
+    concreteBudget: pn(STATE.concreteBudget),
+    laborBudget: pn(STATE.laborBudget),
+    contractMeta: STATE.contractMeta || {},
+    draws: draws,
+    tradeBudgets: tradeBudgets,
+    budgetTotal: turnkeyTotal,
+    rawState: STATE
+  };
+
+  var url = (typeof window !== "undefined" && window.SAVE_CONTRACT_URL) || "/stmc_ops/app/save-contract/";
+  var csrf = (typeof window !== "undefined" && window.CSRF_TOKEN) || "";
+  showToast("Saving contract...");
+  fetch(url, {
+    method:"POST",
+    credentials:"same-origin",
+    headers:{ "Content-Type":"application/json", "X-CSRFToken": csrf },
+    body: JSON.stringify(payload)
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw new Error("HTTP "+r.status+": "+t); });
+    return r.json();
+  }).then(function(resp){
+    showToast("✓ Contract saved (job "+(resp.job_id||"?")+")");
+    var dest = (typeof window !== "undefined" && window.SALES_OVERVIEW_URL) || "/stmc_ops/sales/overview/";
+    setTimeout(function(){ window.location.href = dest; }, 600);
+  }).catch(function(err){
+    console.error("[saveContract] failed:", err);
+    showToast("Save failed: " + (err && err.message ? err.message : "see console"));
+  });
+}
+
 function isTurnkeyEligible(model){
   var c = canonicalModel(model);
   if(c === "CUSTOM FLOOR PLAN") return true; // custom uses reverse-margin formula
@@ -1463,7 +1667,7 @@ function defaultState(){
     cabUpgrades:null,
 
     // Step 6 Sub-Tab B (Countertops)
-    ct:{areas:[], notes:""},
+    ct:{areas:[], notes:"", tiers:{}, tierSF:{}},
 
     // Step 6 sub-tab pill: "cabinets" or "countertops"
     cabSubTab:"cabinets",
@@ -1523,7 +1727,11 @@ function livSF(E){
   if(STATE && STATE.int && pn(STATE.int.livingSFOverride) > 0) return pn(STATE.int.livingSFOverride);
   var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="1st Floor Living Area"||s.n==="2nd Floor Area"||s.n==="Bonus Room")t+=pn(s.sf)});return t;
 }
-function garSF(E){var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="Garage Area")t+=pn(s.sf)});return t}
+function garSF(E){
+  // Garage SF override from Step 5 — takes precedence when set (mirrors livingSFOverride pattern).
+  if(!E && STATE && STATE.int && pn(STATE.int.garageSFOverride) > 0) return pn(STATE.int.garageSFOverride);
+  var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="Garage Area")t+=pn(s.sf)});return t;
+}
 function porSF(E){var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="Front Porch Area"||s.n==="Back Porch Area")t+=pn(s.sf)});return t}
 function carSF(E){var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="Carport Area")t+=pn(s.sf)});return t}
 function bonSF(E){var t=0;(E||STATE.ext).slab.forEach(function(s){if(s.n==="Bonus Room"||s.n==="2nd Floor Area")t+=pn(s.sf)});return t}
@@ -2214,6 +2422,31 @@ function migrateStateForSprint1(){
     submittedAt:"", submittedBy:"", packageId:"",
     status:"not_submitted", error:"", documentsIncluded:[], checklistSnapshot:{}
   };
+  // Countertop tiers
+  if(!STATE.ct) STATE.ct = {areas:[], notes:"", tiers:{}, tierSF:{}};
+  if(!STATE.ct.tiers) STATE.ct.tiers = {};
+  if(!STATE.ct.tierSF) STATE.ct.tierSF = {};
+  // Shower calculator
+  if(STATE.sel && STATE.sel.plumbing){
+    if(!STATE.sel.plumbing.showers) STATE.sel.plumbing.showers = [];
+    if(STATE.sel.plumbing.showerUpgrade === undefined) STATE.sel.plumbing.showerUpgrade = null;
+    // Migrate legacy toggles into shower if they were on
+    if(STATE.sel.plumbing.toggles && STATE.sel.plumbing.showers.length === 0){
+      var lt = STATE.sel.plumbing.toggles;
+      if(lt.showerAcrylic || lt.showerTile){
+        STATE.sel.plumbing.showers.push({
+          label:"Shower 1", width:3, depth:5, height:8,
+          base: lt.showerTile ? "tile" : "acrylic",
+          benchQty: lt.showerBench ? 1 : 0,
+          nicheQty: lt.showerNiche ? 1 : 0
+        });
+        STATE.sel.plumbing.showerUpgrade = true;
+        // Clear legacy toggles
+        delete lt.showerAcrylic; delete lt.showerTile;
+        delete lt.showerBench; delete lt.showerNiche;
+      }
+    }
+  }
 }
 
 function onMilesToggle(checked){
@@ -2485,6 +2718,7 @@ function initInteriorState(){
     // For presets: defaults to model's slab total, editable on Step 5.
     // For custom: starts at manualLivingSF from Step 1 (or 0).
     livingSFOverride: isCustom ? pn(STATE.manualLivingSF) : living,
+    garageSFOverride: isCustom ? 0 : garSF(),
     bedrooms: autoBeds,
     fullBaths: fullBaths,
     halfBaths: halfBaths,
@@ -2609,7 +2843,7 @@ function calcIntTradeBase(tg, S){
   var lsf = (I.livingSFOverride > 0) ? pn(I.livingSFOverride) : livSF(S.ext);
   var drivers = {
     livingSF: lsf,
-    garSF: garSF(S.ext),
+    garSF: (I.garageSFOverride > 0) ? pn(I.garageSFOverride) : garSF(S.ext),
     cabLF: pn(I.cabLF),
     counterSF: pn(I.counterSF),
     drywallSF: pn(I.drywallSF),
@@ -2670,22 +2904,18 @@ function renderStep5(){
   if(STATE.int && STATE.int.livingSFOverride === undefined){
     STATE.int.livingSFOverride = livSF(STATE.ext);  // seed from slab data
   }
+  // DEFENSIVE: ensure garageSFOverride exists (migrates old states)
+  if(STATE.int && STATE.int.garageSFOverride === undefined){
+    // Seed from slab data — bypass override by passing STATE.ext explicitly
+    var slabGar = 0; STATE.ext.slab.forEach(function(s){if(s.n==="Garage Area")slabGar+=pn(s.sf)});
+    STATE.int.garageSFOverride = slabGar;
+  }
 
   var m = STATE.model;
   var mdl = MODELS[m] || {};
   var pm = PLAN_METRICS[m] || {};
   var isCustom = isCustomFloorPlan();
   var pdfFile = PDF_FILES[m];
-  var pdfUrl = "";
-  if(pdfFile){
-    var pdfRouteTemplate = window.SALES_FLOOR_PLAN_PDF_URL_TMPL || "";
-    if(pdfRouteTemplate && pdfRouteTemplate.indexOf("__FILENAME__") !== -1){
-      pdfUrl = pdfRouteTemplate.replace("__FILENAME__", encodeURIComponent(pdfFile));
-    } else {
-      // Fallback for stale templates that don't inject SALES_FLOOR_PLAN_PDF_URL_TMPL.
-      pdfUrl = "/stmc_ops/sales/floor-plan-pdfs/" + encodeURIComponent(pdfFile) + "/";
-    }
-  }
   var I = STATE.int;
   var h = '';
 
@@ -2696,17 +2926,23 @@ function renderStep5(){
   //   hvacTons, insulationSF, bedrooms, and all trade costs.
   // ═══════════════════════════════════════════════════════════════
   var currentLivSF = livSF();
+  var currentGarSF = garSF();
   var modelDefaultSF = 0;
+  var modelDefaultGarSF = 0;
   if(!isCustom){
     (MD[m] && MD[m].sqft || []).forEach(function(s){
       if(s.n==="1st Floor Living Area"||s.n==="2nd Floor Area"||s.n==="Bonus Room") modelDefaultSF += pn(s.sf);
+      if(s.n==="Garage Area") modelDefaultGarSF += pn(s.sf);
     });
   }
   var livHint = isCustom ? "Enter total heated/cooled living area" :
     (modelDefaultSF > 0 ? "Model default: "+$(modelDefaultSF)+" SF — editable to override" : "From plan data — editable to override");
+  var garHint = isCustom ? "Enter garage area — drives insulation & drywall budget" :
+    (modelDefaultGarSF > 0 ? "Model default: "+$(modelDefaultGarSF)+" SF — editable to override" : "From plan data — editable to override");
 
   h += '<div class="card" style="border:2px solid var(--red)">';
-  h +=   '<div class="section-hdr section-hdr-red"><span>Total Living SF · Primary Interior Driver</span><span class="badge" id="livSF-badge">'+$(currentLivSF)+' SF</span></div>';
+  h +=   '<div class="section-hdr section-hdr-red"><span>Area SF · Primary Interior Drivers</span><span class="badge" id="livSF-badge">'+$(currentLivSF)+' SF</span></div>';
+  // ── Living SF row ──
   h +=   '<div class="card-pad" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 20px">';
   h +=     '<div style="flex:1;min-width:200px">';
   h +=       '<div style="font-size:15px;font-weight:700;color:var(--red-dark)">Total Living SF (Heated / Cooled)</div>';
@@ -2714,6 +2950,16 @@ function renderStep5(){
   h +=       '<div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.5">Drives: Flooring SF · Trim LF · Drywall SF · Paint SF · HVAC Tons · Insulation SF · All interior trade costs</div>';
   h +=     '</div>';
   h +=     '<input class="inp mono num" style="width:180px;font-size:22px;text-align:right;font-weight:700;border-color:var(--red);border-width:2px;padding:12px 16px" type="number" min="0" step="1" id="livingSFInput" placeholder="0" value="'+(currentLivSF > 0 ? currentLivSF : "")+'" oninput="onLivingSFEdit(this.value)">';
+  h +=   '</div>';
+  // ── Garage SF row ──
+  h +=   '<div style="border-top:1px solid var(--g200)"></div>';
+  h +=   '<div class="card-pad" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 20px">';
+  h +=     '<div style="flex:1;min-width:200px">';
+  h +=       '<div style="font-size:15px;font-weight:700;color:var(--red-dark)">Garage SF</div>';
+  h +=       '<div style="font-size:12px;color:var(--g600);margin-top:4px">'+esc(garHint)+'</div>';
+  h +=       '<div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.5">Drives: Garage Insulation ($2.78/SF) · Garage Drywall · Soffit LF</div>';
+  h +=     '</div>';
+  h +=     '<input class="inp mono num" style="width:180px;font-size:22px;text-align:right;font-weight:700;border-color:var(--red);border-width:2px;padding:12px 16px" type="number" min="0" step="1" id="garageSFInput" placeholder="0" value="'+(currentGarSF > 0 ? currentGarSF : "")+'" oninput="onGarageSFEdit(this.value)">';
   h +=   '</div>';
 
   // ── Live computed metrics readout ──
@@ -2724,17 +2970,18 @@ function renderStep5(){
   h +=     '<div class="sum-box" style="flex:1;min-width:90px"><div class="sum-lbl">Paint SF</div><div class="sum-val" id="cmPaintSF">'+$(I.paintSF)+'</div><div class="sum-sub">Living × 4.057</div></div>';
   h +=     '<div class="sum-box" style="flex:1;min-width:90px"><div class="sum-lbl">HVAC Tons</div><div class="sum-val" id="cmHvacTons">'+I.hvacTons.toFixed(1)+'</div><div class="sum-sub">Living ÷ 700</div></div>';
   h +=     '<div class="sum-box" style="flex:1;min-width:90px"><div class="sum-lbl">Insulation SF</div><div class="sum-val" id="cmInsulationSF">'+$(I.insulationSF)+'</div><div class="sum-sub">= Living SF</div></div>';
+  h +=     '<div class="sum-box" style="flex:1;min-width:90px"><div class="sum-lbl">Gar. Insulation</div><div class="sum-val" id="cmGarInsul">'+fmtC(currentGarSF * 2.78)+'</div><div class="sum-sub">'+$(currentGarSF)+' × $2.78</div></div>';
   h +=   '</div>';
   h += '</div>';
 
   // ── PDF VIEWER (top) ──────────────────────────────
-  if(pdfFile && pdfUrl){
+  if(pdfFile){
     h += '<div class="card">';
     h +=   '<div class="section-hdr"><span>Floor Plan — '+esc(m)+'</span>';
-    h +=     '<a class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff;text-decoration:none" href="'+esc(pdfUrl)+'" target="_blank" rel="noopener">Open in New Window ↗</a>';
+    h +=     '<button class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff" onclick="window.open(\'pdfs/'+esc(pdfFile)+'\',\'_blank\')">Open in New Window ↗</button>';
     h +=   '</div>';
-    h +=   '<iframe src="'+esc(pdfUrl)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
-    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, make sure you are signed in and the file exists in <code>pdf-plans/</code>: <code>'+esc(pdfFile)+'</code>.</div>';
+    h +=   '<iframe src="pdfs/'+esc(pdfFile)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
+    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, confirm a <code>pdfs/</code> folder sits alongside this HTML file containing <code>'+esc(pdfFile)+'</code>.</div>';
     h += '</div>';
   }
 
@@ -2940,6 +3187,25 @@ function onLivingSFEdit(val){
   // Cascade to running total + autosave
   refreshLiveTotals();
 }
+/* Garage SF edit — editable override for garage area. Drives garage
+   insulation ($2.78/SF via insulGarage) and feeds into soffit LF and
+   base SF calculations. Mirrors the livingSFOverride pattern. */
+function onGarageSFEdit(val){
+  if(!STATE.int) return;
+  var newSF = Math.max(0, pi(val));
+  STATE.int.garageSFOverride = newSF;
+
+  // Update the Garage Insulation cost readout
+  var garInsul = document.getElementById("cmGarInsul");
+  if(garInsul) garInsul.textContent = fmtC(newSF * 2.78);
+  // Update the sub-label showing the math
+  if(garInsul && garInsul.nextElementSibling){
+    garInsul.nextElementSibling.textContent = $(newSF) + " × $2.78";
+  }
+
+  // Cascade to running total + autosave
+  refreshLiveTotals();
+}
 function stepIntMetric(path, delta){
   var key = path.split('.')[1];
   var cur = pi(STATE.int[key]);
@@ -3096,12 +3362,13 @@ function computeCabSections(S){
 
 function computeCtSections(S){
   S = S || STATE;
-  if(!S.ct || !S.int) return {planCharge:0, areaUpgradesTotal:0, upgradesSubtotal:0, ctSummaryTotal:0, addedSF:0, stdSF:0, modSF:0};
+  if(!S.ct || !S.int) return {planCharge:0, tierTotal:0, areaUpgradesTotal:0, upgradesSubtotal:0, ctSummaryTotal:0, addedSF:0, stdSF:0, modSF:0};
 
   var m = S.model;
   var mdl = MODELS[m] || {};
   var isCustom = isCustomFloorPlan(S);
 
+  // Section 1: Plan-based charges — UNCHANGED formula
   var modCabLF = pn(S.int.cabLF);
   var modIsland = pn(S.int.islandDepth) * pn(S.int.islandWidth);
   var modSF = modCabLF * 2 + modIsland;
@@ -3111,16 +3378,37 @@ function computeCtSections(S){
   var addedSF = Math.max(0, modSF - stdSF);
   var planCharge = isCustom ? 0 : Math.round(addedSF * 50);
 
+  // Section 2: Tier upgrades — from CT_TIER_DATA per model
+  var tierTotal = 0;
+  var tierData = CT_TIER_DATA[canonicalModel(m)] || {};
+  var ct = S.ct || {};
+  var tiers = ct.tiers || {};
+  var tierSF = ct.tierSF || {};
+  CT_AREA_KEYS.forEach(function(area){
+    var td = tierData[area];
+    if(!td) return;
+    var sel = tiers[area] || "";
+    if(!sel) return;
+    var baseCost = sel === "t2" ? td.t2 : (sel === "t3" ? td.t3 : 0);
+    // If user adjusted SF, scale proportionally
+    var userSF = pn(tierSF[area]);
+    if(userSF > 0 && td.sf > 0 && Math.abs(userSF - td.sf) > 0.01){
+      baseCost = baseCost * (userSF / td.sf);
+    }
+    tierTotal += Math.round(baseCost * 100) / 100;
+  });
+
+  // Section 3: Custom areas (existing free-form rows)
   var areaUpgradesTotal = 0;
-  (S.ct.areas || []).forEach(function(r){
+  (ct.areas || []).forEach(function(r){
     areaUpgradesTotal += pn(r.rate) * pn(r.sqft);
   });
 
-  var upgradesSubtotal = areaUpgradesTotal;
-  var ctSummaryTotal = planCharge + areaUpgradesTotal;
+  var upgradesSubtotal = tierTotal + areaUpgradesTotal;
+  var ctSummaryTotal = planCharge + upgradesSubtotal;
 
   return {
-    planCharge: planCharge, areaUpgradesTotal: areaUpgradesTotal,
+    planCharge: planCharge, tierTotal: tierTotal, areaUpgradesTotal: areaUpgradesTotal,
     upgradesSubtotal: upgradesSubtotal, ctSummaryTotal: ctSummaryTotal,
     addedSF: addedSF, stdSF: stdSF, modSF: modSF
   };
@@ -3320,9 +3608,9 @@ function renderCabSubTab(cu, cr, cabT){
   h +=   '<div class="section-hdr"><span>Section 4 · Cabinet Inserts</span><span class="badge" id="cabsec-4">'+fmt(cabT.insertsTotal)+'</span></div>';
   h +=   '<div class="card-pad">';
   [
-    {id:"pullOut",    lbl:"Pull Out Inserts",              rate:350, ph:"Describe insert location & type"},
-    {id:"drawerRoll", lbl:"Drawer / Roll Out / Tip Out",    rate:275, ph:"Describe insert location & type"},
-    {id:"custom",     lbl:"Custom Inserts",                  rate:500, ph:"Describe custom insert details"}
+    {id:"pullOut",    lbl:"Trash Can / Spice Pull Out Insert", rate:350, ph:"Enter insert type (e.g. Trash Can, Spice Rack, etc.)"},
+    {id:"drawerRoll", lbl:"Drawer / Roll Out / Tip Out Insert",    rate:275, ph:"Enter insert type (e.g. Drawer Roll Out, Tip Out, etc.)"},
+    {id:"custom",     lbl:"Custom Cabinet Insert",                  rate:500, ph:"Enter insert type (e.g. Lazy Susan, Wine Rack, etc.)"}
   ].forEach(function(ins){
     var entry = cu.inserts[ins.id];
     var qty = pi(entry.qty);
@@ -3448,8 +3736,13 @@ function buildCabSummaryHTML(cabT){
 function renderCtSubTab(ctT){
   var ct = STATE.ct;
   var isCustom = isCustomFloorPlan();
+  var m = canonicalModel(STATE.model);
+  var tierData = CT_TIER_DATA[m] || {};
+  var tiers = ct.tiers || {};
+  var tierSF = ct.tierSF || {};
   var h = '';
 
+  // Section 1 — Plan-Based Charges (UNCHANGED)
   h += '<div class="card">';
   h +=   '<div class="section-hdr"><span>Section 1 · Plan-Based Countertop Charges</span><span class="badge" id="ctsec-1">'+fmt(ctT.planCharge)+'</span></div>';
   h +=   '<div class="card-pad">';
@@ -3468,8 +3761,52 @@ function renderCtSubTab(ctT){
   h +=   '</div>';
   h += '</div>';
 
+  // Section 2 — Countertop Material Tier (NEW)
   h += '<div class="card">';
-  h +=   '<div class="section-hdr"><span>Section 2 · Upgraded Countertop Areas</span><span class="badge" id="ctsec-2">'+fmt(ctT.areaUpgradesTotal)+'</span></div>';
+  h +=   '<div class="section-hdr"><span>Section 2 · Countertop Material Tier</span><span class="badge" id="ctsec-2">'+fmt(ctT.tierTotal||0)+'</span></div>';
+  h +=   '<div class="card-pad">';
+  h +=     '<div class="banner banner-info" style="font-size:12px">Select a countertop material tier per area. <strong>Standard</strong> = included. <strong>Tier 2</strong> and <strong>Tier 3</strong> are upgrade charges. SF is editable if the area differs from plan data.</div>';
+
+  // Visible areas: only those with non-zero tier data for this model
+  var visibleAreas = [];
+  CT_AREA_KEYS.forEach(function(ak){
+    var td = tierData[ak];
+    if(td && (td.t2 > 0 || td.t3 > 0)) visibleAreas.push(ak);
+  });
+
+  if(visibleAreas.length > 0){
+    h += '<div class="row-hdr" style="grid-template-columns:1fr 80px 200px 80px"><div>Area</div><div style="text-align:right">SF</div><div style="text-align:center">Material Tier</div><div style="text-align:right">Cost</div></div>';
+    visibleAreas.forEach(function(ak){
+      var td = tierData[ak];
+      var sel = tiers[ak] || "";
+      var sf = pn(tierSF[ak]) || td.sf;
+      var baseCost = sel === "t2" ? td.t2 : (sel === "t3" ? td.t3 : 0);
+      var cost = baseCost;
+      if(sf > 0 && td.sf > 0 && Math.abs(sf - td.sf) > 0.01) cost = Math.round(baseCost * (sf/td.sf) * 100)/100;
+      h += '<div class="row-line" style="grid-template-columns:1fr 80px 200px 80px;margin-bottom:4px">';
+      h +=   '<div><strong>'+esc(CT_AREA_LABELS[ak])+'</strong>';
+      h +=     '<span style="font-size:11px;color:var(--g500);margin-left:6px">— ~'+td.estLF+' LF est*</span>';
+      h +=     '<br><span style="font-size:11px;color:var(--g400)">T2 '+fmt(td.t2)+' · T3 '+fmt(td.t3)+'</span>';
+      h +=   '</div>';
+      h +=   '<input class="inp mono num" type="number" min="0" step="0.25" style="padding:6px 8px;font-size:13px" value="'+(sf||"")+'" oninput="updCtTierSF(\''+ak+'\', this.value)">';
+      h +=   '<select class="sel" style="font-size:13px;'+(sel?'background:#FFF7ED':'')+'" onchange="updCtTier(\''+ak+'\', this.value)">';
+      h +=     '<option value=""'+(sel===""?" selected":"")+'>— Standard (included) —</option>';
+      h +=     '<option value="t2"'+(sel==="t2"?" selected":"")+'>Tier 2 — '+fmt(td.t2)+'</option>';
+      h +=     '<option value="t3"'+(sel==="t3"?" selected":"")+'>Tier 3 — '+fmt(td.t3)+'</option>';
+      h +=   '</select>';
+      h +=   '<div class="row-cost" style="color:'+(cost>0?'var(--g900)':'var(--g400)')+'">'+(cost>0?fmt(cost):"—")+'</div>';
+      h += '</div>';
+    });
+    h += '<div style="font-size:11px;color:var(--g500);margin-top:10px;font-style:italic">*LF estimates derived from countertop SF ÷ 2 (standard 24″ counter depth). Island LF = island width. Actual LF may vary based on CAD layout.</div>';
+  } else {
+    h += '<div class="banner banner-empty">No tier upgrade data for this model'+(isCustom?' (Custom Floor Plan)':'')+'.</div>';
+  }
+  h +=   '</div>';
+  h += '</div>';
+
+  // Section 3 — Custom Countertop Areas (was Section 2)
+  h += '<div class="card">';
+  h +=   '<div class="section-hdr"><span>Section 3 · Custom Countertop Areas</span><span class="badge" id="ctsec-3">'+fmt(ctT.areaUpgradesTotal)+'</span></div>';
   h +=   '<div class="card-pad">';
   if((ct.areas||[]).length > 0){
     h += '<div class="row-table">';
@@ -3477,7 +3814,7 @@ function renderCtSubTab(ctT){
     ct.areas.forEach(function(r, i){
       var cost = pn(r.rate) * pn(r.sqft);
       h += '<div class="row-line" style="grid-template-columns:1.4fr 130px 110px 110px 36px">';
-      h +=   '<input class="inp" type="text" value="'+esc(r.area)+'" placeholder="e.g. Kitchen Perimeter" oninput="updCtArea('+i+', \'area\', this.value)">';
+      h +=   '<input class="inp" type="text" value="'+esc(r.area)+'" placeholder="e.g. Outdoor Kitchen" oninput="updCtArea('+i+', \'area\', this.value)">';
       h +=   '<input class="inp mono num" type="number" min="0" value="'+(pn(r.rate)||"")+'" placeholder="0" oninput="updCtArea('+i+', \'rate\', this.value)">';
       h +=   '<input class="inp mono num" type="number" min="0" value="'+(pn(r.sqft)||"")+'" placeholder="0" oninput="updCtArea('+i+', \'sqft\', this.value)">';
       h +=   '<div class="row-cost" id="ctAreaCost-'+i+'">'+(cost>0?fmt(cost):"—")+'</div>';
@@ -3486,21 +3823,23 @@ function renderCtSubTab(ctT){
     });
     h += '</div>';
   } else {
-    h += '<div class="banner banner-empty">No upgraded countertop areas. Use "+ Add Another Area" to enter specific areas at custom $/SF rates.</div>';
+    h += '<div class="banner banner-empty">No custom areas. Add for areas not covered by the tier selector above.</div>';
   }
   h +=     '<div style="margin-top:10px"><button class="row-add" onclick="addCtArea()">+ Add Another Area</button></div>';
   h +=   '</div>';
   h += '</div>';
 
+  // Section 4 — Notes (was Section 3)
   h += '<div class="card">';
-  h +=   '<div class="section-hdr"><span>Section 3 · Notes</span></div>';
+  h +=   '<div class="section-hdr"><span>Section 4 · Notes</span></div>';
   h +=   '<div class="card-pad">';
   h +=     '<textarea class="inp" rows="4" style="width:100%;resize:vertical" placeholder="Countertop material selections, edge profiles, seams, etc." oninput="updCtNotes(this.value)">'+esc(ct.notes||"")+'</textarea>';
   h +=   '</div>';
   h += '</div>';
 
+  // Section 5 — Summary (was Section 4)
   h += '<div class="card">';
-  h +=   '<div class="section-hdr section-hdr-red"><span>Section 4 · Countertop Upgrade Total</span></div>';
+  h +=   '<div class="section-hdr section-hdr-red"><span>Section 5 · Countertop Upgrade Total</span></div>';
   h +=   '<div class="card-pad" id="ctSummary-pad">'+buildCtSummaryHTML(ctT, isCustom)+'</div>';
   h += '</div>';
 
@@ -3512,7 +3851,8 @@ function buildCtSummaryHTML(ctT, isCustom){
   if(isCustom === undefined) isCustom = isCustomFloorPlan();
   var h = '';
   h += summaryRow("Plan-Based Charge (added SF × $50)", ctT.planCharge, isCustom?"not applied for Custom Floor Plan":null);
-  h += summaryRow("Area Upgrades",                       ctT.areaUpgradesTotal);
+  h += summaryRow("Tier Upgrades",                        ctT.tierTotal || 0);
+  h += summaryRow("Custom Area Upgrades",                  ctT.areaUpgradesTotal);
   h += '<div class="total-bar" style="margin-top:14px"><span class="total-lbl">COUNTERTOP UPGRADE TOTAL</span><span class="total-val" id="ctTotalVal">'+fmt(ctT.ctSummaryTotal)+'</span></div>';
   return h;
 }
@@ -3613,6 +3953,74 @@ function updCtArea(i, field, val){
 }
 function updCtNotes(val){ STATE.ct.notes = val; scheduleSave(); }
 
+/* Tier selection handlers */
+function updCtTier(area, val){
+  if(!STATE.ct.tiers) STATE.ct.tiers = {};
+  STATE.ct.tiers[area] = val;
+  renderCurrentStep();
+}
+function updCtTierSF(area, val){
+  if(!STATE.ct.tierSF) STATE.ct.tierSF = {};
+  STATE.ct.tierSF[area] = pn(val);
+  renderCurrentStep();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHOWER PRICING CALCULATOR
+   Derived from benchmark prices — rates computed, never hardcoded.
+   ═══════════════════════════════════════════════════════════════ */
+function computeShowerCost(sh){
+  var w = pn(sh.width), d = pn(sh.depth), h = pn(sh.height) || 8;
+  var wallSF = ((w*2)+(d*2))*h;
+  var floorSF = w * d;
+  var wallCost = wallSF * SHOWER_WALL_RATE;
+  var floorCost = sh.base === "tile" ? floorSF * SHOWER_FLOOR_RATE : 0;
+  var benchCost = pi(sh.benchQty) * SHOWER_BENCH_PRICE;
+  var nicheCost = pi(sh.nicheQty) * SHOWER_NICHE_PRICE;
+  return {wallSF:wallSF, floorSF:floorSF, wallCost:wallCost, floorCost:floorCost, benchCost:benchCost, nicheCost:nicheCost, total: wallCost+floorCost+benchCost+nicheCost};
+}
+
+function computeAllShowersCost(S){
+  S = S || STATE;
+  if(!S.sel || !S.sel.plumbing || !S.sel.plumbing.showers) return 0;
+  var total = 0;
+  S.sel.plumbing.showers.forEach(function(sh){ total += computeShowerCost(sh).total; });
+  return total;
+}
+
+function showerContractNote(sh){
+  var w = pn(sh.width), d = pn(sh.depth);
+  var base = sh.base === "tile" ? "Tile Floor" : "Acrylic Base";
+  var addons = [];
+  if(pi(sh.benchQty) > 0) addons.push(sh.benchQty + " bench" + (sh.benchQty > 1 ? "es" : ""));
+  if(pi(sh.nicheQty) > 0) addons.push(sh.nicheQty + " niche" + (sh.nicheQty > 1 ? "s" : ""));
+  return "Std " + w + "×" + d + " Tile Shower — " + base + (addons.length ? " w/ " + addons.join(" & ") : "");
+}
+
+function addShower(){
+  if(!STATE.sel.plumbing.showers) STATE.sel.plumbing.showers = [];
+  STATE.sel.plumbing.showers.push({label:"Shower "+(STATE.sel.plumbing.showers.length+1), width:3, depth:5, height:8, base:"acrylic", benchQty:0, nicheQty:0});
+  renderCurrentStep();
+}
+function delShower(idx){
+  STATE.sel.plumbing.showers.splice(idx, 1);
+  renderCurrentStep();
+}
+function updShowerField(idx, field, val){
+  var sh = STATE.sel.plumbing.showers[idx];
+  if(!sh) return;
+  if(field === "benchQty" || field === "nicheQty") sh[field] = pi(val);
+  else if(field === "label" || field === "base") sh[field] = val;
+  else sh[field] = pn(val);
+  renderCurrentStep();
+}
+function setShowerGate(val){
+  if(!STATE.sel.plumbing) return;
+  STATE.sel.plumbing.showerUpgrade = val;
+  if(val && (!STATE.sel.plumbing.showers || STATE.sel.plumbing.showers.length === 0)) addShower();
+  renderCurrentStep();
+}
+
 /* ═══════════════════════════════════════════════════════════════
    STEP 6 LIVE REFRESH — targeted DOM updates without rebuilding inputs.
    Mirrors the Step 7 refreshStep7Live pattern: every section badge,
@@ -3680,11 +4088,13 @@ function refreshStep6Live(){
   var cabSum = document.getElementById("cabSummary-pad");
   if(cabSum) cabSum.innerHTML = buildCabSummaryHTML(cabT);
 
-  // 7. Countertop section badges
+  // 7. Countertop section badges (Section 1=plan, 2=tiers, 3=custom)
   var ctSec1 = document.getElementById("ctsec-1");
   if(ctSec1) ctSec1.textContent = fmt(ctT.planCharge);
   var ctSec2 = document.getElementById("ctsec-2");
-  if(ctSec2) ctSec2.textContent = fmt(ctT.areaUpgradesTotal);
+  if(ctSec2) ctSec2.textContent = fmt(ctT.tierTotal || 0);
+  var ctSec3 = document.getElementById("ctsec-3");
+  if(ctSec3) ctSec3.textContent = fmt(ctT.areaUpgradesTotal);
 
   // 8. Countertop area row cost cells
   (STATE.ct && STATE.ct.areas || []).forEach(function(r, i){
@@ -3798,13 +4208,8 @@ var SEL_DEFS = {
   plumbing: {
     label: "Plumbing",
     sections: [
-      {title:"Tile & Shower", items:[
-        {id:"tileShowerSF", type:"sf", label:"Tile Shower — Custom SF (Cust. Supplies Tile)", price:50, trade:"tile"},
-        {id:"tileFloorSF", type:"sf", label:"Tile Floors — Custom SF (Cust. Supplies Tile)", price:30, trade:"tile"},
-        {id:"showerAcrylic", type:"toggle", label:"Std 3×5 Tile Shower — Acrylic Base", price:3000, trade:"tile"},
-        {id:"showerTile", type:"toggle", label:"Std 3×5 Tile Shower — Tile Floor", price:3200, trade:"tile"},
-        {id:"showerBench", type:"toggle", label:"Tile Shower Bench", price:484, trade:"tile"},
-        {id:"showerNiche", type:"toggle", label:"Tile Shower Niche", price:459, trade:"tile"}
+      {title:"Tile & Shower", type:"showerCalc", items:[
+        {id:"tileFloorSF", type:"sf", label:"Tile Floors — Custom SF (Cust. Supplies Tile)", price:30, trade:"tile"}
       ]},
       {title:"Plumbing Stubs & Add-Ons", items:[
         {id:"freeTub", type:"qty", label:"Freestanding Tub & Faucet (full package)", price:3876, unit:"each", trade:"plumbing", fp:1},
@@ -3900,6 +4305,9 @@ function initSelState(){
   });
   if(!STATE.sel.docusign.gasType) STATE.sel.docusign.gasType = "";
   if(!Array.isArray(STATE.sel.trim.concreteFinishLines)) STATE.sel.trim.concreteFinishLines = [];
+  // Shower calculator state
+  if(!Array.isArray(STATE.sel.plumbing.showers)) STATE.sel.plumbing.showers = [];
+  if(STATE.sel.plumbing.showerUpgrade === undefined) STATE.sel.plumbing.showerUpgrade = null;
   if(!STATE.sel.custom) STATE.sel.custom = {upgrades:[], credits:[]};
   if(!Array.isArray(STATE.sel.custom.upgrades)) STATE.sel.custom.upgrades = [];
   if(!Array.isArray(STATE.sel.custom.credits)) STATE.sel.custom.credits = [];
@@ -3957,6 +4365,9 @@ function computeSelPillTotal(pillKey, S){
     }
     if(sec.type === "concreteFinishLines"){
       (sel.concreteFinishLines || []).forEach(function(r){ total += pn(r.rate) * pn(r.sqft); });
+    }
+    if(sec.type === "showerCalc"){
+      total += computeAllShowersCost(S);
     }
   });
   return total;
@@ -4052,6 +4463,8 @@ function renderSelPill(pillKey){
       h += renderCustomLinesSection(pillKey);
     } else if(sec.type === "concreteFinishLines"){
       h += renderConcreteFinishSection(sec);
+    } else if(sec.type === "showerCalc"){
+      h += renderShowerCalcSection(sec, pillKey);
     } else {
       // Standard section with items or subsections
       (sec.items || []).forEach(function(it){ h += renderSelItem(it, pillKey); });
@@ -4086,6 +4499,10 @@ function computeSelSectionTotal(sec, sel){
   });
   if(sec.type === "customLines") (sel.customLines || []).forEach(function(r){ total += pn(r.amount); });
   if(sec.type === "concreteFinishLines") (sel.concreteFinishLines || []).forEach(function(r){ total += pn(r.rate) * pn(r.sqft); });
+  if(sec.type === "showerCalc"){
+    // Shower calculator total + standalone tile items
+    total += computeAllShowersCost();
+  }
   return total;
 }
 
@@ -4183,6 +4600,86 @@ function renderConcreteFinishSection(sec){
     h += '</div>';
   }
   h += '<div style="margin-top:10px"><button class="row-add" onclick="addConcFinishLine()">+ Add Another Line</button></div>';
+  return h;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHOWER CALCULATOR RENDERER
+   Renders the gated shower calculator + standalone tile floor
+   ═══════════════════════════════════════════════════════════════ */
+function renderShowerCalcSection(sec, pillKey){
+  var sel = STATE.sel.plumbing;
+  var showers = sel.showers || [];
+  var gate = sel.showerUpgrade; // null=unanswered, true, false
+  var shTotal = computeAllShowersCost();
+  var h = '';
+
+  // Gate question
+  h += '<div class="upg-row" style="padding:14px 16px;margin-bottom:14px;'+(gate===null||gate===undefined?'background:var(--amber-light);border-color:#FDE68A':'background:var(--g50)')+'">';
+  h +=   '<span style="font-size:14px;font-weight:700;flex:1">Customer Tile Shower Upgrade?</span>';
+  h +=   '<div style="display:flex;gap:8px">';
+  h +=     '<button class="footer-btn" style="padding:8px 20px;font-weight:700;font-size:13px;'+(gate===true?'border-color:var(--green);background:var(--green-light);color:var(--green-dark)':'')+'" onclick="setShowerGate(true)">Yes</button>';
+  h +=     '<button class="footer-btn" style="padding:8px 20px;font-weight:700;font-size:13px;'+(gate===false?'border-color:var(--red);background:var(--red-light);color:var(--red-dark)':'')+'" onclick="setShowerGate(false)">No</button>';
+  h +=   '</div>';
+  h += '</div>';
+
+  if(gate === true){
+    h += '<div class="banner banner-amber" style="font-size:12px"><strong>Standard tile height is up to 8\'.</strong> Heights above 8\' may require additional material and labor.</div>';
+
+    showers.forEach(function(sh, idx){
+      var c = computeShowerCost(sh);
+      h += '<div style="border:1px solid var(--g200);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      // Header
+      h +=   '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+      h +=     '<input class="inp" type="text" value="'+esc(sh.label)+'" style="border:none;border-bottom:2px solid var(--g200);border-radius:0;padding:4px 0;width:200px;font-size:15px;font-weight:700" oninput="updShowerField('+idx+',\'label\',this.value)">';
+      h +=     '<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-weight:700;font-size:16px;color:var(--red)">'+fmt(Math.round(c.total))+'</span>';
+      if(showers.length > 1) h += '<button class="row-del" style="width:28px;height:28px" onclick="delShower('+idx+')">×</button>';
+      h +=     '</div>';
+      h +=   '</div>';
+      // Inputs: Base type + W + D + H
+      h +=   '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
+      h +=     '<div><div class="sum-lbl" style="margin-bottom:4px">Base Type</div><select class="sel" style="font-size:13px;'+(sh.base==="tile"?"background:#FFF7ED":"")+'" onchange="updShowerField('+idx+',\'base\',this.value)"><option value="acrylic"'+(sh.base!=="tile"?" selected":"")+'>Acrylic</option><option value="tile"'+(sh.base==="tile"?" selected":"")+'>Tile</option></select></div>';
+      h +=     '<div><div class="sum-lbl" style="margin-bottom:4px">Width (ft)</div><input class="inp mono" type="number" min="0" step="0.5" style="text-align:center;font-size:16px;font-weight:700" value="'+(sh.width||"")+'" placeholder="3" oninput="updShowerField('+idx+',\'width\',this.value)"></div>';
+      h +=     '<div><div class="sum-lbl" style="margin-bottom:4px">Depth (ft)</div><input class="inp mono" type="number" min="0" step="0.5" style="text-align:center;font-size:16px;font-weight:700" value="'+(sh.depth||"")+'" placeholder="5" oninput="updShowerField('+idx+',\'depth\',this.value)"></div>';
+      h +=     '<div><div class="sum-lbl" style="margin-bottom:4px">Height (ft)</div><input class="inp mono" type="number" min="0" step="0.5" style="text-align:center;font-size:16px;font-weight:700;'+(pn(sh.height)>8?'border-color:var(--amber)':'')+'" value="'+(sh.height||"")+'" placeholder="8" oninput="updShowerField('+idx+',\'height\',this.value)">';
+      if(pn(sh.height) > 8) h += '<div style="font-size:10px;color:var(--amber-dark);margin-top:2px">Above std 8\'</div>';
+      h +=     '</div>';
+      h +=   '</div>';
+      // Add-ons: Bench + Niche qty
+      h +=   '<div style="display:flex;gap:12px;margin-bottom:14px">';
+      h +=     '<div style="flex:1"><div class="sum-lbl" style="margin-bottom:4px">Bench ($'+SHOWER_BENCH_PRICE+' ea)</div><input class="inp mono" type="number" min="0" step="1" style="text-align:center;font-size:14px" value="'+(pi(sh.benchQty)||"")+'" placeholder="0" oninput="updShowerField('+idx+',\'benchQty\',this.value)"></div>';
+      h +=     '<div style="flex:1"><div class="sum-lbl" style="margin-bottom:4px">Niche ($'+SHOWER_NICHE_PRICE+' ea)</div><input class="inp mono" type="number" min="0" step="1" style="text-align:center;font-size:14px" value="'+(pi(sh.nicheQty)||"")+'" placeholder="0" oninput="updShowerField('+idx+',\'nicheQty\',this.value)"></div>';
+      h +=   '</div>';
+      // Breakdown
+      h +=   '<div style="background:var(--g50);border-radius:var(--radius-sm);padding:10px 14px;border:1px solid var(--g200)">';
+      h +=     '<div class="sum-lbl" style="margin-bottom:8px">Breakdown</div>';
+      h +=     '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid var(--g100)"><span>Walls <span style="font-size:11px;color:var(--g500);font-family:var(--font-mono)">'+c.wallSF+' SF × $'+SHOWER_WALL_RATE.toFixed(4)+'/SF</span></span><span style="font-family:var(--font-mono);font-weight:600">'+fmtC(c.wallCost)+'</span></div>';
+      h +=     '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid var(--g100)"><span>Floor <span style="font-size:11px;color:var(--g500);font-family:var(--font-mono)">'+(sh.base==="tile"?c.floorSF+' SF × $'+SHOWER_FLOOR_RATE.toFixed(4)+'/SF':'Acrylic pan (included in wall rate)')+'</span></span><span style="font-family:var(--font-mono);font-weight:600">'+(sh.base==="tile"?fmtC(c.floorCost):'$0.00')+'</span></div>';
+      if(c.benchCost > 0 || c.nicheCost > 0){
+        var addonDesc = [];
+        if(pi(sh.benchQty)>0) addonDesc.push(sh.benchQty+' bench × $'+SHOWER_BENCH_PRICE);
+        if(pi(sh.nicheQty)>0) addonDesc.push(sh.nicheQty+' niche × $'+SHOWER_NICHE_PRICE);
+        h += '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid var(--g100)"><span>Add-Ons <span style="font-size:11px;color:var(--g500);font-family:var(--font-mono)">'+addonDesc.join(' + ')+'</span></span><span style="font-family:var(--font-mono);font-weight:600">'+fmtC(c.benchCost+c.nicheCost)+'</span></div>';
+      }
+      h +=     '<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;border-top:2px solid var(--g300);font-weight:700"><span>TOTAL</span><span style="font-family:var(--font-mono);font-size:15px">'+fmtC(c.total)+'</span></div>';
+      h +=   '</div>';
+      // Contract note
+      h +=   '<div style="margin-top:10px;padding:8px 12px;background:var(--g50);border:1px solid var(--g200);border-radius:var(--radius-sm);font-size:12px;color:var(--g700)"><strong style="color:var(--red)">Contract Note:</strong> '+esc(showerContractNote(sh))+'</div>';
+      h += '</div>';
+    });
+    h += '<button class="row-add" onclick="addShower()" style="margin-bottom:14px">+ Add Another Shower</button>';
+  }
+
+  if(gate === false){
+    h += '<div class="banner banner-empty" style="margin:0 0 14px">No tile shower upgrades. Standard shower package included.</div>';
+  }
+
+  // Standalone Tile Floor — ALWAYS visible
+  h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--g200)">';
+  h +=   '<div class="sum-lbl" style="margin-bottom:8px">Standalone Tile (outside showers)</div>';
+  (sec.items || []).forEach(function(it){ h += renderSelItem(it, pillKey); });
+  h += '</div>';
+
   return h;
 }
 
@@ -4582,7 +5079,11 @@ function gatherUpgradeTextLines(){
   // Step 5 — CAD modifications
   var cadList = computeCadCharges(S);
   cadList.forEach(function(c){
-    if(c.cost > 0 || c.cost < 0) lines.push(c.label);
+    if(c.cost > 0 || c.cost < 0){
+      // Strip pricing info (e.g. "× $330", "× $225") from labels for contract notes
+      var cleanLabel = c.label.replace(/\s*×\s*\$[\d,.]+/g, "").trim();
+      lines.push(cleanLabel);
+    }
   });
 
   // Step 6 Sub-Tab A — Cabinets
@@ -4593,40 +5094,41 @@ function gatherUpgradeTextLines(){
       if(ds[area]) lines.push("Door Style — "+area.charAt(0).toUpperCase()+area.slice(1)+": "+ds[area]);
     });
     (cu.customCraftRows||[]).forEach(function(r){
-      if(r.area && r.finish) lines.push("Custom Craftsman: "+r.area+" — "+r.finish+(pn(r.lf)>0?" ("+pn(r.lf)+" LF)":""));
+      if(r.area && r.finish) lines.push("Custom Craftsman: "+r.area+" — "+r.finish);
     });
     // Kitchen upgrades
     var kNames = {doorsToDrawers:"Doors to Drawers", fridgePanel:"Fridge Panel", hoodVent:"Hood Vent", tallPantry:"Tall Pantry", lazySusan:"Lazy Susan"};
     if(cu.kitchen) Object.keys(kNames).forEach(function(k){
       var qty = pi(cu.kitchen[k]);
-      if(qty > 0) lines.push("Kitchen: "+kNames[k]+(qty>1?" ("+qty+")":""));
+      if(qty > 0) lines.push("Kitchen: "+kNames[k]+" (×"+qty+")");
     });
     // Inserts
     if(cu.inserts){
       ["pullOut","drawerRoll","custom"].forEach(function(k){
         var ins = cu.inserts[k];
         if(ins && pi(ins.qty) > 0){
-          var iLabel = {pullOut:"Pull-Out Shelf", drawerRoll:"Drawer Roll-Out", custom:"Custom Insert"}[k];
-          lines.push("Cabinet Insert: "+iLabel+" ("+pi(ins.qty)+")"+(ins.note ? " — "+ins.note : ""));
+          var iLabel = {pullOut:"Trash Can / Spice Pull Out Insert", drawerRoll:"Drawer / Roll Out / Tip Out Insert", custom:"Custom Cabinet Insert"}[k];
+          var displayLabel = ins.note ? ins.note + " Insert" : iLabel;
+          lines.push("Cabinet Insert: "+displayLabel+" (×"+pi(ins.qty)+")");
         }
       });
     }
     // Laundry
     if(cu.laundry){
-      if(pi(cu.laundry.uppersWD)>0) lines.push("Laundry: Uppers Above W/D ("+pi(cu.laundry.uppersWD)+")");
-      if(pi(cu.laundry.tallCab)>0) lines.push("Laundry: Tall Cabinet ("+pi(cu.laundry.tallCab)+")");
+      if(pi(cu.laundry.uppersWD)>0) lines.push("Laundry: Uppers Above W/D (×"+pi(cu.laundry.uppersWD)+")");
+      if(pi(cu.laundry.tallCab)>0) lines.push("Laundry: Tall Cabinet (×"+pi(cu.laundry.tallCab)+")");
     }
     // Bath
     if(cu.bath){
-      if(pi(cu.bath.drawerVanity)>0) lines.push("Bath: Drawer Stack Vanity ("+pi(cu.bath.drawerVanity)+")");
-      if(pi(cu.bath.tallLinen)>0) lines.push("Bath: Tall Linen ("+pi(cu.bath.tallLinen)+")");
-      if(pi(cu.bath.makeupSeat)>0) lines.push("Bath: Makeup Seat ("+pi(cu.bath.makeupSeat)+")");
+      if(pi(cu.bath.drawerVanity)>0) lines.push("Bath: Drawer Stack Vanity (×"+pi(cu.bath.drawerVanity)+")");
+      if(pi(cu.bath.tallLinen)>0) lines.push("Bath: Tall Linen (×"+pi(cu.bath.tallLinen)+")");
+      if(pi(cu.bath.makeupSeat)>0) lines.push("Bath: Makeup Seat (×"+pi(cu.bath.makeupSeat)+")");
     }
     // Custom cabinetry rows
     (cu.customRows||[]).forEach(function(r){
       if(r.area && pn(r.lf)>0){
         var type = r.type==="uppersLowers"?"Uppers & Lowers":"Lowers Only";
-        lines.push("Custom Cabinetry: "+r.area+" — "+type+" ("+pn(r.lf)+" LF)");
+        lines.push("Custom Cabinetry: "+r.area+" — "+type);
       }
     });
     // Custom line items
@@ -4639,8 +5141,19 @@ function gatherUpgradeTextLines(){
 
   // Step 6 Sub-Tab B — Countertops
   if(S.ct){
+    // Tier selections
+    var tierData = CT_TIER_DATA[canonicalModel(S.model)] || {};
+    var tiers = S.ct.tiers || {};
+    CT_AREA_KEYS.forEach(function(ak){
+      var sel = tiers[ak];
+      if(!sel) return;
+      var td = tierData[ak];
+      var tierLabel = sel === "t2" ? "Tier 2" : "Tier 3";
+      lines.push("Countertop "+tierLabel+": "+(CT_AREA_LABELS[ak]||ak));
+    });
+    // Custom areas
     (S.ct.areas||[]).forEach(function(a){
-      if(a.area && pn(a.sqft)>0) lines.push("Countertop Upgrade: "+a.area+" ("+pn(a.sqft)+" SF × "+fmtC(pn(a.rate))+"/SF)");
+      if(a.area && pn(a.sqft)>0) lines.push("Countertop Upgrade: "+a.area);
     });
     if(S.ct.notes) lines.push("Countertop Notes: "+S.ct.notes);
   }
@@ -4654,13 +5167,19 @@ function gatherUpgradeTextLines(){
       if(it.type === "toggle" && sel.toggles[it.id]) lines.push(it.label);
       if(it.type === "qty" && pi(sel.qtys[it.id]) > 0){
         var qty = pi(sel.qtys[it.id]);
-        lines.push(it.label+(qty>1?" ("+qty+")":""));
+        lines.push(it.label+" (×"+qty+")");
       }
-      if(it.type === "sf" && pn(sel.sfs[it.id]) > 0) lines.push(it.label+": "+pn(sel.sfs[it.id])+" SF");
-      if(it.type === "lf" && pn(sel.lfs[it.id]) > 0) lines.push(it.label+": "+pn(sel.lfs[it.id])+" LF");
+      if(it.type === "sf" && pn(sel.sfs[it.id]) > 0) lines.push(it.label);
+      if(it.type === "lf" && pn(sel.lfs[it.id]) > 0) lines.push(it.label);
     }
     defs.sections.forEach(function(sec){
       if(sec.type === "radio" && sel[sec.id]) lines.push(sec.title+": "+sel[sec.id]);
+      // Shower calculator — generate contract note per shower
+      if(sec.type === "showerCalc" && sel.showerUpgrade && sel.showers){
+        sel.showers.forEach(function(sh){
+          lines.push(showerContractNote(sh));
+        });
+      }
       (sec.items||[]).forEach(processItem);
       (sec.subsections||[]).forEach(function(sub){ sub.items.forEach(processItem); });
     });
@@ -4668,13 +5187,13 @@ function gatherUpgradeTextLines(){
 
   // Step 7 — Concrete finish lines
   (S.sel.trim.concreteFinishLines||[]).forEach(function(r){
-    if(r.desc && (pn(r.rate)*pn(r.sqft))>0) lines.push("Concrete Finish: "+r.desc+" ("+pn(r.sqft)+" SF × "+fmtC(pn(r.rate))+"/SF)");
+    if(r.desc && (pn(r.rate)*pn(r.sqft))>0) lines.push("Concrete Finish: "+r.desc);
   });
 
   // Step 7 Pill 5 — Custom upgrades
   (S.sel.custom.upgrades||[]).forEach(function(r){
     if(r.pricing === "flat" && pn(r.amount) > 0) lines.push("Custom: "+(r.desc||"Upgrade"));
-    else if(pn(r.rate)*pn(r.qty) > 0) lines.push("Custom: "+(r.desc||"Upgrade")+" ("+pn(r.qty)+" "+(r.unit||"SF")+")");
+    else if(pn(r.rate)*pn(r.qty) > 0) lines.push("Custom: "+(r.desc||"Upgrade")+" (×"+pi(r.qty)+")");
   });
 
   // Step 7 Pill 5 — Credits
@@ -4714,7 +5233,7 @@ function gatherUpgradeBulletItems(){
     // Custom craftsman rows
     (cu.customCraftRows || []).forEach(function(r){
       var rate = r.finish === "stain" ? 45 : (r.finish === "paint" ? 35 : 0);
-      if(pn(r.lf) > 0 && rate > 0) items.push({label:"Craftsman "+r.finish+" — "+(r.area||"Custom")+" ("+$(pn(r.lf))+" LF)", cost:rate*pn(r.lf)});
+      if(pn(r.lf) > 0 && rate > 0) items.push({label:"Craftsman "+r.finish+" — "+(r.area||"Custom"), cost:rate*pn(r.lf)});
     });
     // Kitchen upgrades — rates MUST match computeCabSections (line 2865)
     if(cu.kitchen){
@@ -4729,34 +5248,35 @@ function gatherUpgradeBulletItems(){
       kItems.forEach(function(ki){
         if(ki.cost > 0){
           var qty = pi(k[ki.key]);
-          items.push({label:"Kitchen: "+ki.lbl+(qty>1?" ×"+qty:""), cost:ki.cost});
+          items.push({label:"Kitchen: "+ki.lbl+" ×"+qty, cost:ki.cost});
         }
       });
     }
     // Inserts — rates MUST match computeCabSections (line 2869)
     if(cu.inserts){
       var iItems = [
-        {key:"pullOut",    lbl:"Pull-Out Shelf",   rate:350},
-        {key:"drawerRoll", lbl:"Drawer Roll-Out",  rate:275},
-        {key:"custom",     lbl:"Custom Insert",    rate:500}
+        {key:"pullOut",    lbl:"Trash Can / Spice Pull Out Insert",   rate:350},
+        {key:"drawerRoll", lbl:"Drawer / Roll Out / Tip Out Insert",  rate:275},
+        {key:"custom",     lbl:"Custom Cabinet Insert",    rate:500}
       ];
       iItems.forEach(function(ii){
         var ins = cu.inserts[ii.key];
         if(ins && pi(ins.qty)>0){
-          items.push({label:"Insert: "+ii.lbl+" ×"+pi(ins.qty), cost:pi(ins.qty)*ii.rate});
+          var displayLabel = ins.note ? ins.note + " Insert" : ii.lbl;
+          items.push({label:"Insert: "+displayLabel+" ×"+pi(ins.qty), cost:pi(ins.qty)*ii.rate});
         }
       });
     }
     // Laundry — rates MUST match computeCabSections (line 2871)
     if(cu.laundry){
-      if(cu.laundry.uppersWD) items.push({label:"Laundry: Uppers Above W/D", cost:1250});
-      if(cu.laundry.tallCab) items.push({label:"Laundry: Tall Cabinet", cost:1200});
+      if(cu.laundry.uppersWD) items.push({label:"Laundry: Uppers Above W/D ×"+pi(cu.laundry.uppersWD), cost:pi(cu.laundry.uppersWD)*1250});
+      if(cu.laundry.tallCab) items.push({label:"Laundry: Tall Cabinet ×"+pi(cu.laundry.tallCab), cost:pi(cu.laundry.tallCab)*1200});
     }
     // Bath — rates MUST match computeCabSections (line 2874)
     if(cu.bath){
-      if(pi(cu.bath.drawerVanity)>0) items.push({label:"Bath: Drawer Stack Vanity", cost:pi(cu.bath.drawerVanity)*350});
-      if(pi(cu.bath.tallLinen)>0) items.push({label:"Bath: Tall Linen", cost:pi(cu.bath.tallLinen)*1250});
-      if(pi(cu.bath.makeupSeat)>0) items.push({label:"Bath: Makeup Seat", cost:pi(cu.bath.makeupSeat)*350});
+      if(pi(cu.bath.drawerVanity)>0) items.push({label:"Bath: Drawer Stack Vanity ×"+pi(cu.bath.drawerVanity), cost:pi(cu.bath.drawerVanity)*350});
+      if(pi(cu.bath.tallLinen)>0) items.push({label:"Bath: Tall Linen ×"+pi(cu.bath.tallLinen), cost:pi(cu.bath.tallLinen)*1250});
+      if(pi(cu.bath.makeupSeat)>0) items.push({label:"Bath: Makeup Seat ×"+pi(cu.bath.makeupSeat), cost:pi(cu.bath.makeupSeat)*350});
     }
     // Custom rows
     (cu.customRows||[]).forEach(function(r){
@@ -4770,14 +5290,29 @@ function gatherUpgradeBulletItems(){
     if(pn(cu.discount) > 0) items.push({label:"Cabinet Discount", cost: -pn(cu.discount)});
   }
 
-  // Countertop upgrades — includes plan charge (addedSF × $50) for non-custom plans
-  // BUG FIX (C2): previously only the user-entered area rows were bulleted, which
-  // caused Part E's Grand Total to be $600 lower than Part D's on a modest upgrade
-  // pile because Part D included ctPlanCharge while Part E didn't.
+  // Countertop upgrades — plan charge + tier selections + custom areas
   var ctS = computeCtSections(S);
   if(!isCustomFloorPlan() && ctS.planCharge > 0){
-    items.push({label:"Countertop: Plan (added SF × $50)", cost: ctS.planCharge});
+    items.push({label:"Countertop: Plan-Based Charge", cost: ctS.planCharge});
   }
+  // Tier selections
+  var tierData = CT_TIER_DATA[canonicalModel(S.model)] || {};
+  var ctTiers = (S.ct && S.ct.tiers) || {};
+  var ctTierSF = (S.ct && S.ct.tierSF) || {};
+  CT_AREA_KEYS.forEach(function(ak){
+    var sel = ctTiers[ak];
+    if(!sel) return;
+    var td = tierData[ak]; if(!td) return;
+    var baseCost = sel === "t2" ? td.t2 : (sel === "t3" ? td.t3 : 0);
+    var userSF = pn(ctTierSF[ak]);
+    if(userSF > 0 && td.sf > 0 && Math.abs(userSF - td.sf) > 0.01) baseCost = baseCost * (userSF / td.sf);
+    baseCost = Math.round(baseCost * 100) / 100;
+    if(baseCost > 0){
+      var tierLabel = sel === "t2" ? "Tier 2" : "Tier 3";
+      items.push({label:"Countertop "+tierLabel+": "+(CT_AREA_LABELS[ak]||ak), cost: baseCost});
+    }
+  });
+  // Custom areas
   if(S.ct)(S.ct.areas||[]).forEach(function(a){
     if(pn(a.sqft)>0) items.push({label:"Countertop: "+a.area, cost:pn(a.rate)*pn(a.sqft)});
   });
@@ -4788,9 +5323,16 @@ function gatherUpgradeBulletItems(){
     var sel = S.sel[pk];
     function proc(it){
       var cost = computeSelItemCost(it, sel);
-      if(cost > 0) items.push({label:it.label+(it.type==="qty"&&pi(sel.qtys[it.id])>1?" ×"+pi(sel.qtys[it.id]):""), cost:cost});
+      if(cost > 0) items.push({label:it.label+(it.type==="qty"?" ×"+pi(sel.qtys[it.id]):""), cost:cost});
     }
     defs.sections.forEach(function(sec){
+      // Shower calculator — add each shower as a bullet
+      if(sec.type === "showerCalc" && sel.showerUpgrade && sel.showers){
+        sel.showers.forEach(function(sh){
+          var c = computeShowerCost(sh);
+          if(c.total > 0) items.push({label: showerContractNote(sh), cost: Math.round(c.total)});
+        });
+      }
       (sec.items||[]).forEach(proc);
       (sec.subsections||[]).forEach(function(sub){ sub.items.forEach(proc); });
     });
@@ -5140,7 +5682,6 @@ function renderStep8(){
   h +=   '<div style="padding:8px 16px 14px;border-top:1px solid var(--g200);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
   h +=     '<span style="font-size:10px;color:var(--g500);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:4px">Tools:</span>';
   h +=     '<button class="nav-btn" style="font-size:11px;padding:6px 10px" onclick="generateBankContractCalibration()">🎯 Calibration PDF</button>';
-  h +=     '<button class="nav-btn" style="font-size:11px;padding:6px 10px" onclick="printCanonicalContractPDF()">📄 HTML-Print Version (Legacy)</button>';
   h +=   '</div>';
   h += '</div>';
 
@@ -5156,17 +5697,19 @@ function renderStep8(){
   h += '</div>';
 
   // ═══════════════════════════════════════════════════════════════
-  // SUBMIT CONTRACT PACKAGE — pre-flight checklist + save action.
-  // The same checklist also gates the Step 9 "Save & Submit" nav button
-  // via saveContract() below.
+  // SUBMIT CONTRACT PACKAGE — Final action. Bundles everything
+  // for this customer/order and sends to the backend database.
   // ═══════════════════════════════════════════════════════════════
   var checklist = buildSubmissionChecklist();
   var allPassed = checklist.every(function(c){ return c.ok; });
+  var subStatus = STATE.submission && STATE.submission.status || "not_submitted";
   var orderLabel = STATE.customer.order ? "#"+STATE.customer.order : "(no order #)";
 
   h += '<div class="card" style="border-top:4px solid var(--red)">';
   h +=   '<div class="section-hdr" style="background:var(--red)"><span>Submit Contract Package</span><span class="badge">'+esc(orderLabel)+'</span></div>';
   h +=   '<div class="card-pad">';
+
+  // Pre-flight checklist
   h +=     '<div style="font-size:11px;font-weight:600;color:var(--g600);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Pre-Flight Checklist</div>';
   checklist.forEach(function(c){
     var icon = c.ok ? '✅' : '⬜';
@@ -5175,10 +5718,44 @@ function renderStep8(){
     if(c.detail) h += ' <span style="font-size:11px;color:var(--g500);margin-left:6px">'+esc(c.detail)+'</span>';
     h +=   '</div>';
   });
-  h +=     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">';
-  h +=       '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px'+(allPassed?'':';opacity:.6')+'" onclick="saveContract()"'+(allPassed?'':' title="Complete all checklist items first"')+'>📦 Submit Contract Package</button>';
-  if(!allPassed) h += '<div style="font-size:12px;color:var(--amber-dark)">Complete all checklist items above to submit.</div>';
+
+  // What gets submitted
+  h +=     '<div style="margin-top:16px;padding:12px 14px;background:var(--g50);border:1px solid var(--g200);border-radius:var(--radius-sm);font-size:12px;color:var(--g700);line-height:1.6">';
+  h +=       '<strong>When you submit, this package is created under Order '+esc(orderLabel)+':</strong><br>';
+  h +=       '• <strong>Contract PDF</strong> — 14-page bank contract with customer data overlaid<br>';
+  h +=       '• <strong>DocuSign Envelope</strong> — routed to buyer'+(STATE.customer.coBuyerName ? ' + co-buyer' : '')+' + contracts rep for signature<br>';
+  h +=       '• <strong>PM Budget</strong> — full budget breakdown (25 PO lines with cost codes + draw schedule)<br>';
+  h +=       '• <strong>QB Line Items</strong> — trade-level line items mapped to QuickBooks accounts<br>';
+  h +=       '• <strong>Customer Upgrades</strong> — selection details for each pill<br>';
+  h +=       '• <strong>Draw Schedule</strong> — 6-draw payment schedule matching the contract<br>';
+  h +=       '• <strong>Complete STATE snapshot</strong> — every field, selection, and calculation preserved<br>';
+  h +=       '<br>All documents are stored together and retrievable by order number. The backend assigns a package ID for tracking.';
   h +=     '</div>';
+
+  // Submit button
+  h +=     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">';
+  if(subStatus === "submitted"){
+    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px;opacity:.7" onclick="saveContract()">📦 Re-Submit Package</button>';
+    h +=     '<div style="font-size:12px;color:var(--green-dark)">✅ Submitted '+(STATE.submission.submittedAt ? new Date(STATE.submission.submittedAt).toLocaleString() : "")+'</div>';
+  } else if(subStatus === "submitting"){
+    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--g400);color:#fff;font-weight:700;font-size:15px;padding:14px 24px" disabled>⏳ Submitting...</button>';
+  } else if(subStatus === "error"){
+    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px" onclick="saveContract()">📦 Retry Submission</button>';
+    h +=     '<div style="font-size:12px;color:var(--red)">⚠ '+esc(STATE.submission.error || "Submission failed")+'</div>';
+  } else {
+    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px'+(allPassed?'':';opacity:.6')+'" onclick="saveContract()"'+(allPassed?'':' title="Complete all checklist items first"')+'>📦 Submit Contract Package</button>';
+    if(!allPassed) h += '<div style="font-size:12px;color:var(--amber-dark)">Complete all checklist items above to submit.</div>';
+  }
+  h +=     '</div>';
+
+  // Package ID (if submitted)
+  if(STATE.submission && STATE.submission.packageId){
+    h +=   '<div style="margin-top:12px;padding:8px 12px;background:var(--red-light);border:1px solid #FCA5A5;border-radius:var(--radius-sm);font-size:12px;color:var(--red-dark)">';
+    h +=     '<strong>Package ID:</strong> <code style="font-family:var(--font-mono)">'+esc(STATE.submission.packageId)+'</code>';
+    if(STATE.submission.submittedBy) h += ' · Submitted by: '+esc(STATE.submission.submittedBy);
+    h +=   '</div>';
+  }
+
   h +=   '</div>';
   h += '</div>';
 
@@ -6130,835 +6707,32 @@ function resolveOrderNumberString(){
   return primary || secondary || "";
 }
 
-/* Shared CSS for canonical contract pages — inline so print-stylesheet
-   stripping doesn't break them. Tighter line spacing than the legacy
-   summary pages because the contract has 14 pages of text to fit. */
-var CC_CSS = {
-  page:       'font-family:Calibri,"Segoe UI",Arial,sans-serif;font-size:11px;line-height:1.45;color:#000;padding:0 4px',
-  hdrTable:   'width:100%;border-collapse:collapse;margin-bottom:10px',
-  hdrLogo:    'text-align:center;font-size:24px;font-weight:900;color:#A31A1A;letter-spacing:1px',
-  hdrSub:     'text-align:center;font-size:9px;font-weight:600;color:#fff;background:#000;letter-spacing:2px;padding:2px 0;display:inline-block',
-  hdrInfo:    'text-align:right;font-size:11px;line-height:1.4',
-  title:      'text-align:center;font-size:18px;font-weight:700;margin:8px 0 14px 0;letter-spacing:.5px',
-  para:       'margin:0 0 10px 0',
-  intro:      'font-size:11px;line-height:1.55;margin:0 0 12px 0',
-  introBold:  'font-weight:700;font-style:italic',
-  clauseHdr:  'font-weight:700;margin-top:8px;margin-bottom:2px',
-  bullet:     'margin:0 0 8px 18px;font-size:11px;line-height:1.5',
-  numHdr:     'font-weight:700;margin-top:10px;margin-bottom:4px;font-size:11.5px',
-  subClause:  'margin:0 0 6px 18px;font-size:10.5px;line-height:1.5',
-  subClauseLbl: 'font-weight:700',
-  pageFooter: 'position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;font-size:10px;padding:0 4px',
-  initLine:   'border-bottom:1px solid #000;display:inline-block;min-width:180px;height:24px;vertical-align:bottom',
-  costTable:  'width:100%;border-collapse:collapse;font-size:11px;margin-top:6px',
-  costRow:    'border-bottom:1px solid #999',
-  costLbl:    'padding:8px 4px;vertical-align:top',
-  costAmt:    'padding:8px 4px;text-align:right;font-family:Calibri,sans-serif;white-space:nowrap;border-bottom:1px solid #000',
-  signTable:  'width:100%;border-collapse:collapse;margin-top:14px',
-  signLine:   'border-bottom:1px solid #000;height:32px;vertical-align:bottom',
-  signLabel:  'font-weight:600;padding:14px 0 0 0;width:140px;vertical-align:bottom'
-};
-
-/* Header block reproduced on every contract page. The Leese header
-   shows the STM CONTRACTING logo at top-center with Order/Bank info
-   at top-right — but for the body pages (3+) it's just the Docusign
-   envelope ID strip and an empty top, so we use a thin variant. */
-/* Inline SVG logo for the contract header. Recreates the STM Contracting
-   visual identity (red peaked-roof graphic + bold name + black banner)
-   without an external image asset, so the HTML→PDF pipeline doesn't depend
-   on any file resolution. Sized to match the Leese reference layout.
-
-   The logo composition:
-     - Top: stylized red peaked-roof graphic suggesting a barndominium row
-     - Middle: "STM CONTRACTING, LLC" in dark red, sans-serif bold
-     - Bottom: black band with white "A PARTNER OF SUMMERTOWN METALS" */
-function buildStmLogoSvg(){
-  // 280x80 viewBox, banner sized so the tagline fits comfortably.
-  return ''
-    + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 80" '
-    +   'width="240" height="68" style="display:block;margin:0 auto">'
-    // Red roof silhouette: three peaks suggesting a barndominium row
-    + '<g fill="#A31A1A">'
-    +   '<polygon points="30,30 70,10 110,30 96,30 70,18 44,30"/>'
-    +   '<polygon points="110,30 150,10 190,30 176,30 150,18 124,30"/>'
-    +   '<polygon points="190,30 230,10 250,30 236,30 230,20 204,30"/>'
-    // Center chimney/dormer
-    +   '<rect x="143" y="6" width="8" height="14"/>'
-    +   '<polygon points="141,6 147,2 153,6"/>'
-    // Crossbeam under the roof line
-    +   '<rect x="30" y="31" width="220" height="2"/>'
-    + '</g>'
-    // Wordmark: STM CONTRACTING, LLC (centered above the banner)
-    + '<text x="140" y="52" text-anchor="middle" '
-    +   'font-family="Arial,Helvetica,sans-serif" font-weight="900" '
-    +   'font-size="14.5" fill="#A31A1A" letter-spacing="0.5">'
-    +   'STM CONTRACTING, LLC</text>'
-    // Black banner with white tagline (banner extends almost full width
-    // so the tagline never clips even on imprecise renderers like wkhtmltopdf)
-    + '<rect x="14" y="60" width="252" height="14" fill="#000"/>'
-    + '<text x="140" y="70.5" text-anchor="middle" '
-    +   'font-family="Arial,Helvetica,sans-serif" font-weight="600" '
-    +   'font-size="7.5" fill="#fff" letter-spacing="1.2">'
-    +   'A PARTNER OF SUMMERTOWN METALS</text>'
-    + '</svg>';
-}
-
-function buildContractHeaderFull(){
-  var c = STATE.customer || {};
-  var orderStr = resolveOrderNumberString();
-  var bankStr = c.bankName || "";
-  // Three-column layout matching Leese: left empty / logo center / Order+Bank right.
-  // Padding tuned so the logo sits compact in one row, not wrapping vertically.
-  var h = '<table style="'+CC_CSS.hdrTable+'"><tr>';
-  h +=   '<td style="width:30%"></td>';
-  h +=   '<td style="width:40%;text-align:center;padding:0">'+ buildStmLogoSvg() +'</td>';
-  h +=   '<td style="width:30%;'+CC_CSS.hdrInfo+';padding-top:8px">';
-  h +=     '<div><strong>Order:</strong> '+esc(orderStr || "—")+'</div>';
-  h +=     '<div><strong>Bank:</strong> '+esc(bankStr || "—")+'</div>';
-  h +=   '</td>';
-  h += '</tr></table>';
-  return h;
-}
-
-/* Slim header for body/clause pages (no logo, just the Docusign-style
-   envelope ID strip — the actual envelope ID is added by DocuSign on
-   the server side, not by us). */
-function buildContractHeaderSlim(){
-  return '<div style="font-size:8px;color:#444;margin-bottom:14px">&nbsp;</div>';
-}
-
-/* Footer block at the bottom of each page: Buyer Initial line on left,
-   "Page | N" on right. Page numbers passed in as cardinal integers. */
-function buildContractFooter(pageNum){
-  // Per-page buyer initial line. DocuSign anchor `init_buyer_pN` placed as
-  // zero-size transparent text. The previous white-on-white approach
-  // (color:#fff;font-size:1px) was rendering as visible black text in the
-  // print engine — print drivers commonly force-color text for readability,
-  // overriding color:#fff. font-size:0 removes the glyphs from rendering
-  // entirely (text still in the DOM/PDF stream for DocuSign's text-extraction
-  // anchor scan, just no visual footprint).
-  var c = STATE.customer || {};
-  var hasCoBuyer = !!(c.coBuyerName && c.coBuyerName.trim());
-  var dsAnchor = '<span style="font-size:0;line-height:0;color:transparent">\\init_buyer_p'+pageNum+'\\</span>';
-  var dsAnchorCo = hasCoBuyer ? '<span style="font-size:0;line-height:0;color:transparent">\\init_cobuyer_p'+pageNum+'\\</span>' : '';
-  var h = '<div style="margin-top:auto;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px">';
-  h +=   '<div><strong>Buyer Initial:</strong> <span style="'+CC_CSS.initLine+'">'+dsAnchor+'</span>';
-  if(hasCoBuyer) h +=   ' <span style="'+CC_CSS.initLine+'">'+dsAnchorCo+'</span>';
-  h +=   '</div>';
-  h +=   '<div>Page | '+pageNum+'</div>';
-  h += '</div>';
-  return h;
-}
-
-/* PAGE 1 — Title page with intro paragraph + opening clauses */
-function buildContractPage1(){
-  var c = STATE.customer || {};
-  var contractTotal = pn(STATE.shellContract) + computeInteriorContractPrice();
-  var dateStr = contractDateString();
-  var buyer1 = c.name || "";
-  var buyer2 = c.coBuyerName || "";
-  var siteAddr = resolveSiteAddressString();
-
-  var h = '<div style="'+CC_CSS.page+';display:flex;flex-direction:column;min-height:100%">';
-  h += buildContractHeaderFull();
-
-  h += '<div style="'+CC_CSS.title+'">Turnkey Bank Contract</div>';
-
-  // Intro paragraph (Leese verbatim, with field substitutions inline)
-  h += '<p style="'+CC_CSS.intro+'">';
-  h +=   'This Contract is made and entered into on this day: <u>'+esc(dateStr)+'</u>, by and between <u>'+esc(buyer1 || "_______________")+'</u>';
-  if(buyer2){
-    h += ' and <u>'+esc(buyer2)+'</u>';
-  } else {
-    h += ' <u>and ____________________</u>';
-  }
-  h +=   ', hereinafter designated as the Buyer, and STM Contracting, LLC, hereinafter ';
-  h +=   'designated as the Contractor, for the property located at <u>'+esc(siteAddr || "____________________________")+'</u>. ';
-  h +=   '<span style="'+CC_CSS.introBold+'">The Contractor will act as the General Contractor, responsible for scheduling sub-contractors and overseeing all work performed for the building as described below. The Buyer agrees, binds, and obligates themselves to pay the Contractor the total amount for the project as listed, for the sum of $ <u>'+esc(fmt(contractTotal).replace("$",""))+'</u>.</span>';
-  h += '</p>';
-
-  // Opening clauses (Leese verbatim)
-  function clause(name, body){
-    var s = '<div style="'+CC_CSS.clauseHdr+'">'+esc(name)+':</div>';
-    s += '<ul style="margin:0 0 8px 20px;padding:0"><li style="font-size:11px;line-height:1.5">'+body+'</li></ul>';
-    return s;
-  }
-  h += clause('Proof of Funds',
-    'This Contract is contingent upon the Buyer obtaining approval of a construction loan or proof of funds within 21 days of the Contract date. The Buyer must use reasonable diligence to obtain loan approval and pay all loan expenses. If the Buyer fails to obtain loan approval after a diligent, good faith effort, either party may cancel this Contract by written notice, and the Buyer will be refunded the deposit minus any expenses or fees. Construction activities will not commence until this contingency is satisfied.');
-  h += clause('Permits',
-    'The Contractor will allocate two thousand dollars ($2,000.00) towards obtaining all necessary permits for the completion of this contract, only if the Buyer elects to include a turn-key finish. Any permitting, impact, or licensing fees above this allotment shall be the responsibility of the Client and shall be paid at the time the cost of the permit is required. Shell-only construction will not include any allotment for permitting or licensing fees.');
-  h += clause('Change Orders',
-    'The Buyer agrees to this contract based on quotes completed prior to CAD Drawings being finalized. If any changes are made to the CAD Drawings, the Buyer acknowledges that they are entering a change order and will be responsible for paying all costs associated with that change order at the time the change is made.');
-  h += clause('Site Preparation',
-    'Buyer is solely responsible for site preparation unless Buyer elects to have STM Contracting, LLC serve as Construction Coordinator for site preparation under a separate Site Preparation Coordination Agreement. If elected, all site preparation costs, allowances, and responsibilities shall be governed exclusively by that separate Agreement. If Buyer does not elect STM Contracting, LLC to serve as Construction Coordinator, STM Contracting, LLC shall not be held liable for any delays, structural issues, or performance deficiencies resulting from improper or inadequate site preparation performed by Buyer or by any third party engaged by Buyer.');
-  h += clause('Concrete Work',
-    'The Buyer acknowledges that minor surface imperfections such as hairline cracks in concrete are a normal and unavoidable characteristic of concrete construction, even when best practices and proper reinforcement are used. These cosmetic imperfections do not indicate structural failure and are not covered under warranty. The Contractor will pour concrete to ACI/IRC 2018 standards, which state that cracking up to 1/8&rdquo; is structurally acceptable. Cracking in concrete is not a reasonable justification for withholding payment. Late payments due to concrete imperfections will result in late fees being added.');
-  h += clause('Building Methods',
-    'The Contractor does not build to exact plan specifications and may use substitute building methods, provided those methods are approved by a structural engineer and meet the codes and standards required by IRC 2018.');
-  h += clause('Additional Costs',
-    'Any construction builds on a crawl space over 4 feet are subject to additional labor costs.');
-
-  // Page 1 has NO footer in the canonical Leese template — the title page
-  // ends with the last clause and lets the bottom of the page fall into
-  // natural whitespace. Pages 2-14 each carry their own Buyer Initial /
-  // Page | N footer via buildContractFooter().
-  h += '</div>';
-  return h;
-}
-
-/* PAGE 2 — Project Cost Itemized (canonical draw schedule, always shows
-   shop/detached rows per request #3) */
-function buildContractPage2(){
-  var meta = STATE.contractMeta || {};
-  var p10WithMFT = pn(STATE.customer.p10) + getMFTMarkup();
-  var shellTotal = pn(STATE.shellContract);
-  var concBudget = pn(STATE.concreteBudget);
-  var laborBudg  = pn(STATE.laborBudget);
-  var intC = computeInteriorContractPrice();
-
-  var d = computeDrawAmounts({
-    isShell: false, p10WithMFT: p10WithMFT,
-    concTotal: concBudget, custLabor: laborBudg,
-    intContract: intC, shellTotal: shellTotal,
-    detP10: 0, detLabor: 0
-  });
-
-  var shopMat = pn(meta.detShopMaterial);
-  var shopCL  = pn(meta.detShopConcLabor);
-
-  var h = '<div style="'+CC_CSS.page+'">';
-  h += buildContractHeaderSlim();
-
-  h += '<div style="font-weight:700;font-size:14px;margin:24px 0 18px 0;display:flex;justify-content:space-between;border-bottom:1px solid #000;padding-bottom:6px">';
-  h +=   '<span>PROJECT COST ITEMIZED</span><span>Amount</span>';
-  h += '</div>';
-
-  // Each row: <label block> ... <amount>
-  // Each row: label block (left) + dollar amount with underline (right).
-  // Leese visual rules (verified against canonical Leese PDF, page 2):
-  //   • The DRAW NAME portion of every numbered row is BOLD + UNDERLINED
-  //     ("1st Home Draw at Loan Closing", "1st Draw Shop/Detached Garage
-  //     Portion", etc.) — this includes the indented shop sub-rows.
-  //   • The (parenthetical) that follows each draw name is REGULAR WEIGHT,
-  //     no underline ("(Minimum of 20% of total home contract)",
-  //     "(if applicable)", etc.). The split point is the FIRST " (" in the
-  //     label string — anything before it is the draw name, anything from
-  //     that space-paren onward is the parenthetical.
-  //   • The DEPOSIT row is fully plain weight — no bold, no underline on
-  //     either the label or its inline parenthetical. Pass {bold:false}.
-  //   • Sub-text below the label (e.g., "Total Shell Material Amount minus
-  //     Prepayment") is always plain weight, smaller font, on its own line.
-  //   • EXCEPT the deposit's parenthetical, which is INLINE on the same
-  //     line as the label (Leese layout). Pass {inlineSub:true}.
-  //   • Money column: "$ " followed by amount with underline going under the
-  //     amount across the full column width (not just under the digits).
-  function costRow(label, sub, amount, opts){
-    opts = opts || {};
-    var indent = opts.indent || false;
-    var bold = (opts.bold !== false);  // default to bold-underline; opts.bold=false for deposit only
-    var inlineSub = opts.inlineSub || false;  // sub-text on same line (deposit only)
-    var pad = indent ? 'padding-left:32px' : 'padding-left:0';
-
-    // Split label into "draw name" and "(parenthetical)" at first " (".
-    // The draw name carries the bold+underline; the parenthetical stays
-    // plain weight and unstyled. If the label has no parenthetical
-    // (none of our current cases, but safe), the entire string is treated
-    // as the draw name.
-    var labelMain = label;
-    var labelParen = '';
-    var splitIdx = label.indexOf(' (');
-    if(splitIdx >= 0){
-      labelMain  = label.substring(0, splitIdx);
-      labelParen = label.substring(splitIdx); // includes the leading space
-    }
-    var mainStyle = bold
-      ? 'font-weight:700;text-decoration:underline'
-      : 'font-weight:400';
-
-    var s = '<table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tr>';
-    s +=   '<td style="'+pad+';width:74%;vertical-align:top;line-height:1.4">';
-    s +=     '<span style="'+mainStyle+'">'+esc(labelMain)+'</span>';
-    if(labelParen){
-      s +=   '<span style="font-weight:400">'+esc(labelParen)+'</span>';
-    }
-    if(sub){
-      if(inlineSub){
-        s += ' <span style="font-weight:400;font-size:11px">'+esc(sub)+'</span>';
-      } else {
-        s += '<div style="font-weight:400;font-size:10.5px;margin-top:1px">'+esc(sub)+'</div>';
-      }
-    }
-    s +=   '</td>';
-    s +=   '<td style="text-align:left;width:26%;font-size:11.5px;padding:0 0 2px 6px;'
-        +    'border-bottom:1px solid #000;vertical-align:top;white-space:nowrap">';
-    s +=     '$ '+esc(fmt(amount).replace("$",""));
-    s +=   '</td>';
-    s += '</tr></table>';
-    return s;
-  }
-
-  // Deposit row: NOT bold/underlined (Leese formatting).
-  // All draw rows including indented shop sub-rows: bold + underlined
-  // on the draw-name portion, regular weight on the parenthetical.
-  h += costRow('Contract \u201cGood Faith\u201d Deposit', '(non-refundable, paid at signing)', d.deposit, {bold:false, inlineSub:true});
-  h += costRow('1st Home Draw at Loan Closing (Minimum of 20% of total home contract)', 'Total Shell Material Amount minus Prepayment', d.draw1);
-  // Shop rows ALWAYS rendered (request #3) — indented per Leese formatting.
-  // They get the same bold+underline treatment as the parent draws above.
-  h += costRow('1st Draw Shop/Detached Garage Portion (if applicable)', 'Total Shop/Detached Garage Deposit (Full Material Amount of shop/detached garage)', shopMat, {indent:true});
-  h += costRow('2nd Home Draw Upon Concrete Completion (Minimum 20%)', 'Includes remaining material, contract allowance (if applicable), and concrete', d.draw2);
-  h += costRow('2nd Draw Shop/Detached Garage Portion (if applicable)', 'Total Concrete and Labor Cost at Completion of Shop/Detached Garage', shopCL, {indent:true});
-  h += costRow('3rd Home Draw Upon Framing Completion (Minimum 15%)', 'Includes exterior labor', d.draw3);
-  h += costRow('4th Home Draw (Minimum 20%)', '20% of total contract upon completion of mechanical rough-in/electric/plumbing/HVAC', d.draw4);
-  h += costRow('5th Home Draw (Minimum 20%)', '20% of total contract upon completion of drywall/cabinets/countertops', d.draw5);
-  h += costRow('6th Home Draw (Minimum 5%)', 'Final Punch/Notice of Completion or Certificate of Occupancy if necessary', d.draw6);
-
-  h += '<p style="margin-top:24px;font-size:11px;font-weight:700">Note that progress in construction shall not proceed to the next step until the draw is received on the completed work up to that point.</p>';
-  h += '<p style="font-size:11px;margin-top:8px">Contractor accepts cash, checks, and wires. Past due accounts are subject to a monthly fee which will be calculated at the rate of 1.5% monthly interest rate.</p>';
-
-  h += buildContractFooter(2);
-  h += '</div>';
-  return h;
-}
-
-/* PAGES 3-4 — Project Plans and Specification Notes
-   Renders the rep's freeform Notes from Step 8 followed by a paragraph
-   break and the auto-generated upgrade list (Option A render-time
-   concatenation per request #5).
-
-   Returns an array of HTML page fragments — typically 1-2 pages
-   depending on content length. The "Extended Notes" page break comes
-   when the upgrade list is long (>15 items typically). */
-function buildContractNotesPages(){
-  var meta = STATE.contractMeta || {};
-  var notes = (meta.notes || "").trim();
-  var upgradeLines = (typeof gatherUpgradeTextLines === "function") ? gatherUpgradeTextLines() : [];
-
-  // Two-page structure mirroring Leese:
-  //   Page 3 (always): "PROJECT PLANS AND SPECIFICATION NOTES"     — notes only
-  //   Page 4 (when upgrades exist): "PROJECT PLANS AND SPECIFICATION
-  //                                  EXTENDED NOTES"               — upgrade list
-  //
-  // Previously this fn put upgrades inline on page 3 when ≤15 items, which
-  // caused the canonical PDF to skip from "Page | 3" straight to "Page | 5"
-  // (the §1 hardcoded page-number). Leese always has the EXTENDED NOTES page
-  // when there is content for it, regardless of count.
-  var pages = [];
-
-  // Page 3 — Notes only
-  var hA = '<div style="'+CC_CSS.page+'">';
-  hA += buildContractHeaderSlim();
-  hA += '<div style="text-align:center;font-weight:700;font-size:14px;text-decoration:underline;margin:24px 0 16px 0">PROJECT PLANS AND SPECIFICATION NOTES</div>';
-  hA += '<div style="font-size:11px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word">';
-  if(notes){
-    hA += esc(notes);
-  } else {
-    hA += '<span style="color:#888;font-style:italic">[No specification notes entered]</span>';
-  }
-  hA += '</div>';
-  hA += buildContractFooter(3);
-  hA += '</div>';
-  pages.push(hA);
-
-  // Page 4 — Extended Notes (always emit, so page numbering stays
-  // sequential 1,2,3,4,5... matching Leese. When upgrades exist they list
-  // here; when absent we show a placeholder so the page is never empty
-  // and the next physical page is correctly labeled "Page | 5".)
-  var hB = '<div style="'+CC_CSS.page+'">';
-  hB += buildContractHeaderSlim();
-  hB += '<div style="text-align:center;font-weight:700;font-size:14px;text-decoration:underline;margin:24px 0 16px 0">PROJECT PLANS AND SPECIFICATION EXTENDED NOTES</div>';
-  hB += '<div style="font-size:11px;line-height:1.55">';
-  hB += '<div style="font-weight:700;margin-bottom:8px">INTERIOR UPGRADES:</div>';
-  if(upgradeLines.length > 0){
-    upgradeLines.forEach(function(line){
-      hB += '<div style="margin-bottom:2px">'+esc(line)+'</div>';
-    });
-  } else {
-    hB += '<div style="color:#888;font-style:italic">[No interior upgrades selected]</div>';
-  }
-  hB += '</div>';
-  hB += buildContractFooter(4);
-  hB += '</div>';
-  pages.push(hB);
-
-  return pages;
-}
-
-/* PAGES 5-12 — Sections 1-42 boilerplate (verbatim from Leese)
-   Each section is a numbered heading followed by sub-clauses. The
-   text is copied character-for-character from the Leese contract.
-   This is the legal body — no field substitutions, no conditionals
-   on STATE. Pure static legal language.
-
-   Returns an array of HTML page fragments. We split sections across
-   pages to roughly match Leese's pagination (5,6,7,8,9,10,11,12). */
-function buildContractClausesPages(){
-  // Build one big array of section blocks, then split into pages.
-  function num(n, title, subs){
-    var s = '<div style="'+CC_CSS.numHdr+'">'+n+'. '+esc(title)+'</div>';
-    s += '<div style="margin-left:18px">';
-    subs.forEach(function(sub){
-      s += '<div style="'+CC_CSS.subClause+'"><span style="'+CC_CSS.subClauseLbl+'">'+sub.n+'. '+(sub.lbl?esc(sub.lbl)+':':'')+'</span> '+sub.body+'</div>';
-    });
-    s += '</div>';
-    return s;
-  }
-
-  var sections = [];
-
-  sections.push(num(1, 'PAYMENT TERMS', [
-    {n:'1.1', lbl:'Good Faith Deposit', body:'A $2500 deposit by the buyer is required to proceed with plans.'},
-    {n:'1.2', lbl:'Material Payment',   body:'Payment for all materials is due at the time of loan closing, in accordance with the draw schedule listed on page 2.'},
-    {n:'1.3', lbl:'Change Orders',      body:'Full payment by the buyer for any change order is required after loan closing, before the work order is initiated or accepted.'},
-    {n:'1.4', lbl:'Adjustments',        body:'Payment is subject to additions or deductions based on mutually agreed changes or modifications in the Work.'},
-    {n:'1.5', lbl:'Payment Methods',    body:'Payment can be made by personal check, cash, money order, or through electronic means established by the Contractor.'},
-    {n:'1.6', lbl:'Final Payment',      body:'Final payment is due within 7 days of the certificate of occupancy or notice of completion if no final codes inspection is required for occupancy.'},
-    {n:'1.7', lbl:'Late Payment Fee',   body:'Any late payment for a scheduled deposit will incur a $1000 late payment fee after 7 days past the due date. This fee may be added every time a payment is more than 7 days late and may be added every 7 days that a bill is past due.'},
-    {n:'1.8', lbl:'Special Orders',     body:'Final payment cannot be withheld due to availability issues or delays on special order items or garage doors or garage door installations. The Contractor agrees to install the delayed special-order item or garage doors once the product becomes available for installation.'},
-    {n:'1.9', lbl:'Backordered Items',  body:'No more than the total value of backordered products can be withheld in the event of backordered material.'}
-  ]));
-
-  sections.push(num(2, 'DESCRIPTION OF WORK', [
-    {n:'2.1', lbl:'Scope',                 body:'Contractor shall perform the described work at the property listed on Page 1, in accordance with the Buyer\'s contract plans and specifications, this Agreement, and any Change Order (collectively, the &ldquo;Contract Documents&rdquo;). This includes completion of the exterior up to dry-in and/or completion of the home up to turnkey completion, which will include electrical installation, plumbing, drywall, HVAC, insulation, granite tops, interior trim, interior doors, door handles, closet and pantry shelving/rods, all needed surfaces caulked/painted, tile floor/walls flooring, cabinets and vanities, kitchen and bathroom sinks, and bathroom tubs and showers, unless otherwise noted in the contract (the &ldquo;Work&rdquo;).'},
-    {n:'2.2', lbl:'Terminology',           body:'Industry terminology used in any Contract Documents that are not defined shall be interpreted as having the same meaning as recognized in the construction industry in the area where the property is located.'},
-    {n:'2.3', lbl:'Electrical and Plumbing',body:'All electrical and plumbing will be completed for the use of the house at occupancy and will not include additional electrical or plumbing for future expansion of the service. Any additional plumbing or electrical must be agreed to in writing at either the time the contract is signed or through a change order signed by both parties.'},
-    {n:'2.4', lbl:'Handrails',             body:'Contractor will not be held liable for the installation of handrails, step rails, or porch rails that might be required by certain codes. The buyer will be responsible for hiring an appropriate contractor to install those.'}
-  ]));
-
-  sections.push(num(3, 'MATERIALS AND LABOR', [
-    {n:'3.1', lbl:'Materials',           body:'Contractor includes all material needed for the exterior framing and completion up until dry-in as a separate line item as part of this agreement in the payment draw schedule.'},
-    {n:'3.2', lbl:'Labor and Equipment', body:'Contractor shall provide and pay for all labor and equipment, including tools, construction equipment, machinery, transportation, and all other facilities and services, and all materials as described in attached documentation necessary for the completion of the Work. All materials shall be of good quality and new, unless the Contract Documents require or permit otherwise. The Contract Price for turnkey contracts shall include the following fixtures: sinks, faucets, tubs, tub faucets, shower pans, and shower faucets.'},
-    {n:'3.3', lbl:'Price Escalation',    body:'Subsequent to the date of the Contract, any rise in the total cost of an individual item or labor, building material, and/or fuel used in the performance of this Contract that equals or exceeds 5% of the original contract price may, at the sole discretion of the Contractor, be added to the fixed contract price. Any escalation charge shall be provided to the Buyer via invoice.'},
-    {n:'3.4', lbl:'Unused Materials',    body:'All materials not used in the construction of the purchased building according to the building specifications outlined in the contractual agreement will remain the property of the Contractor. The buyer agrees not to use extra material and must surrender material back to the Contractor. If the buyer fails to surrender the extra material at the request of the Contractor, regardless of any circumstance, the buyer agrees to be charged the full material cost for each item not surrendered or used, plus any applicable material pick-up costs and fees.'}
-  ]));
-
-  sections.push(num(4, 'SUPERVISION OF CONSTRUCTION', [
-    {n:'4.1', lbl:'Contractor Responsibility', body:'The Contractor is solely responsible for supervising and directing all construction under this Agreement. They will provide competent personnel and maintain discipline and order at the Property, taking reasonable safety precautions for employees and the public. The Contractor assumes full responsibility for the acts, negligence, and omissions of its employees and subcontractors.'},
-    {n:'4.2', lbl:'Buyer Access and Risk',     body:'The Buyer has the right to access and inspect the Premises at any time. However, construction sites are hazardous, and any entry by the Buyer or their invitees is at their own risk. The Buyer cannot hold the Contractor liable for any damage or injury occurring on the Premises.'},
-    {n:'4.3', lbl:'Non-Interference',          body:'The Buyer agrees not to interfere with the work or communicate directly with trade contractors or laborers. All inquiries must be directed to the Contractor. The Buyer will not hire or attempt to hire any trade contractor or laborer for work on the Premises without the Contractor\'s written permission.'}
-  ]));
-
-  sections.push(num(5, 'UTILITIES', [
-    {n:'5.1', lbl:'Utility Payments',     body:'Buyer shall pay for all permanent electric, water, phone, cable, sewer and gas service as needed to perform the Work. Buyer shall pay for the installation, connection and removal of all temporary utilities on the Property during the performance of the Work, Contractor will provide the temporary power pole for Buyer, but Buyer must pay for connection. All temporary utilities shall conform and adhere to the Applicable Laws. Buyer will be responsible for having all utilities ran to within fifty (50) feet of the connection area at the time that work is to be started as not to delay the beginning of work. Buyer will be responsible for all cost related to getting utilities to the site. The cost specified within this contract for electrical hook-up will be for overhead connections only. The installation of underground hook-up compatibility will result in an additional cost that will be noted with a change order and signed by both parties.'},
-    {n:'5.2', lbl:'Temporary Power Pole', body:'Not all jobs require a temporary power pole. The Contractor will determine the need. If not required, the Contractor or subcontractors will provide power via generators.'},
-    {n:'5.3', lbl:'Underground Utilities',body:'All utilities installation that requires underground service is subject to the ability to perform the connection without interference of underground rock barriers. Contractor may refuse to install underground connection if there is rock the prevents the service from being underground of severely impacts the installation. Contractor, at his sole discretion, may offer to perform the installation for an additional fee, which Buyer will agree to in writing as a change order.'},
-    {n:'5.4', lbl:'Plumbing Liability',   body:'Contractor shall not be held liable for any fault in plumbing if Buyer has another contracted plumber install the stubbed in plumbing prior to engaging Contractor to perform the interior completion.'}
-  ]));
-
-  sections.push(num(6, 'WARRANTY', [
-    {n:'6.1', lbl:'Work Warranty', body:'Contractor warrants that the Work shall be in accordance with the Contract Documents, applicable law and trade standards and free from material structural defects, improper workmanship or defective materials. Contractor shall replace, correct or repair any Work not in accordance with the Contract Documents, applicable law and trade standards or any defects caused by faulty materials, equipment or workmanship for a period of one (1) year(s) from the date of completion of the Work. Nothing in this Section shall be construed to place a time limit with respect to any other obligation Contractor may have under this Agreement.'}
-  ]));
-
-  sections.push(num(7, 'WORK CHANGES', [
-    {n:'7.1', lbl:'Change Orders',       body:'Buyer reserves the right to order changes to the Work in the nature of additions, deletions or modifications, without invalidating this Agreement, and agrees to make corresponding adjustments in the Contract Price and time of termination if applicable on the schedule as described below. All changes will be authorized in a written &ldquo;Change Order&rdquo; signed by Buyer and Contractor, which shall be incorporated by reference herein. The fee for all change orders must be paid at the time of the change order. There shall be one change order allowed prior to the shipment of materials at a fee of $500 plus any additional cost for materials. Contractor may allow, at their sole discretion, one change order after the shipment of material which will incur a minimum of $1,000 fee plus any additional cost incurred for material.'},
-    {n:'7.2', lbl:'CAD Drawing Changes', body:'Any change to CAD Drawings before work starts is considered a change order, affecting the contract price. The Buyer is responsible for paying the price change and change order fee at the time of the change.'}
-  ]));
-
-  sections.push(num(8, 'CONDITION OF THE PROPERTY', [
-    {n:'8.1', lbl:'Property Boundaries',  body:'Buyer is solely responsible for providing an accurate survey of the Property and for staking or otherwise marking the location of all improvements, including but not limited to the house, driveway, and other structures. Contractor has no obligation to verify property lines, setbacks, easements, or zoning compliance unless specifically agreed to in writing. Contractor may rely on the survey, markings, or other directions provided by Buyer in locating and constructing improvements. Contractor will not be liable for any claims, costs, damages, or losses resulting from errors in property boundaries, staking, or siting of improvements where Contractor has relied on information or directions furnished by Buyer. Any disputes, claims, or costs related to encroachments, boundary conflicts, or relocation of improvements shall be the sole responsibility of Buyer.'},
-    {n:'8.2', lbl:'Property Maintenance', body:'Contractor agrees to keep the Property and adjoining driveways free and clear of waste material and rubbish. Contractor shall confine the storage of materials and equipment and the operations of employees to the Property. Contractor shall not be responsible for any damage to the Property or areas contiguous thereto resulting from the performance of the Work. At the completion of the Work, Contractor shall remove all waste materials, rubbish and debris from and about the Property that will fit within the disposal method provided by the Contractor. If additional disposal is provided by the Buyer, Contractor will use said disposal to remove waste. Complete disposal is not guaranteed unless written notice is signed by both parties.'}
-  ]));
-
-  sections.push(num(9, 'INSPECTION', [
-    {n:'9.1', lbl:'Inspection Rights', body:'Buyer shall have a right to inspect the Work at any time and request that Contractor correct any Work that is defective or does not conform to the Contract Documents. Contractor shall have 10 business days to make any corrections deemed necessary. If required, the Work shall be inspected and certified by the appropriate state or local agency or health officer at each necessary stage at the cost of Buyer. Should there be any dispute regarding the completion of work, Buyer may pay an independent inspector to complete a review and final punch list for corrections to be made. Inspector must be a certified home inspector.'}
-  ]));
-
-  sections.push(num(10, 'RIGHT TO STOP WORK', [
-    {n:'10.1', lbl:'Right to Stop Work', body:'If Contractor fails to correct any defective Work or repeatedly fails to perform Work in accordance with the Contract Documents, Buyer shall have the right to order Contractor to stop performing the Work, or any portion thereof, until the cause for such order is eliminated.'}
-  ]));
-
-  sections.push(num(11, 'CERTIFICATE OF COMPLETION', [
-    {n:'11.1', lbl:'Final Inspection', body:'Upon completion, the Contractor will notify the Buyer that the Work is ready for final inspection and acceptance.'},
-    {n:'11.2', lbl:'',                 body:'The Owner agrees not to occupy, reside in, or allow others to occupy the residence until all payments due under this Agreement have been made in full, including any final draw and approved change orders. Occupation of the premises prior to full payment shall constitute a material breach of this Agreement.'}
-  ]));
-
-  sections.push(num(12, 'REMOVAL OF WASTE', [
-    {n:'12.1', lbl:'Dumpster Costs',  body:'The Contractor will cover the cost of one 30-yard haul-away dumpster and disposal of its contents. If additional disposal or dumpsters are needed, the Buyer will bear the cost. Dumpsters will be provided when work begins.'},
-    {n:'12.2', lbl:'Portable Toilet', body:'Contractor will provide a portable toilet for the use of the Contactor and Subcontractors.'}
-  ]));
-
-  sections.push(num(13, 'HAZARDOUS MATERIALS', [
-    {n:'13.1', lbl:'Hazardous Material Disposal', body:'The Buyer is responsible for providing proper disposal methods for hazardous materials on the property. If the Contractor discovers hazardous materials, they will notify the Buyer and may cease work until the materials are rendered harmless. Buyer shall defend, indemnify, and hold harmless Contractor, any subcontractors, and their respective agents and employees from and against all claims, damages, losses, and expenses, including attorney\'s fees, arising out of or resulting from contact with the Hazardous Substance in performance of the Work resulting in bodily injury, illness, or death, or injury or property damage, provided such claim, damage, loss, or expense is not the result of any negligent act or omission by the party seeking such indemnity.'}
-  ]));
-
-  sections.push(num(14, 'OTHER CONTRACTORS', [
-    {n:'14.1', lbl:'Cooperation', body:'Buyer reserves the right to enter into other contracts in connection with the Work. Contractor shall cooperate with all other contractors so that their work shall not be impeded and shall give them access to the Property as necessary to perform their contracts.'}
-  ]));
-
-  sections.push(num(15, 'INDEMNIFICATION', [
-    {n:'15.1', lbl:'Buyer Indemnity Agreement',      body:'Buyer agrees not to materially interfere with the performance of the contract or alter the working conditions of the property in such a way that would make conditions unsafe or unworkable for the Contractor. Buyer agrees to defend, indemnify, and hold harmless Contractor, its sub-contractors, or employees, from and against all claims, actions, liabilities, suits, demands, injuries, obligations, damages, losses, settlements, judgments, fines, penalties, costs, and expenses, including reasonable attorneys\' fees, arising out of any negligent act or omission by Buyer.'},
-    {n:'15.2', lbl:'Contractor Indemnity Agreement', body:'Contractor agrees to defend, indemnify, and hold harmless Buyer and its agents and employees, from and against all claims, actions, liabilities, suits, demands, injuries, obligations, damages, losses, settlements, judgments, fines, penalties, costs, and expenses, excluding attorneys\' fees, arising out of any negligent act or omission by Contractor, a subcontractor, or anyone directly or indirectly employed by them in the performance of the Work resulting in bodily injury, illness, or death, or for property damage, including loss of use.'}
-  ]));
-
-  sections.push(num(16, 'CONTRACTOR\u2019S INSURANCE', [
-    {n:'16.1', lbl:'Insurance Maintenance', body:'The Contractor agrees to maintain insurance at their expense during the construction period.'}
-  ]));
-
-  sections.push(num(17, 'WAIVER OF SUBROGATION', [
-    {n:'17.1', lbl:'Insurance Claims', body:'Buyer and Contractor each waive any and all claims or rights to recovery against the other Party for any loss or damage to the extent such loss or damage is covered by insurance or would be covered by any insurance required under this Agreement. Buyer and Contractor shall cause each insurance policy carried by Buyer or Contractor relating to the Property to include or allow a full waiver of any subrogation claims.'}
-  ]));
-
-  sections.push(num(18, 'TIME OF THE ESSENCE', [
-    {n:'18.1', lbl:'Timeliness', body:'All times stated in this Agreement or in the Contract Documents are of the essence. Contractor agrees that such times are reasonable for performing and completing the Work.'}
-  ]));
-
-  sections.push(num(19, 'EXTENSION OF TIME', [
-    {n:'19.1', lbl:'Time Extensions', body:'The times stated in this Agreement may be extended for such reasonable time as Contractor may determine when performance of the Work by Contractor is delayed by a Change Order, labor disputes, fire, unusual delay in deliveries, abnormal adverse weather conditions, unavoidable casualties, or other causes beyond Contractor\u2019s control or which justify the delay.'},
-    {n:'19.2', lbl:'',                body:'Contractor may delay this project by a reasonable amount of time if there is ever a shortage of labor needed. Labor shortages could lead to delays that are outside of the control of Contractor as stated above.'},
-    {n:'19.3', lbl:'Buyer Delay',     body:'Should there be any delay caused by the Buyer, by either a change order or a problem with funding, that last more than one workday, Contractor shall have the ability to assess a $100 per day penalty for each day of work delayed by the Buyer. This penalty may be assessed at the sole discretion of the Contractor.'}
-  ]));
-
-  sections.push(num(20, 'CANCELLATION AND REFUNDS', [
-    {n:'20.1', lbl:'Buyer Cancellation',      body:'Should Buyer decide to cancel their order for any reason after the contract has been signed, the Buyer will be subject to a 30% cancellation fee at the sole discretion of Contractor. This 30% shall be of the materials only, not the total contracted price.'},
-    {n:'20.2', lbl:'Contractor Cancellation', body:'The Contractor reserves the right to cancel the contract at any time due to delays on the Buyer\u2019s behalf regardless of circumstance, after 90 days from the initial start date set by STM Contracting with no further obligations to the Buyer, with Contractor collecting the Buyer\u2019s initial deposit as compensation for the time put into coordination of the project.'}
-  ]));
-
-  sections.push(num(21, 'SITE ACCESS', [
-    {n:'21.1', lbl:'Access Requirements', body:'The Buyer must provide access for large trucks and equipment. The Buyer holds the Contractor harmless for any damage caused by equipment. Failure to provide access may result in delays and additional charges. If access is not provided within 60 days, the Contractor may cancel the contract, retaining the deposit and charging for manufactured materials. If Buyer cannot provide reasonable and accommodatable access to the job site within 60 days from the initial ship date, then Contractor reserves the right and discretion to cancel the contract at any time after the 60-day deadline, seizing the Buyer\u2019s initial deposit and charging the Buyer for any manufactured material or special-order items.'},
-    {n:'21.2', lbl:'Access for Work',     body:'Buyer shall provide access to the property at all times for Contractor or Sub-contractors to enter and perform necessary work. Locked doors, closed gates, coded entry shall all be considered an obstacle to entry and will result in a &ldquo;burned trip&rdquo; if there is no proper form of remediation provided for the Contractor to access it. A &ldquo;burned trip&rdquo; is a day that a contractor is not able to complete work due on the project due to no fault of his own. A burned trip will result in a five-hundred-dollar ($500) fee for every occurrence.'}
-  ]));
-
-  sections.push(num(22, 'EARLY TERMINATION FOR BREACH OF CONTRACT', [
-    {n:'22.1', lbl:'Contractor\'s Termination', body:'The Contractor may terminate this Agreement with ten (10) days\' written notice to the Buyer if the Buyer fails to make a progress payment within ten (10) days after it is due or causes delays lasting five (5) consecutive days. The Contractor may recover payment for all completed Work and any losses for materials, equipment, tools, or machinery, plus reasonable profit.'},
-    {n:'22.2', lbl:'Dispute Resolution',        body:'Any dispute in work will result in work stopping until a resolution to the dispute has been accomplished. If no mutual resolution can be reached, Buyer must immediately get an inspector to come and give an opinion on the dispute as directed in this contract. This will be considered a delay in work in accordance with the Contractor\u2019s Termination section.'},
-    {n:'22.3', lbl:'Buyer\'s Termination',      body:'Buyer may, on thirty (30) days\u2019 written notice to Contractor, terminate this Agreement before the completion of the Work, and without prejudice to any other remedy Buyer may have when Contractor defaults in the performance of any provision of this Agreement, or fails to carry out performance of the Work in accordance with the provisions of the Contract Documents. If the unpaid balance on the Contract Price at the time of the termination exceeds the expense of finishing the Work, Buyer shall pay such excess to Contractor.'}
-  ]));
-
-  sections.push(num(23, 'DISPUTES', [
-    {n:'23.1', lbl:'Mediation and Arbitration', body:'Any dispute arising from this Agreement shall be resolved through mediation. If the dispute cannot be resolved through mediation, then the dispute will be resolved through binding arbitration conducted in accordance with the rules of the American Arbitration Association.'},
-    {n:'23.2', lbl:'Governing Law',             body:'All disputes shall be governed by the laws of the State of Tennessee.'},
-    {n:'23.3', lbl:'Locations',                 body:'Any Mediation or Arbitration held in a dispute shall be held in Hohenwald, Tennessee or in the Jurisdiction of Lewis County, Tennessee.'},
-    {n:'23.4', lbl:'Cost of Suit',              body:'In the event Contractor is required to take legal action of any kind, including but not limited to arbitration, to enforce or defend its rights under this Contract, and Contractor is the prevailing party, Buyer shall pay Contractor\u2019s reasonable attorney\u2019s fees, expert witness fees, arbitration costs, court costs, and all expenses incurred in connection with such action, including costs of appeal.'},
-    {n:'23.5', lbl:'',                          body:'All claims, disputes, and questions arising out of or relating to this Agreement, its formation, execution, or performance, or the breach thereof, shall be decided by arbitration under the Construction Industry Rules of the American Arbitration Association.<div style="margin-top:6px;margin-left:18px"><strong>23.5.1.</strong> The award of the arbitrator or arbitrators may be entered in any court of record that would have otherwise had jurisdiction of the dispute(s) decided by the arbitrators.</div><div style="margin-top:6px;margin-left:18px"><strong>23.5.2.</strong> Any claims of subcontractors of Contractor may, upon request of Contractor, be joined with any arbitration proceeding by Contractor against Buyer.</div><div style="margin-top:6px;margin-left:18px"><strong>23.5.3.</strong> Arbitration shall be commenced by the filing, in writing, of a demand with the other party to this Agreement and the parties agree that the arbitration shall be held in Hohenwald, Tennessee, unless otherwise agreed to at the time of the initiation of the arbitration demand.</div>'}
-  ]));
-
-  // Arbitration acknowledgement initial line — appears between section 23 and 24.
-  // DocuSign anchor `init_arb_buyer` placed as invisible text so DocuSign
-  // can auto-place an initial tab here when the contract is uploaded.
-  var arbInitial = '<div style="margin:14px 0 14px 0;font-size:11px"><strong>BUYER INITIAL ACKNOWLEDGING ARBITRATION AGREEMENT:</strong> <span style="'+CC_CSS.initLine+'"><span style="font-size:0;line-height:0;color:transparent">\\init_arb_buyer\\</span></span>';
-  if(STATE.customer && STATE.customer.coBuyerName && STATE.customer.coBuyerName.trim()){
-    arbInitial += ' <span style="'+CC_CSS.initLine+'"><span style="font-size:0;line-height:0;color:transparent">\\init_arb_cobuyer\\</span></span>';
-  }
-  arbInitial += '</div>';
-
-  sections.push(arbInitial);
-
-  sections.push(num(24, 'CONSTRUCTION DOCUMENT REUSE FEE', [
-    {n:'24.1', lbl:'Reuse Fee', body:'Should the buyer purchase building plans from the Contractor, the plans can only be used one time for construction purposes. Should the buyer want to reuse the plan set at any time the buyer must pay the Contractor a fee of $500.00 each time the building plan is reused.'}
-  ]));
-
-  sections.push(num(25, 'COUNTERPARTS', [
-    {n:'25.1', lbl:'Execution', body:'This Agreement may be executed in multiple counterparts, each deemed an original, collectively constituting one document.'}
-  ]));
-
-  sections.push(num(26, 'HEADINGS', [
-    {n:'26.1', lbl:'Reference', body:'Section headings are for reference only and do not affect the meaning or interpretation of the Agreement.'}
-  ]));
-
-  sections.push(num(27, 'NOTICES', [
-    {n:'27.1', lbl:'Communication', body:'Any notice or communication given or made to any Party under this Agreement shall be in writing and delivered by hand, sent by overnight courier service, or sent by certified or registered mail, return receipt requested, to the address stated above or to another address as that Party may subsequently designate by notice and shall be deemed given on the date of delivery.'}
-  ]));
-
-  sections.push(num(28, 'ASSIGNMENT', [
-    {n:'28.1', lbl:'Rights and Duties', body:'No Party can assign rights or delegate duties without written consent from the other Party, which shall not be unreasonably withheld.'}
-  ]));
-
-  sections.push(num(29, 'BINDING EFFECT', [
-    {n:'29.1', lbl:'Benefit', body:'This Agreement binds and benefits the Parties and their legal representatives, heirs, administrators, executors, successors, and permitted assigns.'}
-  ]));
-
-  sections.push(num(30, 'GOVERNING LAW', [
-    {n:'30.1', lbl:'Law', body:'This Agreement and the rights and obligations of the Parties hereto shall be governed by and construed in accordance with the laws of the State of Tennessee, without regard to its conflicts of laws provisions.'}
-  ]));
-
-  sections.push(num(31, 'SEVERABILITY', [
-    {n:'31.1', lbl:'Validity', body:'If any provision of this Agreement is held to be invalid, illegal, or unenforceable in whole or in part, the remaining provisions shall not be affected and shall continue to be valid, legal, and enforceable as though the invalid, illegal, or unenforceable part had not been included in this Agreement.'}
-  ]));
-
-  sections.push(num(32, 'ENTIRE AGREEMENT', [
-    {n:'32.1', lbl:'Complete Agreement', body:'This Agreement contains the entire agreement between the Parties, hereto with respect to the subject matter hereof and supersedes all prior negotiations, understandings, and agreements.'}
-  ]));
-
-  sections.push(num(33, 'AMENDMENTS', [
-    {n:'33.1', lbl:'Modification', body:'This Agreement can only be amended or modified by a written agreement signed by the Parties.'}
-  ]));
-
-  sections.push(num(34, 'WAIVER', [
-    {n:'34.1', lbl:'Waiver', body:'No Party shall be deemed to have waived any provision of this Agreement, or the exercise of any rights held under this Agreement unless such waiver is made expressly and in writing. Waiver by any Party of a breach or violation of any provision of this Agreement shall not constitute a waiver of any other subsequent breach or violation.'}
-  ]));
-
-  sections.push(num(35, 'SURVIVAL', [
-    {n:'35.1', lbl:'Obligations', body:'The obligations of Contractor expressly identified in this Agreement, or those by operation of law, shall survive the completion of Work or termination of this Agreement.'}
-  ]));
-
-  sections.push(num(36, 'INDUSTRY LANGUAGE', [
-    {n:'36.1', lbl:'Terminology', body:'The language used for terms of this Agreement, unless otherwise defined, shall be construed according to the customary meaning within the construction industry in the area where the Project is located and for the type of Work being performed.'}
-  ]));
-
-  sections.push(num(37, 'INDEPENDENT CONTRACTOR', [
-    {n:'37.1', lbl:'Status',         body:'Contractor acknowledges that it is an independent contractor and is not an agent, partner, joint venture nor employee of Buyer. Contractor shall have no authority to bind or otherwise obligate Buyer in any manner nor shall Contractor represent to anyone that it has the right to do so. Contractor further agrees that in the event that the Company suffers loss or damage as a result of a violation of this provision Contractor shall indemnify and hold harmless Buyer from any such loss or damage.'},
-    {n:'37.2', lbl:'Subcontractors', body:'Subcontractors do not have the ability to bind Contractor to any changes or alterations to this contract. Any amendments to this contract must be placed as a change order to be valid.'}
-  ]));
-
-  sections.push(num(38, 'RIGHTS OF THIRD PARTIES', [
-    {n:'38.1', lbl:'Third Party Claims', body:'This Agreement does not create or give any third party a claim or right of action against Contractor or Buyer.'}
-  ]));
-
-  sections.push(num(39, 'CONFIDENTIALITY', [
-    {n:'39.1', lbl:'Access to Confidential Information',         body:'As a result of Contractor\'s participation in the Work, Contractor will have access to and contribute to information and materials of a highly sensitive nature, including Confidential Information.'},
-    {n:'39.2', lbl:'Non-Disclosure Agreement',                   body:'Contractor hereby warrants that Contractor, and its employees and agents shall not disclose, make commercial or other use of, or give or sell to any person, firm, or corporation, any Confidential Information received directly or indirectly from Buyer or acquired or developed in the course of the performance of this Agreement without the Buyer\'s prior written consent, except in the following circumstances:<div style="margin-top:6px;margin-left:18px"><strong>39.2.1. Legal Requirement:</strong> If required to do so pursuant to Applicable Laws, and then only after Contractor has given Buyer prompt written notice of the legal compulsion and, at Buyer\'s expense, provided Buyer with cooperation in any attempt Buyer may make to gain a protective order acceptable to Buyer.</div><div style="margin-top:6px;margin-left:18px"><strong>39.2.2. Prior Possession:</strong> If the information is rightfully in the possession of Contractor from a source other than Buyer prior to the time of disclosure of the information to Contractor under this Contract.</div><div style="margin-top:6px;margin-left:18px"><strong>39.2.3. Public Domain:</strong> If the information was in the public domain prior to the time of Contractor\'s receipt.</div><div style="margin-top:6px;margin-left:18px"><strong>39.2.4. Subsequent Public Domain:</strong> If the information became part of the public domain prior to the time of Contractor\'s receipt by any means other than an authorized act or omission on the part of Contractor.</div><div style="margin-top:6px;margin-left:18px"><strong>39.2.5. Third-Party Disclosure:</strong> If the information is supplied to Contractor after the time of Contractor\'s receipt by a third party who was not under any obligation to Buyer to maintain such information in confidence.</div><div style="margin-top:6px;margin-left:18px"><strong>39.2.6. Independent Development:</strong> If the information was independently developed by Contractor prior to the time of its receipt from Buyer.</div>'},
-    {n:'39.3', lbl:'Ownership and Return of Confidential Information', body:'All Confidential Information, regardless of form, shall be the property of Buyer and shall be returned to Buyer upon its request, or in any event, at the completion or earlier termination of this Agreement.'}
-  ]));
-
-  sections.push(num(40, 'FORCE MAJEURE', [
-    {n:'40.1', lbl:'', body:'Contractor may not be held responsible for any act of God that would cause a partial or complete loss. This shall include tornadoes, severe wind, lightning strike, earthquake, flood, or any other natural act that might result in a partial or complete loss.'},
-    {n:'40.2', lbl:'', body:'Buyer is responsible for maintaining all risk of loss insurance policies to cover any such acts and it will not be the responsibility of the Contractor to check with Buyer on the validity or continued coverage of such policies.'},
-    {n:'40.3', lbl:'', body:'Buyer will be responsible for all risk of loss coverage for theft of property from the job site as well. Contractor will not be held responsible for any theft of property that occurs from Buyer\u2019s job site.'},
-    {n:'40.4', lbl:'', body:'In the event that Contractor is delayed, directly or indirectly, from the performance of any act required under the terms hereof by acts of God, fire, floods, inclement weather, unreasonable or arbitrary failure of governmental authorities to deliver or perform any government approvals, permits, inspections, or similar official functions, strikes, acts of war, riot and civil commotion, or by any similar cause reasonably beyond the control of the Contractor as the case may be, such failure shall not be deemed a violation or breach of this contract.'},
-    {n:'40.5', lbl:'', body:'Contractor\u2019s commitment to the contract is withstanding and performance to execute will resume when reasonably possible.'}
-  ]));
-
-  sections.push(num(41, 'ADDITIONAL REQUIREMENTS', [
-    {n:'41.1', lbl:'Site Compliance',   body:'Buyer will be responsible for providing all contractors with a level site to comply with all federal, state, and local codes regarding entryways and step ups. Buyer will be responsible for any cost associated with codes that require additional labor or materials taxed to Contractor to be compliant with codes. Such codes that might apply, but are not limited to, are as follows: sleeved plumbing, job boxes, and portable bathroom services on site.'},
-    {n:'41.2', lbl:'Utility Hookups',   body:'Contractor will have all utility hookups prepared for connection to utilities, cost and connection of utilities shall be the responsibility of Buyer.'},
-    {n:'41.3', lbl:'Price Adjustments', body:'Any price given without the benefit of having final drawings may be subject to additional costs that may be up to 10% of the original total contract price. Any changes made to the final draws during the CAD drawing process are also subject to change order fees and the fee and additional amount owed are due at the time of the change.'}
-  ]));
-
-  sections.push(num(42, 'MEDIA USAGE WAIVER', [
-    {n:'42.1', lbl:'Media Rights', body:'Buyer waives rights to photography and videography taken for public use by Summertown Metals, STM Contracting, and STM Interiors. Staff may enter the site for media capture between 6 A.M. and 6 P.M. during construction. After completion, staff may enter with 24 hours\' notice or within 30 days of scheduled notice. Buyer will not receive compensation for media use, and consents to personal images being used if present during capture. The right to enter can be revoked by written notice via mail or email, but the media usage waiver remains in effect.'}
-  ]));
-
-  // Pack sections into pages matching Leese's pagination (5,6,7,8,9,10,11,12,13).
-  // Each section is wrapped to discourage mid-section breaks.
-  // For the canonical 9-page clauses layout we group as:
-  //   Page 5:  §1, §2
-  //   Page 6:  §3, §4, §5, §6
-  //   Page 7:  §7, §8, §9, §10, §11
-  //   Page 8:  §12, §13, §14, §15, §16, §17, §18, §19
-  //   Page 9:  §20, §21, §22
-  //   Page 10: §23, arbInitial, §24, §25, §26, §27
-  //   Page 11: §28, §29, §30, §31, §32, §33, §34, §35, §36, §37, §38
-  //   Page 12: §39, §40
-  //   Page 13: §41, §42 + DISCLAIMER + oil canning + substitution
-  //
-  // Previously page 12 was §39-§42 and the disclaimer had its own dedicated
-  // page 13 — but Leese puts §41/§42/DISCLAIMER all together on page 13,
-  // which matches the canonical bank template. Splitting §39+§40 onto page 12
-  // also fixes the empty-page-12 footer bug from the WIZV_5 PDF (the previous
-  // §39-§42 grouping was small enough that the print engine combined it with
-  // page 11, leaving page 12 with just a footer).
-  // Numbering: arbInitial is at sections[23] (after §23 at index 22).
-  // sections array order:
-  //  0=§1, 1=§2, 2=§3, 3=§4, 4=§5, 5=§6, 6=§7, 7=§8, 8=§9, 9=§10, 10=§11,
-  // 11=§12, 12=§13, 13=§14, 14=§15, 15=§16, 16=§17, 17=§18, 18=§19, 19=§20,
-  // 20=§21, 21=§22, 22=§23, 23=arbInitial, 24=§24, 25=§25, 26=§26, 27=§27,
-  // 28=§28, 29=§29, 30=§30, 31=§31, 32=§32, 33=§33, 34=§34, 35=§35, 36=§36,
-  // 37=§37, 38=§38, 39=§39, 40=§40, 41=§41, 42=§42
-
-  var pageGroupings = [
-    {start:0,  end:1,  pageNum:5},                            // §1, §2
-    {start:2,  end:5,  pageNum:6},                            // §3-§6
-    {start:6,  end:10, pageNum:7},                            // §7-§11
-    {start:11, end:18, pageNum:8},                            // §12-§19
-    {start:19, end:21, pageNum:9},                            // §20-§22
-    {start:22, end:27, pageNum:10},                           // §23, arbInitial, §24-§27
-    {start:28, end:38, pageNum:11},                           // §28-§38
-    {start:39, end:40, pageNum:12},                           // §39, §40
-    {start:41, end:42, pageNum:13, includeDisclaimer:true}    // §41, §42 + disclaimer
-  ];
-
-  var pages = [];
-  pageGroupings.forEach(function(g){
-    var h = '<div style="'+CC_CSS.page+'">';
-    h += buildContractHeaderSlim();
-    for(var i = g.start; i <= g.end; i++){
-      h += sections[i];
-    }
-    if(g.includeDisclaimer){
-      h += buildDisclaimerContent();
-    }
-    h += buildContractFooter(g.pageNum);
-    h += '</div>';
-    pages.push(h);
-  });
-
-  return pages;
-}
-
-/* PAGE 13 — Disclaimer + Oil Canning + Substitution paragraphs */
-/* DISCLAIMER + OIL CANNING + SUBSTITUTION block.
-   Returns just the inline content (no page wrapper, no header, no footer)
-   so it can be appended to the bottom of clauses page 13 alongside §41
-   and §42 — which is exactly how the canonical Leese contract structures
-   it. Previously this returned a full standalone page, but Leese has
-   §41.3, §42, DISCLAIMER, oil canning, and substitution all on page 13. */
-function buildDisclaimerContent(){
-  var h = '';
-  h += '<hr style="border:none;border-top:1px solid #999;margin:20px 0">';
-  h += '<p style="font-size:11px;line-height:1.55;margin:0 0 14px 0"><span style="font-size:14px;font-weight:900">DISCLAIMER</span> ALL CONTRACTS INCLUDE SEPARATE SELECTION PAGES FOR THE BUYER TO MAKE SELECTIONS REGARDING THEIR BUILD. THESE SELECTION PAGES WILL BE INCORPORATED INTO THE CONTRACT UPON COMPLETION. SELECTIONS MAY INCREASE THE LISTED PRICES. IF THIS OCCURS, A NEW DRAW SCHEDULE WILL BE ISSUED TO REFLECT THE PRICE CHANGES, AND THE BUYER WILL BE RESPONSIBLE FOR COVERING ALL ASSOCIATED COSTS.</p>';
-  h += '<p style="font-size:11px;line-height:1.55;margin:0 0 14px 0;text-align:justify">&nbsp;&nbsp;&nbsp;&nbsp;Summertown Metals, LLC disclaims that in the production of roll formed metal that there are instances occur that cause metal surfaces to appear as deformed. This is an effect referred to as &ldquo;oil canning.&rdquo; Oil canning is a <strong>visual distortion or waviness of thin sheet metal products</strong>. It is a characteristic of metal panels, especially on flat surfaces. It is caused by uneven stresses at the fastening points or by temperature changes. Oil canning can be minimized, but cannot be stopped completely, because of the characteristics of sheet metal. This effect may be seen in all formed metal panels, but specifically in board and batten panels. This effect has no effect on the integrity or effectiveness of the panel and therefore is not covered under the material warranty or eligible for replacement.</p>';
-  h += '<p style="font-size:11px;line-height:1.55;margin:0 0 14px 0;text-align:justify">&nbsp;&nbsp;&nbsp;&nbsp;In the event that the specific product requested by the customer or listed in the contract is unavailable due to inventory limitations, supply chain issues, or other unforeseen circumstances, STM reserves the right to substitute the unavailable product with a similar item of equal or greater value and comparable functionality or quality. Every effort will be made to ensure that the substitute product meets or exceeds the expectations associated with the original request.</p>';
-  h += '<hr style="border:none;border-top:1px solid #999;margin:24px 0">';
-  return h;
-}
-
-/* DEPRECATED — kept for backward compat in case any other code path
-   still calls it. Returns a full page that wraps the disclaimer content,
-   but the canonical contract orchestrator now appends buildDisclaimerContent()
-   inline on page 13 instead of using this. Safe to remove once all callers
-   are migrated. */
-function buildContractDisclaimerPage(){
-  var h = '<div style="'+CC_CSS.page+'">';
-  h += buildContractHeaderSlim();
-  h += buildDisclaimerContent();
-  h += buildContractFooter(13);
-  h += '</div>';
-  return h;
-}
-
-/* PAGE 14 — Signature page (Contractor + Buyer + Co-Buyer + STMC footer) */
-function buildContractSignaturePage(){
-  var c = STATE.customer || {};
-  var contractor = resolveContractsRepName();
-  var buyer1 = c.name || "";
-  var buyer2 = c.coBuyerName || "";
-  var dateStr = contractDateString();
-
-  var h = '<div style="'+CC_CSS.page+'">';
-  h += buildContractHeaderSlim();
-  h += '<div style="font-weight:700;font-size:13px;margin:24px 0 10px 0">Signatures</div>';
-  h += '<p style="font-size:11px;line-height:1.55;margin:0 0 24px 0">By signing this contract, Buyer agrees to the terms and conditions contained herein. In the event Buyer breaches the contract, Buyer will be responsible for all legal fees incurred as a result of payment collections activity.</p>';
-
-  // Three signature blocks (Contractor / Buyer / Co-Buyer).
-  // DocuSign anchor tokens are embedded as zero-size transparent text.
-  // When the rep uploads this PDF to DocuSign manually today, DocuSign can
-  // scan for these strings to auto-place signature/initial/date tabs without
-  // requiring absolute coordinate placement. The tokens are invisible to the
-  // human reading the signed PDF.
-  //   \sig_buyer\, \sig_cobuyer\, \sig_contractor\ — signature lines
-  //   \date_buyer\, \date_cobuyer\, \date_contractor\ — date lines
-  // When Aaron's Django backend takes over rendering in Sprint 3, the anchor
-  // strings move to the server-side template unchanged.
-  //
-  // IMPORTANT: signature LINES are deliberately blank — Leese leaves them
-  // empty so DocuSign's "Signed by [name]" boxes render cleanly above the
-  // line at signing time. Pre-typing the buyer's name here causes the typed
-  // text to overlap the signature line ("running into the line" — the
-  // complaint flagged in the WIZV_5 PDF review).
-  var dsAnchor = function(token){
-    return '<span style="font-size:0;line-height:0;color:transparent;letter-spacing:0">\\'+token+'\\</span>';
-  };
-  function signBlock(label, name, sigToken, dateToken){
-    var s = '<table style="width:100%;border-collapse:collapse;margin-bottom:30px"><tr>';
-    s +=     '<td style="'+CC_CSS.signLabel+'">'+esc(label)+':</td>';
-    s +=     '<td style="'+CC_CSS.signLine+'">'+dsAnchor(sigToken)+'</td>';
-    s +=     '<td style="width:60px;'+CC_CSS.signLabel+';padding-left:30px">Date:</td>';
-    s +=     '<td style="'+CC_CSS.signLine+';width:120px">'+dsAnchor(dateToken)+'</td>';
-    s +=   '</tr></table>';
-    return s;
-  }
-
-  h += signBlock('Contractor Signature', contractor, 'sig_contractor', 'date_contractor');
-  h += signBlock('Buyer Signature',      buyer1,     'sig_buyer',      'date_buyer');
-  h += signBlock('Co-Buyer Signature',   buyer2,     'sig_cobuyer',    'date_cobuyer');
-
-  // STMC footer (matches Leese)
-  h += '<table style="width:100%;border-collapse:collapse;margin-top:20px"><tr>';
-  h +=   '<td style="width:50%;text-align:center;vertical-align:top">';
-  h +=     '<div style="font-size:24px;font-weight:900;color:#A31A1A;letter-spacing:1px">STM CONTRACTING, LLC</div>';
-  h +=     '<div style="font-size:9px;font-weight:600;color:#fff;background:#000;letter-spacing:2px;padding:2px 0;display:inline-block;margin-top:2px">A PARTNER OF SUMMERTOWN METALS</div>';
-  h +=   '</td>';
-  h +=   '<td style="width:50%;font-size:11px;line-height:1.5;vertical-align:top">';
-  h +=     '<div>A Partner of, Summertown Metals, LLC</div>';
-  h +=     '<div>3864 Summertown Hwy</div>';
-  h +=     '<div>Summertown, TN 38483</div>';
-  h +=     '<div>Main Office/Sales: (931) 796-1521</div>';
-  h +=     '<div>Email: info@summertownmetals.com</div>';
-  h +=     '<div>Building Coordination Dept: (931) 796-7117</div>';
-  h +=     '<div>Garage Door Dept: (931) 796-7855</div>';
-  h +=     '<div>Website: www.summertownmetals.com</div>';
-  h +=   '</td>';
-  h += '</tr></table>';
-
-  h += buildContractFooter(14);
-  h += '</div>';
-  return h;
-}
-
-/* MASTER ORCHESTRATOR — assembles all pages of the canonical contract.
-   Returns one HTML string containing all <div class="ps-page"> blocks
-   ready to be set as #printSheet.innerHTML. */
-function buildCanonicalContractHTML(){
-  var html = '';
-  // Supersedes banner — only when checked, prepended above page 1.
-  html += buildPsSupersedesBanner();
-  // Every page wrapper carries `ps-contract` in addition to ps-page.
-  // The print CSS uses `.ps-contract, .ps-contract *` to force the Calibri
-  // font stack !important — overriding the #printSheet rule that sets
-  // DM Sans for the wizard's other print outputs (upgrade pricing, contract
-  // summary, etc.). The Leese canonical bank template uses Calibri throughout
-  // and this is the only path to ensure the print engine actually renders
-  // Calibri rather than inheriting DM Sans from the print sheet ancestor.
-  html += '<div class="ps-page ps-contract">' + buildContractPage1() + '</div>';
-  html += '<div class="ps-page ps-page-break ps-contract">' + buildContractPage2() + '</div>';
-
-  // Pages 3-4: Project Plans and Specification Notes (variable count: 1 or 2)
-  var notesPages = buildContractNotesPages();
-  notesPages.forEach(function(pg){
-    html += '<div class="ps-page ps-page-break ps-contract">' + pg + '</div>';
-  });
-
-  // Pages 5-13: Sections 1-42 boilerplate + disclaimer (9 pages total).
-  // The last clauses page (13) appends DISCLAIMER + oil canning + substitution
-  // inline alongside §41 and §42 — matches Leese's canonical structure.
-  var clausePages = buildContractClausesPages();
-  clausePages.forEach(function(pg){
-    html += '<div class="ps-page ps-page-break ps-contract">' + pg + '</div>';
-  });
-
-  // Page 14: Signatures
-  html += '<div class="ps-page ps-page-break ps-contract">' + buildContractSignaturePage() + '</div>';
-
-  return html;
-}
-
-/* New PDF entry point — Sprint 2 request #6.
-   Replaces printContractsPDF()'s prior dashboard-style output with the
-   word-for-word canonical bank contract that mirrors the Leese template.
-
-   BROWSER PRINT-CHROME NOTE (Phase 1 limitation):
-   When the user clicks "Save as PDF" in Chrome's print dialog, the saved
-   PDF will include browser-injected headers ("[date]  [document title]")
-   and footers ("[file URL]  [page N of total]") UNLESS the user unchecks
-   "Headers and footers" in Chrome's print dialog (More settings →
-   Headers and footers OFF). This setting persists per-browser for the
-   user's session/profile, so it only needs to be unchecked once.
-
-   This is a known limitation of the browser-driven print pipeline and
-   cannot be reliably suppressed via CSS — `@page { margin: 0 }` works
-   in some engines but causes layout regressions on the wizard's other
-   print outputs (upgrade pricing, draw schedule, etc.). Will be fully
-   resolved when Aaron's Django backend takes over PDF generation in
-   Sprint 3 via WeasyPrint, which renders without any browser chrome. */
-function printCanonicalContractPDF(){
-  if(!requireModel()) return;
-  if(!requireConcreteOrConfirm()) return;
-  // Validation: the contract really shouldn't go out without a primary
-  // buyer name, bank name, or address. Warn the rep but allow override
-  // (some draft contracts get printed for review before all fields filled).
-  var c = STATE.customer || {};
-  var missing = [];
-  if(!c.name)      missing.push("Buyer Name");
-  if(!c.bankName)  missing.push("Bank Name");
-  if(!resolveSiteAddressString()) missing.push("Job Site Address");
-  if(!resolveOrderNumberString()) missing.push("S/M Order Number");
-  if(missing.length > 0){
-    var ok = confirm("The following contract field(s) are blank and will show as underlined placeholders on the PDF:\n\n  • " + missing.join("\n  • ") + "\n\nProceed anyway? (Recommended only for draft / review prints — NOT for sending to the bank.)");
-    if(!ok) return;
-  }
-  var html = buildCanonicalContractHTML();
-  printToSheet(html, "Contract");
-}
-
+/* ═══════════════════════════════════════════════════════════════════════
+   LEGACY HTML-PRINT CONTRACT — REMOVED (V10 cleanup)
+   ───────────────────────────────────────────────────────────────────────
+   The following functions were removed because the pdf-lib overlay
+   (generateBankContractFromState → generateStmcBankContractPdf) now
+   serves as the sole bank contract PDF path.
+
+   Removed functions (829 lines):
+     CC_CSS, buildContractHeaderFull, buildContractHeaderSlim,
+     buildContractFooter, buildContractPage1, buildContractPage2,
+     buildContractNotesPages, buildContractClausesPages,
+     buildDisclaimerContent, buildContractDisclaimerPage,
+     buildContractSignaturePage, buildCanonicalContractHTML,
+     printCanonicalContractPDF
+
+   Still active (pdf-lib overlay):
+     STMC_BANK_CONTRACT_COORDINATES, generateStmcBankContractPdf,
+     mapStateToBankContractData, generateBankContractFromState,
+     generateBankContractCalibration, STMC_TEMPLATE_B64
+
+   Still active (HTML-print for non-contract outputs):
+     printToSheet, printUpgradesPDF, printContractsPDF,
+     printDrawSchedulePDF, buildPsUpgradesPricing, buildPsDrawSchedule,
+     buildPsContractSummary, buildPsUpgradeWording,
+     buildPsContractNotesPage, buildPsSupersedesBanner
+   ═══════════════════════════════════════════════════════════════════════ */
 /* Placeholder for the future DocuSign API integration (Sprint 3+).
    When clicked today, this shows a modal explaining that DocuSign API
    integration requires Aaron's Django backend, and offers to generate
@@ -7995,13 +7769,14 @@ function buildPMBudgetRows(){
   var orderNum = (S.customer.order || "").trim();
   var jobLabel = custName + (orderNum ? " OE1-" + orderNum : "");
 
-  function add(title, cost, costCode, draw){
+  function add(title, cost, btCode, qbAccount, draw){
     rows.push({
       job: jobLabel,
       poNum: String(poNum).padStart(4, "0"),
       title: title,
       cost: Math.round(pn(cost) * 100) / 100,
-      costCode: costCode || "",
+      btCode: btCode || "",
+      qbAccount: qbAccount || "",
       draw: draw || ""
     });
     poNum++;
@@ -8013,7 +7788,7 @@ function buildPMBudgetRows(){
   function rateCost(rateKey){
     var rc = INT_RC[rateKey]; if(!rc) return 0;
     var drivers = {
-      livingSF: livSF(), cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
+      livingSF: livSF(), garSF: garSF(), cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
       drywallSF: pn(I.drywallSF), trimLF: pn(I.trimLF), doors: pn(I.doors),
       bathCount: pi(I.fullBaths)+pi(I.halfBaths), fixtures: pn(I.fixtures)+getSelectionFixturePoints(S),
       hvacTons: pn(I.hvacTons), flat: 1
@@ -8028,48 +7803,57 @@ function buildPMBudgetRows(){
   var ext = S.extLaborTotals || {};
 
   // Row 1: Concrete (Draw 2)
-  add("Concrete", pn(S.concreteBudget), "Concrete", 2);
-  // Rows 2-5: Exterior Labor (Draw 3)
-  add("Framing",           pn(ext.framing),         "Whole House Framing", 3);
-  add("Sheathing on Roof", pn(ext.sheathingOnRoof), "Roofing",             3);
-  add("Roof",              pn(ext.roof),             "Roof Labor",          3);
-  add("Metal Install",     pn(ext.walls),            "Metal Walls",         3);
+  add("Concrete", pn(S.concreteBudget), "Concrete", "Concrete", 2);
+  // Rows 2-9: Exterior Labor (Draw 3)
+  add("Framing",              pn(ext.framing),         "Whole House Framing", "Framing of Home", 3);
+  add("Sheathing on Roof",    pn(ext.sheathingOnRoof), "Roofing",             "Roofing",         3);
+  add("Roof",                 pn(ext.roof),             "Roof Labor",          "Framing of Home", 3);
+  add("Metal Install",        pn(ext.walls),            "Siding",              "Metal Walls",     3);
+  add("Rock",                 pn(ext.stone),            "Siding",              "Metal Walls",     3);
+  add("Door and Window Install", pn(ext.doorsWindows),  "Whole House Framing", "Framing of Home", 3);
+  add("Cupola",               pn(ext.cupola),           "Whole House Framing", "Framing of Home", 3);
+  add("Decks/Porch",          pn(ext.decksPorch),       "Whole House Framing", "Framing of Home", 3);
   // Rows 6-9: Mechanical rough-in (Draw 4)
-  add("Electrical",            sumRates(["elecBase","elecBath"]) + (upgradesByTrade["electrical"]||0) + (upgradesByTrade["lighting"]||0), "Electrical Installation", 4);
-  add("Plumbing Installation", sumRates(["plumbBase","plumbBath"]) + (upgradesByTrade["plumbing"]||0), "Plumbing Installation", 4);
-  add("HVAC",                  rateCost("hvac") + (upgradesByTrade["hvac"]||0), "HVAC", 4);
-  add("Insulation",            rateCost("insulation") + (upgradesByTrade["insulation"]||0), "Insulation - Spray Foam", 4);
+  add("Electrical",            rateCost("electrical") + (upgradesByTrade["electrical"]||0) + (upgradesByTrade["lighting"]||0), "Electrical Installation", "Electrical Installation", 4);
+  add("Plumbing Installation", rateCost("plumbingLab") + (upgradesByTrade["plumbing"]||0), "Plumbing Installation", "Plumbing Installation", 4);
+  add("HVAC",                  rateCost("hvac") + (upgradesByTrade["hvac"]||0), "HVAC", "HVAC", 4);
+  add("Insulation",            sumRates(["insulation","insulGarage"]) + (upgradesByTrade["insulation"]||0), "Insulation - Spray Foam", "Insulation - Spray Foam", 4);
   // Rows 10-11: Drywall (Draw 5)
-  add("Drywall Material",      rateCost("drywallMat"), "Drywall", 5);
-  add("Drywall Installation",  sumRates(["drywallHang","drywallFinish"]) + (upgradesByTrade["drywall"]||0), "Drywall", 5);
+  add("Drywall Material",      rateCost("drywallMat"), "Drywall", "Drywall & Painting", 5);
+  add("Drywall Installation",  rateCost("drywallLab") + (upgradesByTrade["drywall"]||0), "Drywall", "Drywall & Painting", 5);
   // Row 12: Painting (Draw 5)
-  add("Painting", sumRates(["paint","paintExtDoor"]) + (upgradesByTrade["paint"]||0), "Painting", 5);
+  add("Painting", sumRates(["paint","paintExtDoor"]) + (upgradesByTrade["paint"]||0), "Painting", "Drywall & Painting", 5);
   // Rows 13-14: Cabinets + Countertops (Draw 5)
-  add("Cabinets",     rateCost("cabinets") + (upgradesByTrade["cabinets"]||0), "Cabinets and Ctops", 5);
-  add("Countertops",  rateCost("countertops") + (upgradesByTrade["countertops"]||0), "Cabinets and Ctops", 5);
+  add("Cabinets",     rateCost("cabinets") + (upgradesByTrade["cabinets"]||0), "Cabinets and Ctops", "Cabinets and Ctops", 5);
+  // Countertops: use Excel base SF × 1.10 buffer × $43/SF for budget (not cabLF × 2)
+  var ctBaseData = CT_BASE_SF[canonicalModel(S.model)] || {};
+  var ctBaseSF = pn(ctBaseData.baseSF);
+  var ctAddedSF = computeCtSections(S).addedSF;
+  var ctBudgetSF = ctBaseSF > 0 ? Math.round(ctBaseSF * 1.10) + ctAddedSF : pn(I.counterSF);
+  add("Countertops",  ctBudgetSF * 43 + (upgradesByTrade["countertops"]||0), "Cabinets and Ctops", "Cabinets and Ctops", 5);
   // Rows 15-16: Flooring (Draw 5)
-  add("Flooring Materials",    rateCost("floorMat"), "Flooring", 5);
-  add("Flooring Installation", (rateCost("floorInstall")||0) + (upgradesByTrade["flooring"]||0), "Flooring", 5);
+  add("Flooring Materials",    rateCost("floorMat"), "Flooring", "Flooring", 5);
+  add("Flooring Installation", rateCost("floorLab") + (upgradesByTrade["flooring"]||0), "Flooring", "Flooring", 5);
   // Rows 17-18: Trim & Doors (Draw 5)
-  add("Trim and Door Materials",    rateCost("trimMat") + rateCost("doorMat"), "Interior Trim & Doors", 5);
-  add("Trim and Door Installation", (rateCost("trimInstall")||0) + (upgradesByTrade["trim"]||0), "Interior Trim & Doors", 5);
+  add("Trim and Door Materials",    rateCost("trimMat") + rateCost("doorMat"), "Interior Trim & Doors", "Interior Trim & Doors", 5);
+  add("Trim and Door Installation", rateCost("trimDoorLab") + (upgradesByTrade["trim"]||0), "Interior Trim & Doors", "Interior Trim & Doors", 5);
   // Row 19: Fixtures (Draw 5)
-  add("Plumbing & Light Fixtures", sumRates(["plumbFixBase","plumbFixBath","lightBase","lightBath"]), "Plumbing & Lighting Fixtures", 5);
+  add("Plumbing & Light Fixtures", sumRates(["plumbFixBase","plumbFixBath","lightBase","lightBath"]), "Plumbing & Lighting Fixtures", "Plumbing & Lighting Fixtures", 5);
   // Row 20: Fireplace (Draw 5)
-  add("Fireplace", upgradesByTrade["fireplaces"]||0, "Fireplace", 5);
+  add("Fireplace", upgradesByTrade["fireplaces"]||0, "Fireplace", "Fireplaces", 5);
   // Row 21: Tile (Draw 5)
-  add("Tile", upgradesByTrade["tile"]||0, "Flooring", 5);
+  add("Tile", upgradesByTrade["tile"]||0, "Flooring", "Flooring", 5);
   // Rows 22-25: Close-out (Draw 6)
-  add("Permits",                    pn(S.contractMeta && S.contractMeta.permitAllowance), "Permits", 6);
-  add("Final Clean",                rateCost("cleaning"), "Final Cleaning", 6);
-  add("Contract Allowance Expense", pn(S.contractMeta && S.contractMeta.sitePrepAllowance), "Contract Allowance Expense", 6);
-  add("Dumpster Allowance",         rateCost("dumpster"), "Waste Removal", 6);
+  add("Permits",                    pn(S.contractMeta && S.contractMeta.permitAllowance), "Permits", "Permits", 6);
+  add("Final Clean",                rateCost("cleaning"), "Final Clean", "Final Cleaning", 6);
+  add("Contract Allowance Expense", pn(S.contractMeta && S.contractMeta.sitePrepAllowance), "Contract Allowance", "Contract Allowance Expense", 6);
+  add("Dumpster Allowance",         rateCost("dumpster"), "Waste Removal/Dumpster", "Waste Removal", 6);
 
   // Shop / Detached (appended after standard rows if applicable)
   var shopMat = pn(S.contractMeta && S.contractMeta.detShopMaterial);
   var shopCL = pn(S.contractMeta && S.contractMeta.detShopConcLabor);
-  if(shopMat > 0) add("Shop/Detached Garage — Material", shopMat, "Materials", 1);
-  if(shopCL > 0) add("Shop/Detached Garage — Concrete & Labor", shopCL, "Concrete", 2);
+  if(shopMat > 0) add("Shop/Detached Garage — Material", shopMat, "Materials", "Material Misc - For Completion", 1);
+  if(shopCL > 0) add("Shop/Detached Garage — Concrete & Labor", shopCL, "Concrete", "Concrete", 2);
 
   return rows;
 }
@@ -8097,11 +7881,11 @@ function exportPMBudgetXLSX(){
 
 
   // ── Sheet data ──
-  var headers = ["Job", "PO #", "Title", "Cost", "Cost Code", "DRAW SCHEDULE"];
+  var headers = ["Job", "PO #", "Title", "Cost", "BT Cost Code", "QB Account", "DRAW SCHEDULE"];
   var sheetData = [];
 
   // Title row
-  sheetData.push(["Budget Detail", "", "", "", "", ""]);
+  sheetData.push(["Budget Detail", "", "", "", "", "", ""]);
   // Header row
   sheetData.push(headers);
 
@@ -8109,11 +7893,11 @@ function exportPMBudgetXLSX(){
   var totalCost = 0;
   rows.forEach(function(r){
     totalCost += r.cost;
-    sheetData.push([r.job, r.poNum, r.title, r.cost, r.costCode, r.draw ? String(r.draw) : ""]);
+    sheetData.push([r.job, r.poNum, r.title, r.cost, r.btCode, r.qbAccount, r.draw ? String(r.draw) : ""]);
   });
 
   // Total row
-  sheetData.push(["", "", "TOTAL BUDGETED", totalCost, "", ""]);
+  sheetData.push(["", "", "TOTAL BUDGETED", totalCost, "", "", ""]);
 
   // ── Generate XLSX or CSV fallback ──
   if(typeof XLSX !== "undefined"){
@@ -8126,8 +7910,9 @@ function exportPMBudgetXLSX(){
       {wch: 10},  // B: PO #
       {wch: 43},  // C: Title
       {wch: 16},  // D: Cost
-      {wch: 28},  // E: Cost Code
-      {wch: 19}   // F: Draw Schedule
+      {wch: 28},  // E: BT Cost Code
+      {wch: 32},  // F: QB Account
+      {wch: 19}   // G: Draw Schedule
     ];
 
     // Merge title row A1:C1
@@ -8557,7 +8342,7 @@ function mapStateToBankContractData(){
 
 async function generateBankContractFromState(){
   if(typeof PDFLib === "undefined"){
-    showToast("pdf-lib didn't load (offline?). Try the HTML-Print Version under Tools.");
+    showToast("pdf-lib didn't load — check your internet connection and refresh the page.");
     return;
   }
   if(!requireModel()) return;
@@ -8687,6 +8472,14 @@ function computeUpgradesByTrade(S){
     var amt = pn(r.amount);
     if(amt > 0 && r.trade) addTo(r.trade, -amt);
   });
+
+  // Shower calculator → tile trade at ×0.80
+  if(S.sel && S.sel.plumbing && S.sel.plumbing.showers && S.sel.plumbing.showerUpgrade){
+    S.sel.plumbing.showers.forEach(function(sh){
+      var cost = computeShowerCost(sh).total;
+      if(cost > 0) addTo("tile", cost * 0.80);
+    });
+  }
 
   return out;
 }
@@ -8858,7 +8651,31 @@ function onExtLaborInput(key, val){
   if(badgeEl) badgeEl.textContent = fmt(getExtLaborGrandTotal());
   var varEl = document.getElementById("pmvar");
   if(varEl) varEl.innerHTML = buildPmVarianceHTML();
+  refreshPartC();
   scheduleSave();
+}
+
+/* Live-refresh Part C · Combined Budget Summary KPI boxes.
+   Called from onExtLaborInput (totals mode) and updPmBudgetLine (calculator mode)
+   so Part C stays in sync without a full Step 9 re-render. */
+function refreshPartC(){
+  var extTotal = getExtLaborGrandTotal();
+  var calcTotal = pmBudgetGrandTotal();
+  var laborTotal = extTotal > 0 ? extTotal : calcTotal;
+  var concreteBudget = pn(STATE.concreteBudget);
+  // Interior totals: recalculate from trade groups
+  var intBase = 0, intUpg = 0;
+  var upgradesByTrade = (typeof computeUpgradesByTrade === "function") ? computeUpgradesByTrade() : {};
+  INT_TRADE_GROUPS.forEach(function(tg){
+    intBase += calcIntTradeBase(tg);
+    intUpg += (upgradesByTrade[tg.key] || 0);
+  });
+  var el;
+  el = document.getElementById("partC-extLabor"); if(el) el.textContent = fmt(laborTotal);
+  el = document.getElementById("partC-concrete"); if(el) el.textContent = fmt(concreteBudget);
+  el = document.getElementById("partC-intBase");   if(el) el.textContent = fmt(intBase);
+  el = document.getElementById("partC-intUpg");    if(el) el.textContent = "+"+fmt(intUpg);
+  el = document.getElementById("partC-combined");  if(el) el.textContent = fmt(laborTotal + concreteBudget + intBase + intUpg);
 }
 
 function onExtLaborBlur(key, inp){
@@ -9014,6 +8831,7 @@ function updPmBudgetLine(secIdx, lineIdx, field, val){
     if(gtTotalEl) gtTotalEl.textContent = fmt(pmBudgetGrandTotal());
     var varEl = document.getElementById("pmvar");
     if(varEl) varEl.innerHTML = buildPmVarianceHTML();
+    refreshPartC();
   } catch(e){}
   scheduleSave();
 }
@@ -9173,10 +8991,11 @@ function renderStep9(){
 
   // ── PART B: Interior Trade Budget (Part D from parent tool, unchanged) ──
   var livingSF = livSF();
+  var garageSF = garSF();
   var drivers = {
-    livingSF: livingSF, cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
+    livingSF: livingSF, garSF: garageSF, cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
     drywallSF: pn(I.drywallSF), trimLF: pn(I.trimLF), doors: pn(I.doors),
-    bathCount: pi(I.fullBaths)+pi(I.halfBaths), fixtures: pn(I.fixtures),
+    bathCount: pi(I.fullBaths)+pi(I.halfBaths), fixtures: pn(I.fixtures)+getSelectionFixturePoints(),
     hvacTons: pn(I.hvacTons), flat: 1
   };
 
@@ -9197,6 +9016,7 @@ function renderStep9(){
   h +=   '<div class="card-pad">';
   h +=     '<div class="sum-grid" style="margin-bottom:14px">';
   h +=       '<div class="sum-box"><div class="sum-lbl">Living SF</div><div class="sum-val">'+$(livingSF)+'</div></div>';
+  h +=       '<div class="sum-box"><div class="sum-lbl">Garage SF</div><div class="sum-val">'+$(garageSF)+'</div></div>';
   h +=       '<div class="sum-box"><div class="sum-lbl">Cabinet LF</div><div class="sum-val">'+$(pn(I.cabLF))+'</div></div>';
   h +=       '<div class="sum-box"><div class="sum-lbl">Counter SF</div><div class="sum-val">'+$(pn(I.counterSF))+'</div></div>';
   h +=       '<div class="sum-box"><div class="sum-lbl">Drywall SF</div><div class="sum-val">'+$(pn(I.drywallSF))+'</div>'+(pn(I.drywallSF)>0?'<div class="sum-sub">~'+Math.ceil(pn(I.drywallSF)/32)+' sheets (4\'×8\')</div>':'')+'</div>';
@@ -9226,7 +9046,14 @@ function renderStep9(){
       var q = drivers[rc.driver] || 0;
       var lc = rc.rate * q;
       if(lc === 0 && row.baseCost === 0) return;
-      h += '<tr style="font-size:11px;color:var(--g500)"><td style="padding-left:24px">'+esc(rc.label)+' <span class="mono">'+$(q)+' '+rc.unit+' × '+fmtC(rc.rate)+'</span></td><td class="cost" style="color:var(--g500)">'+fmt(lc)+'</td><td></td><td></td></tr>';
+      // Drywall: display as sheets (32 SF/sheet) so PMs can check against invoices
+      if(rk === "drywallMat" || rk === "drywallLab"){
+        var sheets = Math.ceil(q / 32);
+        var perSheet = Math.round(rc.rate * 32 * 100) / 100;
+        h += '<tr style="font-size:11px;color:var(--g500)"><td style="padding-left:24px">'+esc(rc.label)+' <span class="mono">'+sheets+' sheets × '+fmtC(perSheet)+'/sheet</span></td><td class="cost" style="color:var(--g500)">'+fmt(lc)+'</td><td></td><td></td></tr>';
+      } else {
+        h += '<tr style="font-size:11px;color:var(--g500)"><td style="padding-left:24px">'+esc(rc.label)+' <span class="mono">'+$(q)+' '+rc.unit+' × '+fmtC(rc.rate)+'</span></td><td class="cost" style="color:var(--g500)">'+fmt(lc)+'</td><td></td><td></td></tr>';
+      }
     });
   });
   h +=       '<tr class="ps-total"><td>INTERIOR BUDGET TOTAL</td><td class="cost">'+fmt(intBaseTotal)+'</td><td class="cost" style="color:#B45309">+'+ fmt(intUpgTotal)+'</td><td class="cost">'+fmt(intBaseTotal+intUpgTotal)+'</td></tr>';
@@ -9238,17 +9065,18 @@ function renderStep9(){
   // ── PART C: Combined Budget (Exterior Labor + Interior) ──
   var extTotal = getExtLaborGrandTotal();
   var pmTotal = pmBudgetGrandTotal();
+  var combinedExtLabor = extTotal > 0 ? extTotal : pmTotal;
   var concreteBudget = pn(STATE.concreteBudget);
   h += '<div class="card">';
   h +=   '<div class="section-hdr"><span>Part C · Combined Budget Summary</span></div>';
   h +=   '<div class="card-pad">';
   h +=     '<div class="field-row" style="gap:8px;flex-wrap:wrap">';
-  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Exterior Labor Budget Total</div><div class="kpi-val">'+fmt(extTotal > 0 ? extTotal : pmTotal)+'</div></div>';
-  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Concrete Budget (Step 1)</div><div class="kpi-val">'+fmt(concreteBudget)+'</div></div>';
-  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Interior Base</div><div class="kpi-val">'+fmt(intBaseTotal)+'</div></div>';
-  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Interior Upgrades</div><div class="kpi-val" style="color:#B45309">+'+fmt(intUpgTotal)+'</div></div>';
+  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Exterior Labor Budget Total</div><div class="kpi-val" id="partC-extLabor">'+fmt(combinedExtLabor)+'</div></div>';
+  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Concrete Budget (Step 1)</div><div class="kpi-val" id="partC-concrete">'+fmt(concreteBudget)+'</div></div>';
+  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Interior Base</div><div class="kpi-val" id="partC-intBase">'+fmt(intBaseTotal)+'</div></div>';
+  h +=       '<div class="kpi-box" style="flex:1;min-width:160px"><div class="kpi-lbl">Interior Upgrades</div><div class="kpi-val" id="partC-intUpg" style="color:#B45309">+'+fmt(intUpgTotal)+'</div></div>';
   h +=     '</div>';
-  h +=     '<div style="margin-top:12px"><div class="total-bar" style="font-size:16px"><span class="total-lbl">COMBINED INTERNAL BUDGET</span><span class="total-val">'+fmt((extTotal > 0 ? extTotal : pmTotal) + concreteBudget + intBaseTotal + intUpgTotal)+'</span></div></div>';
+  h +=     '<div style="margin-top:12px"><div class="total-bar" style="font-size:16px"><span class="total-lbl">COMBINED INTERNAL BUDGET</span><span class="total-val" id="partC-combined">'+fmt(combinedExtLabor + concreteBudget + intBaseTotal + intUpgTotal)+'</span></div></div>';
   h +=     '<div style="margin-top:6px;font-size:11px;color:var(--g500);line-height:1.5">Exterior Labor + Concrete + Interior Base + Interior Upgrades. Internal view only.</div>';
   h +=   '</div>';
   h += '</div>';
@@ -9286,52 +9114,82 @@ function printPMBudgetPDF(){
 
   var I = STATE.int || {};
   var drivers = {
-    livingSF:livSF(), cabLF:pn(I.cabLF), counterSF:pn(I.counterSF),
+    livingSF:livSF(), garSF:garSF(), cabLF:pn(I.cabLF), counterSF:pn(I.counterSF),
     drywallSF:pn(I.drywallSF), trimLF:pn(I.trimLF), doors:pn(I.doors),
-    bathCount:pi(I.fullBaths)+pi(I.halfBaths), fixtures:pn(I.fixtures),
+    bathCount:pi(I.fullBaths)+pi(I.halfBaths), fixtures:pn(I.fixtures)+getSelectionFixturePoints(),
     hvacTons:pn(I.hvacTons), flat:1
   };
   var upgradesByTrade = computeUpgradesByTrade();
-  var pmTotal = pmBudgetGrandTotal();
+  var extLaborTotal = getExtLaborGrandTotal();
+  var calcLaborTotal = pmBudgetGrandTotal();
+  var pmTotal = (STATE.pmBudgetSubTab === "totals" && extLaborTotal > 0) || (calcLaborTotal === 0 && extLaborTotal > 0) ? extLaborTotal : calcLaborTotal;
   var laborBudget = pn(STATE.laborBudget);
   var concreteBudget = pn(STATE.concreteBudget);
 
   // ═══ PAGE 1: PM Labor Detail (line items from Step 9) ═══
   var h = '<div class="ps-page">';
   h += buildPsHeader("PM Labor Detail", {warning:"INTERNAL DOCUMENT — HIDDEN FROM CUSTOMER"});
-  h += '<div style="background:#FEF3C7;border:1px solid #FDE68A;padding:8px 12px;margin:8px 0;font-size:11px;border-radius:4px">Line-item breakdown of PM labor (framing, roof, walls, doors, etc.) entered by the PM on Step 9.</div>';
+
+  // Determine which data source is authoritative for exterior labor
+  var extTotal = getExtLaborGrandTotal();
+  var calcTotal = pmBudgetGrandTotal();
+  var useExtTotals = (STATE.pmBudgetSubTab === "totals" && extTotal > 0) || (calcTotal === 0 && extTotal > 0);
+  var pmDisplayTotal = useExtTotals ? extTotal : calcTotal;
+
+  h += '<div style="background:#FEF3C7;border:1px solid #FDE68A;padding:8px 12px;margin:8px 0;font-size:11px;border-radius:4px">' +
+    (useExtTotals ? 'Section-level exterior labor totals entered by the PM on Step 9 (Exterior Labor Totals mode).'
+                  : 'Line-item breakdown of PM labor (framing, roof, walls, doors, etc.) entered by the PM on Step 9.') +
+    '</div>';
 
   // Variance box
   if(laborBudget > 0){
-    var variance = pmTotal - laborBudget;
+    var variance = pmDisplayTotal - laborBudget;
     var varColor = Math.abs(variance) < 50 ? '#065F46' : (variance > 0 ? '#B45309' : '#1E40AF');
     var varLabel = Math.abs(variance) < 50 ? 'On budget' : (variance > 0 ? 'Over by '+fmt(variance) : 'Under by '+fmt(Math.abs(variance)));
     h += '<div style="display:flex;gap:10px;margin:8px 0;font-size:11px">';
-    h +=   '<div style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:3px"><div style="color:#777;font-size:10px">PM Labor Total</div><div style="font-weight:700;font-size:13px">'+fmt(pmTotal)+'</div></div>';
+    h +=   '<div style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:3px"><div style="color:#777;font-size:10px">PM Labor Total</div><div style="font-weight:700;font-size:13px">'+fmt(pmDisplayTotal)+'</div></div>';
     h +=   '<div style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:3px"><div style="color:#777;font-size:10px">Step 1 Labor Budget</div><div style="font-weight:700;font-size:13px">'+fmt(laborBudget)+'</div></div>';
     h +=   '<div style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:3px;background:#F9FAFB"><div style="color:#777;font-size:10px">Variance</div><div style="font-weight:700;font-size:13px;color:'+varColor+'">'+esc(varLabel)+'</div></div>';
     h += '</div>';
   }
 
-  h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">';
-  h +=   '<thead><tr style="border-bottom:2px solid #333"><th style="text-align:left;padding:4px 6px">ITEM</th><th style="text-align:right;padding:4px 6px;width:70px">QTY</th><th style="text-align:right;padding:4px 6px;width:60px">UNIT</th><th style="text-align:right;padding:4px 6px;width:80px">RATE</th><th style="text-align:right;padding:4px 6px;width:90px">AMOUNT</th></tr></thead>';
-  h +=   '<tbody>';
-  STATE.pmBudget.sections.forEach(function(sec){
-    var sub = pmBudgetSectionSubtotal(sec);
-    h += '<tr style="background:#F3F4F6;font-weight:700"><td colspan="4" style="padding:4px 6px;text-transform:uppercase;font-size:10px;letter-spacing:.06em">'+esc(sec.name)+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace">'+fmt(sub)+'</td></tr>';
-    sec.lines.forEach(function(line){
-      if(pn(line.amount) === 0) return;   // skip empty rows in the PDF
+  if(useExtTotals){
+    // ── Exterior Labor Totals mode: simple section-level table ──
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">';
+    h +=   '<thead><tr style="border-bottom:2px solid #333"><th style="text-align:left;padding:4px 6px">SECTION</th><th style="text-align:right;padding:4px 6px;width:120px">AMOUNT</th></tr></thead>';
+    h +=   '<tbody>';
+    EXT_LABOR_SECTIONS.forEach(function(sec){
+      var amt = pn(STATE.extLaborTotals[sec.key]);
+      if(amt === 0) return;
       h += '<tr style="border-bottom:1px solid #eee">';
-      h +=   '<td style="padding:4px 6px">'+esc(line.desc)+'</td>';
-      h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+(pn(line.qty)>0?$(line.qty):'')+'</td>';
-      h +=   '<td style="padding:4px 6px;text-align:right;color:#777;font-size:10px">'+esc(line.unit||'')+'</td>';
-      h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+(pn(line.rate)>0?fmtC(line.rate):'')+'</td>';
-      h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+fmt(line.amount)+'</td>';
+      h +=   '<td style="padding:4px 6px">'+esc(sec.label)+'</td>';
+      h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+fmt(amt)+'</td>';
       h += '</tr>';
     });
-  });
-  h +=     '<tr style="border-top:2px solid #333;background:#222;color:#fff;font-weight:700"><td colspan="4" style="padding:6px">PM LABOR TOTAL</td><td style="padding:6px;text-align:right;font-family:monospace">'+fmt(pmTotal)+'</td></tr>';
-  h +=   '</tbody></table>';
+    h +=     '<tr style="border-top:2px solid #333;background:#222;color:#fff;font-weight:700"><td style="padding:6px">PM LABOR TOTAL</td><td style="padding:6px;text-align:right;font-family:monospace">'+fmt(extTotal)+'</td></tr>';
+    h +=   '</tbody></table>';
+  } else {
+    // ── Labor Calculator mode: full line-item detail ──
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">';
+    h +=   '<thead><tr style="border-bottom:2px solid #333"><th style="text-align:left;padding:4px 6px">ITEM</th><th style="text-align:right;padding:4px 6px;width:70px">QTY</th><th style="text-align:right;padding:4px 6px;width:60px">UNIT</th><th style="text-align:right;padding:4px 6px;width:80px">RATE</th><th style="text-align:right;padding:4px 6px;width:90px">AMOUNT</th></tr></thead>';
+    h +=   '<tbody>';
+    STATE.pmBudget.sections.forEach(function(sec){
+      var sub = pmBudgetSectionSubtotal(sec);
+      h += '<tr style="background:#F3F4F6;font-weight:700"><td colspan="4" style="padding:4px 6px;text-transform:uppercase;font-size:10px;letter-spacing:.06em">'+esc(sec.name)+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace">'+fmt(sub)+'</td></tr>';
+      sec.lines.forEach(function(line){
+        if(pn(line.amount) === 0) return;
+        h += '<tr style="border-bottom:1px solid #eee">';
+        h +=   '<td style="padding:4px 6px">'+esc(line.desc)+'</td>';
+        h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+(pn(line.qty)>0?$(line.qty):'')+'</td>';
+        h +=   '<td style="padding:4px 6px;text-align:right;color:#777;font-size:10px">'+esc(line.unit||'')+'</td>';
+        h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+(pn(line.rate)>0?fmtC(line.rate):'')+'</td>';
+        h +=   '<td style="padding:4px 6px;text-align:right;font-family:monospace">'+fmt(line.amount)+'</td>';
+        h += '</tr>';
+      });
+    });
+    h +=     '<tr style="border-top:2px solid #333;background:#222;color:#fff;font-weight:700"><td colspan="4" style="padding:6px">PM LABOR TOTAL</td><td style="padding:6px;text-align:right;font-family:monospace">'+fmt(calcTotal)+'</td></tr>';
+    h +=   '</tbody></table>';
+  }
   h += '<div style="margin-top:12px;font-size:9px;color:#999">Summertown Metals Contracting · '+psDateStamp()+'</div>';
   h += '</div>';
 
@@ -9391,7 +9249,14 @@ function printPMBudgetPDF(){
       var q = drivers[rc.driver]||0;
       var lc = rc.rate*q;
       if(lc===0) return;
-      h += '<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0 2px 12px;color:#555"><span>'+esc(rc.label)+' ('+$(q)+' '+rc.unit+' × '+fmtC(rc.rate)+')</span><span style="font-family:monospace">'+fmt(lc)+'</span></div>';
+      // Drywall: display as sheets for PM invoice checking
+      if(rk === "drywallMat" || rk === "drywallLab"){
+        var sheets = Math.ceil(q / 32);
+        var perSheet = Math.round(rc.rate * 32 * 100) / 100;
+        h += '<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0 2px 12px;color:#555"><span>'+esc(rc.label)+' ('+sheets+' sheets × '+fmtC(perSheet)+'/sheet)</span><span style="font-family:monospace">'+fmt(lc)+'</span></div>';
+      } else {
+        h += '<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0 2px 12px;color:#555"><span>'+esc(rc.label)+' ('+$(q)+' '+rc.unit+' × '+fmtC(rc.rate)+')</span><span style="font-family:monospace">'+fmt(lc)+'</span></div>';
+      }
     });
     if(upg !== 0){
       h += '<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0 2px 12px;color:#B45309"><span>Upgrades (true cost from selections)</span><span style="font-family:monospace">'+(upg>0?'+':'')+fmt(upg)+'</span></div>';
@@ -9684,153 +9549,6 @@ function importStateJSON(){
   } catch(e){
     showToast("Import failed: "+e.message);
   }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   DJANGO SAVE — POST contract to /stmc_ops/app/save-contract/
-
-   Called by wizNext() when the rep clicks "Save & Submit" on the final
-   step. Builds the payload save_contract_view expects, includes the full
-   STATE in `rawState` for rehydration on Edit, and redirects on success.
-   ═══════════════════════════════════════════════════════════════ */
-function saveContract(){
-  if(!STATE.model){
-    showToast("Select a model on Step 1 before submitting.");
-    return;
-  }
-  // Pre-flight checklist — same one shown on Step 8. Refuse to save until
-  // every item passes so the manager dashboard always gets a complete row.
-  if(typeof buildSubmissionChecklist === "function"){
-    var checklist = buildSubmissionChecklist();
-    var failed = checklist.filter(function(it){ return !it.ok; });
-    if(failed.length > 0){
-      var first = failed[0].label;
-      showToast("Pre-flight checklist incomplete: " + first +
-                (failed.length > 1 ? " (+ " + (failed.length - 1) + " more)" : ""));
-      return;
-    }
-  }
-  var c = STATE.customer || {};
-  var p10WithMFT = pn(c.p10) + (typeof getMFTMarkup === "function" ? getMFTMarkup() : 0);
-  var intContract = (typeof computeInteriorContractPrice === "function") ? computeInteriorContractPrice() : 0;
-  var shellTotal  = pn(STATE.shellContract);
-  var turnkeyTotal = shellTotal + Math.max(0, intContract);
-
-  // Build draws array — the Django side expects [{n, l, a}, ...]
-  var draws = [];
-  try {
-    var d = computeDrawAmounts({
-      isShell:false,
-      p10WithMFT:p10WithMFT,
-      concTotal:pn(STATE.concreteBudget),
-      custLabor:pn(STATE.laborBudget),
-      intContract:intContract,
-      shellTotal:shellTotal
-    });
-    draws = [
-      {n:0, l:"Good Faith Deposit",          a:Math.round(d.deposit)},
-      {n:1, l:"1st Home Draw (Loan Closing)", a:Math.round(d.draw1)},
-      {n:2, l:"2nd Home Draw (Concrete)",     a:Math.round(d.draw2)},
-      {n:3, l:"3rd Home Draw (Framing/Labor)",a:Math.round(d.draw3)},
-      {n:4, l:"4th Home Draw (Interior)",     a:Math.round(d.draw4)},
-      {n:5, l:"5th Home Draw (Finishes)",     a:Math.round(d.draw5)},
-      {n:6, l:"Final Draw (Punch)",           a:Math.round(d.draw6)}
-    ];
-  } catch(e){ console.warn("[saveContract] draw build failed:", e); }
-
-  // Build trade budgets for the manager/owner dashboards. Aggregates the
-  // ~25 granular PO lines from buildPMBudgetRows() into ~14 trade buckets,
-  // adds the sales-rep-entered labor lump as "Contractor Labor", and skips
-  // any zero-dollar trades.
-  //
-  // Title-to-trade mapping mirrors the layout shown on the manager Budgets
-  // panel (Cabinets, Countertops, Flooring, Drywall, etc.). Multi-line
-  // titles ("Drywall Material" + "Drywall Installation") fold into one
-  // bucket; close-out rows fold into "Permits & General".
-  var TITLE_TO_TRADE = {
-    "Cabinets":"Cabinets", "Countertops":"Countertops",
-    "Flooring Materials":"Flooring", "Flooring Installation":"Flooring", "Tile":"Flooring",
-    "Drywall Material":"Drywall", "Drywall Installation":"Drywall",
-    "Painting":"Paint",
-    "Trim and Door Materials":"Trim & Doors", "Trim and Door Installation":"Trim & Doors",
-    "Electrical":"Electrical",
-    "Plumbing Installation":"Plumbing",
-    "Insulation":"Insulation",
-    "HVAC":"HVAC",
-    "Plumbing & Light Fixtures":"Light Fixtures",
-    "Fireplace":"Fireplaces",
-    "Permits":"Permits & General",
-    "Final Clean":"Permits & General",
-    "Contract Allowance Expense":"Permits & General",
-    "Dumpster Allowance":"Permits & General"
-  };
-  var TRADE_ORDER = [
-    "Contractor Labor","Cabinets","Countertops","Flooring","Drywall","Paint",
-    "Trim & Doors","Electrical","Plumbing","Insulation","HVAC",
-    "Light Fixtures","Fireplaces","Permits & General"
-  ];
-  var tradeMap = {};
-  // Sales-rep-entered exterior/framing labor (Step 1) becomes one row.
-  if(pn(STATE.laborBudget) > 0) tradeMap["Contractor Labor"] = pn(STATE.laborBudget);
-  try {
-    if(typeof buildPMBudgetRows === "function"){
-      var rows = buildPMBudgetRows() || [];
-      rows.forEach(function(r){
-        var trade = TITLE_TO_TRADE[r.title];
-        if(!trade) return;                  // Concrete / Framing / etc. live outside this table
-        var amt = pn(r.cost);
-        if(amt <= 0) return;
-        tradeMap[trade] = (tradeMap[trade] || 0) + amt;
-      });
-    }
-  } catch(e){ console.warn("[saveContract] PM budget aggregation failed:", e); }
-  var tradeBudgets = [];
-  TRADE_ORDER.forEach(function(name, idx){
-    if(tradeMap[name] && tradeMap[name] > 0){
-      tradeBudgets.push({trade:name, budgeted:Math.round(tradeMap[name]), actual:0, sort_order:idx});
-    }
-  });
-
-  var payload = {
-    leadId: window.STMC_EDIT_JOB_ID || null,
-    jobId:  window.STMC_EDIT_JOB_ID || null,
-    customer: c,
-    model: STATE.model,
-    branch: STATE.branch,
-    jobMode: "turnkey",
-    p10: pn(c.p10),
-    shellTotal: shellTotal,
-    turnkeyTotal: turnkeyTotal,
-    shellContract: shellTotal,
-    concreteBudget: pn(STATE.concreteBudget),
-    laborBudget: pn(STATE.laborBudget),
-    contractMeta: STATE.contractMeta || {},
-    draws: draws,
-    tradeBudgets: tradeBudgets,
-    budgetTotal: turnkeyTotal,
-    rawState: STATE
-  };
-
-  var url = (typeof window !== "undefined" && window.SAVE_CONTRACT_URL) || "/stmc_ops/app/save-contract/";
-  var csrf = (typeof window !== "undefined" && window.CSRF_TOKEN) || "";
-  showToast("Saving contract...");
-  fetch(url, {
-    method:"POST",
-    credentials:"same-origin",
-    headers:{ "Content-Type":"application/json", "X-CSRFToken": csrf },
-    body: JSON.stringify(payload)
-  }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){ throw new Error("HTTP "+r.status+": "+t); });
-    return r.json();
-  }).then(function(resp){
-    showToast("✓ Contract saved (job "+(resp.job_id||"?")+")");
-    // Redirect to the sales overview so the new row shows up under In Progress.
-    var dest = (typeof window !== "undefined" && window.SALES_OVERVIEW_URL) || "/stmc_ops/sales/overview/";
-    setTimeout(function(){ window.location.href = dest; }, 600);
-  }).catch(function(err){
-    console.error("[saveContract] failed:", err);
-    showToast("Save failed: " + (err && err.message ? err.message : "see console"));
-  });
 }
 
 /* ═══════════════════════════════════════════════════════════════

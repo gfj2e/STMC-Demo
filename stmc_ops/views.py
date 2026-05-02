@@ -1557,21 +1557,6 @@ def owner_all_projects_panel_view(request):
 
 
 @role_required(AppUser.ROLE_EXEC)
-def owner_active_projects_panel_view(request):
-    if not request.htmx:
-        return redirect("owner")
-    context = _build_owner_ui_context()
-    return render(
-        request,
-        "owner/active_projects.html",
-        {
-            "all_projects_active": context["all_projects_active"],
-            "all_projects_active_by_branch": context["all_projects_active_by_branch"],
-        },
-    )
-
-
-@role_required(AppUser.ROLE_EXEC)
 def owner_closed_projects_panel_view(request):
     if not request.htmx:
         return redirect("owner")
@@ -1582,21 +1567,6 @@ def owner_closed_projects_panel_view(request):
         {
             "all_projects_closed": context["all_projects_closed"],
             "all_projects_closed_by_month": context["all_projects_closed_by_month"],
-        },
-    )
-
-
-@role_required(AppUser.ROLE_EXEC)
-def owner_payments_panel_view(request):
-    if not request.htmx:
-        return redirect("owner")
-    context = _build_owner_ui_context()
-    return render(
-        request,
-        "owner/payments.html",
-        {
-            "active_projects": context["active_projects"],
-            "closed_projects": context["closed_projects"],
         },
     )
 

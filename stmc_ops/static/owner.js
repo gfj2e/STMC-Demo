@@ -32,7 +32,6 @@ function setOwnerSearchVisibility(tab) {
   const searchWrap = document.getElementById('job-search-wrap');
   if (!searchWrap) return;
   const visibleTabs = {
-    'projects-active': true,
     'projects-closed': true,
   };
   searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
@@ -245,7 +244,6 @@ function clearJobHit() {
 
 function findOwnerJobMatch(query) {
   const targets = [
-    { tab: 'projects-active', panelId: 'tab-projects-active-panel' },
     { tab: 'projects-closed', panelId: 'tab-projects-closed-panel' },
   ];
 
@@ -313,7 +311,7 @@ function _ownerNormalize(value) {
 }
 
 function _ownerFilterPanels() {
-  return ['tab-projects-active-panel', 'tab-projects-closed-panel'];
+  return ['tab-projects-closed-panel'];
 }
 
 function _ownerFilterCards() {
@@ -436,7 +434,7 @@ function bindOwnerFilterRefreshOnSwap() {
   document.body.addEventListener('htmx:afterSwap', event => {
     const target = event.detail && event.detail.target;
     if (!target) return;
-    if (target.id !== 'tab-projects-active-panel' && target.id !== 'tab-projects-closed-panel') return;
+    if (target.id !== 'tab-projects-closed-panel') return;
     rebuildOwnerFilterOptions();
     bindOwnerFilters();
     applyOwnerFilters();

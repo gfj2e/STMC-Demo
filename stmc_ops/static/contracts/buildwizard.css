@@ -21,12 +21,12 @@ html,body{background:var(--g100);font-family:var(--font-ui);color:var(--g900);li
 body{min-height:100vh;padding-bottom:80px}
 
 /* ═══════════════════════════════════════════════════════════════
-   STICKY HEADER
+   STICKY HEADER — wizard PNG absolute-positioned per §15
    ═══════════════════════════════════════════════════════════════ */
 .header{
   background:var(--red);color:#fff;padding:16px 16px 14px;text-align:center;
   box-shadow:0 3px 12px rgba(0,0,0,.2);
-  position:relative;
+  position:relative;  /* anchor for absolute-positioned wizard img */
   z-index:2;
 }
 .header-wizard{
@@ -42,26 +42,6 @@ body{min-height:100vh;padding-bottom:80px}
 .header-subtotal-note{font-size:11px;font-weight:500;opacity:.82;margin-top:1px;text-transform:uppercase;letter-spacing:.1em}
 .header-split{font-family:var(--font-mono);font-size:10px;opacity:.7;margin-top:3px;letter-spacing:.02em}
 @media (max-width:760px){.header-wizard{display:none}}
-
-/* Status badge — color comes from STATUS_LABELS[STATE.status].color */
-.hdr-status {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #fff;
-  background: #94a3b8;
-  display: inline-block;
-  white-space: nowrap;
-}
-@media (max-width: 640px){
-  .hdr-status { top: 4px; right: 8px; font-size: 9px; padding: 3px 8px; }
-}
 
 /* ═══════════════════════════════════════════════════════════════
    PROGRESS BAR
@@ -85,7 +65,7 @@ body{min-height:100vh;padding-bottom:80px}
 }
 .prog-step.active .prog-num{background:var(--red);color:#fff}
 .prog-step.done .prog-num{background:var(--g700);color:#fff}
-.prog-step.done .prog-num::before{content:"\2713";font-size:13px}
+.prog-step.done .prog-num::before{content:"✓";font-size:13px}
 .prog-step.done .prog-num-txt{display:none}
 .prog-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .prog-sep{flex:0 0 auto;height:2px;background:var(--g200);width:12px;margin:0 -2px;align-self:center;margin-top:-18px}
@@ -141,7 +121,7 @@ body{min-height:100vh;padding-bottom:80px}
 .chk input{width:16px;height:16px;accent-color:var(--red);cursor:pointer}
 
 /* ═══════════════════════════════════════════════════════════════
-   JOB SCOPE TOGGLE (legacy classes preserved for any V10 markup that uses them)
+   JOB SCOPE TOGGLE — two big pill buttons
    ═══════════════════════════════════════════════════════════════ */
 .scope-wrap{padding:4px 16px 18px}
 .scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -178,7 +158,7 @@ body{min-height:100vh;padding-bottom:80px}
 .nav-status{font-size:12px;color:var(--g500)}
 
 /* ═══════════════════════════════════════════════════════════════
-   BOTTOM FOOTER (export/import only)
+   BOTTOM FOOTER (save/load draft)
    ═══════════════════════════════════════════════════════════════ */
 .footer{
   position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--g200);
@@ -213,6 +193,7 @@ body{min-height:100vh;padding-bottom:80px}
 .modal{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-lg);max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
 .modal-hdr{padding:14px 18px;background:var(--red);color:#fff;font-weight:600;font-size:15px}
 .modal-body{padding:12px 18px;overflow-y:auto;flex:1}
+.modal-body:empty::before{content:"No saved drafts yet.";color:var(--g500);font-size:13px;display:block;padding:18px 0;text-align:center}
 .modal-ftr{padding:12px 18px;border-top:1px solid var(--g200);display:flex;justify-content:flex-end;gap:8px}
 .modal-btn{padding:7px 14px;border:1px solid var(--g300);border-radius:var(--radius-sm);background:#fff;font-family:var(--font-ui);font-size:13px;cursor:pointer}
 .modal-btn:hover{background:var(--g50)}
@@ -220,7 +201,7 @@ body{min-height:100vh;padding-bottom:80px}
 .modal-btn.primary:hover{background:var(--red-dark)}
 
 /* ═══════════════════════════════════════════════════════════════
-   RADIO PILL BUTTONS
+   RADIO PILL BUTTONS (foundation type, wall type, etc.)
    ═══════════════════════════════════════════════════════════════ */
 .radio-pills{display:flex;flex-wrap:wrap;gap:8px}
 .radio-pill{
@@ -232,7 +213,7 @@ body{min-height:100vh;padding-bottom:80px}
 .radio-pill.active{background:var(--red);color:#fff;border-color:var(--red)}
 
 /* ═══════════════════════════════════════════════════════════════
-   QUANTITY STEPPER
+   QUANTITY STEPPER (.est-qty-wrap / .est-qty-btn pattern)
    ═══════════════════════════════════════════════════════════════ */
 .est-qty-wrap{
   display:inline-flex;align-items:center;gap:0;
@@ -250,7 +231,7 @@ body{min-height:100vh;padding-bottom:80px}
   font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--g900);
 }
 
-/* Row-style upgrade + qty line */
+/* Row-style upgrade + qty line (used for add-ons, fireplaces, etc.) */
 .upg-row{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:8px 12px;border:1px solid var(--g200);border-radius:var(--radius-sm);background:#fff;
@@ -261,7 +242,7 @@ body{min-height:100vh;padding-bottom:80px}
 .upg-row .upg-cost.zero{color:var(--g400);font-weight:400}
 
 /* ═══════════════════════════════════════════════════════════════
-   EDITABLE ROW TABLES
+   EDITABLE ROW TABLES (slab schedule, roof schedule, custom charges)
    ═══════════════════════════════════════════════════════════════ */
 .row-table{display:flex;flex-direction:column;gap:6px}
 .row-hdr,.row-line{display:grid;gap:8px;align-items:center;padding:6px 4px}
@@ -287,12 +268,13 @@ body{min-height:100vh;padding-bottom:80px}
 .row-add:hover{border-color:var(--red);color:var(--red);background:#fff}
 .row-cost{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--g900);text-align:right}
 
+/* Grid templates per row type */
 .slab-row-hdr, .slab-row{grid-template-columns:1.4fr 130px 110px 36px}
 .roof-row-hdr, .roof-row{grid-template-columns:1.4fr 130px 130px 110px 36px}
 .custom-row-hdr, .custom-row{grid-template-columns:1.6fr 110px 90px 100px 100px 36px}
 
 /* ═══════════════════════════════════════════════════════════════
-   SUMMARY BOX GRID
+   SUMMARY BOX GRID (live-computed SQFT summaries)
    ═══════════════════════════════════════════════════════════════ */
 .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:6px 0 12px}
 .sum-box{
@@ -303,10 +285,11 @@ body{min-height:100vh;padding-bottom:80px}
 .sum-val{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--g900)}
 .sum-sub{font-size:10px;color:var(--g500);font-family:var(--font-mono)}
 
+/* Conditional hint strip for live cost inside labels */
 .live-cost{font-family:var(--font-mono);font-size:12px;color:var(--green);font-weight:500;margin-left:6px}
 
 /* ═══════════════════════════════════════════════════════════════
-   SECTION LAYOUT
+   SECTION LAYOUT (inline rows, groups of fields)
    ═══════════════════════════════════════════════════════════════ */
 .sec{padding:14px 16px;border-bottom:1px solid var(--g200)}
 .sec:last-child{border-bottom:none}
@@ -329,7 +312,7 @@ body{min-height:100vh;padding-bottom:80px}
 .total-bar-sm{padding:8px 14px}
 .total-bar-sm .total-val{font-size:15px}
 
-/* KPI grid for Contract page */
+/* KPI grid for Contract page Part A */
 .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 16px}
 .kpi-box{background:var(--g50);border:1px solid var(--g200);border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
 .kpi-lbl{font-size:10px;font-weight:600;color:var(--g500);text-transform:uppercase;letter-spacing:.06em}
@@ -338,7 +321,7 @@ body{min-height:100vh;padding-bottom:80px}
 .kpi-val.green{color:var(--green)}
 .kpi-val.amber{color:var(--amber-dark)}
 
-/* Pricing summary table */
+/* Pricing summary table (Contract customer pricing summary) */
 .ps-table{width:100%;border-collapse:collapse;font-size:13px}
 .ps-table th,.ps-table td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--g200)}
 .ps-table th{font-size:10px;font-weight:600;color:var(--g600);text-transform:uppercase;letter-spacing:.06em;background:var(--g50)}
@@ -355,10 +338,11 @@ body{min-height:100vh;padding-bottom:80px}
 .draw-table td.muted.num{font-weight:400}
 .draw-table tr.draw-deposit td{background:#FEF3C7}
 
+/* Info chip on the contract banner */
 .info-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--g100);color:var(--g700);border-radius:10px;font-size:11px;font-weight:600;margin-left:6px}
 
 /* ═══════════════════════════════════════════════════════════════
-   STEP 5 (Interior) specific styles
+   INTERIOR — STEP 5 specific styles (feature chips, CAD charges, metrics)
    ═══════════════════════════════════════════════════════════════ */
 .feat-chip{
   display:inline-flex;align-items:center;gap:4px;
@@ -373,8 +357,7 @@ body{min-height:100vh;padding-bottom:80px}
   font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--g900);
   padding:6px 0;
 }
-
-/* Sub-tab pill buttons */
+/* Sub-tab pill buttons (Step 6 Cabinets/Countertops + Step 7 Selections) */
 .sub-pills{
   display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--g200);
   flex-wrap:wrap;background:var(--g50);
@@ -393,6 +376,16 @@ body{min-height:100vh;padding-bottom:80px}
   padding:1px 7px;border-radius:8px;background:rgba(0,0,0,.08);
 }
 .sub-pill.active .sub-pill-badge{background:rgba(255,255,255,.22)}
+.draft-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--g200);gap:10px}
+.draft-row:last-child{border-bottom:none}
+.draft-info{flex:1;min-width:0}
+.draft-name{font-weight:600;font-size:13px;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.draft-meta{font-size:11px;color:var(--g500);font-family:var(--font-mono)}
+.draft-actions{display:flex;gap:6px;flex-shrink:0}
+.draft-btn{padding:5px 10px;font-size:12px;border:1px solid var(--g300);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-family:var(--font-ui)}
+.draft-btn:hover{background:var(--g50)}
+.draft-btn.del{color:var(--red);border-color:var(--red-light)}
+.draft-btn.del:hover{background:var(--red-light)}
 
 /* ═══════════════════════════════════════════════════════════════
    PRINT
@@ -405,6 +398,7 @@ body{min-height:100vh;padding-bottom:80px}
   .ps-page:last-child{page-break-after:auto}
   .ps-page-break{page-break-before:always}
 
+  /* STMC branded header */
   .ps-hdr{
     display:flex;justify-content:space-between;align-items:flex-start;
     border-bottom:3px solid #A31A1A;padding-bottom:10px;margin-bottom:14px;
@@ -415,6 +409,7 @@ body{min-height:100vh;padding-bottom:80px}
   .ps-hdr-info{text-align:right;font-size:10.5px;line-height:1.5}
   .ps-hdr-info strong{font-weight:600;color:#666;font-size:9.5px;text-transform:uppercase;letter-spacing:0.05em;margin-right:4px}
 
+  /* Title + info grid */
   .ps-title{font-size:18px;font-weight:700;margin-bottom:10px;color:#111;letter-spacing:-0.01em}
   .ps-info-grid{
     display:grid;grid-template-columns:repeat(3,1fr);gap:6px 18px;
@@ -423,6 +418,7 @@ body{min-height:100vh;padding-bottom:80px}
   }
   .ps-info-grid .lbl{color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;font-size:9px;display:block;margin-bottom:1px}
 
+  /* Tables */
   .ps-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}
   .ps-table th{
     text-align:left;background:#F3F4F6;padding:6px 10px;font-size:9.5px;
@@ -441,14 +437,33 @@ body{min-height:100vh;padding-bottom:80px}
     border-bottom:none;padding:8px 10px;letter-spacing:0.03em;
   }
 
+  /* Footer */
   .ps-footer{
     font-size:9px;color:#666;margin-top:16px;text-align:center;
     border-top:1px solid #eee;padding-top:6px;
   }
-  .ps-upgrade::before{content:"\2B06 Upgrade: ";color:#A31A1A;font-weight:600}
+  /* "Upgrade" prefix for line items on pricing summary */
+  .ps-upgrade::before{content:"⬆ Upgrade: ";color:#A31A1A;font-weight:600}
 
-  .ps-contract,
-  .ps-contract *{
-    font-family:Calibri,"Carlito","Calibri Light","Segoe UI",Arial,sans-serif !important;
-  }
+}
+
+/* Status badge — inserted into the sticky header. Color comes from
+   STATUS_LABELS[STATE.status].color. Tucked under the running total. */
+.hdr-status {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #94a3b8;
+  display: inline-block;
+  white-space: nowrap;
+}
+@media (max-width: 640px){
+  .hdr-status { top: 4px; right: 8px; font-size: 9px; padding: 3px 8px; }
 }
