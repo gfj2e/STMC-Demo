@@ -9,7 +9,8 @@ function _initials(name) {
   return (name || '').split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
 }
 
-function switchTab(btn, tab) {
+function switchTab(btn, tab, options) {
+  var shouldRefresh = !(options && options.refresh === false);
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.style.display = 'none';
   });
@@ -20,8 +21,21 @@ function switchTab(btn, tab) {
   const target = document.getElementById('tab-' + tab);
   if (target) target.style.display = '';
   if (btn) btn.classList.add('active');
+  setOwnerSearchVisibility(tab);
 
-  document.body.dispatchEvent(new CustomEvent('owner-' + tab + '-refresh'));
+  if (shouldRefresh) {
+    document.body.dispatchEvent(new CustomEvent('owner-' + tab + '-refresh'));
+  }
+}
+
+function setOwnerSearchVisibility(tab) {
+  const searchWrap = document.getElementById('job-search-wrap');
+  if (!searchWrap) return;
+  const visibleTabs = {
+    'projects-active': true,
+    'projects-closed': true,
+  };
+  searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
 }
 
 function bindTabNavigation() {
@@ -223,6 +237,212 @@ function bindBellClickOutside() {
   });
 }
 
+function clearJobHit() {
+  document.querySelectorAll('.job-search-hit').forEach(node => {
+    node.classList.remove('job-search-hit');
+  });
+}
+
+function findOwnerJobMatch(query) {
+  const targets = [
+    { tab: 'projects-active', panelId: 'tab-projects-active-panel' },
+    { tab: 'projects-closed', panelId: 'tab-projects-closed-panel' },
+  ];
+
+  for (const target of targets) {
+    const panel = document.getElementById(target.panelId);
+    if (!panel) continue;
+    const cards = panel.querySelectorAll('.card');
+    for (const card of cards) {
+      const haystack = (card.getAttribute('data-job-search') || card.textContent || '').toLowerCase();
+      if (haystack.includes(query)) {
+        return { target, card };
+      }
+    }
+  }
+  return null;
+}
+
+function runOwnerJobSearch() {
+  const input = document.getElementById('job-search-input');
+  if (!input) return;
+
+  const query = (input.value || '').trim().toLowerCase();
+  if (!query) {
+    showToast('Type a job name, order number, or branch to search');
+    return;
+  }
+
+  clearJobHit();
+  const match = findOwnerJobMatch(query);
+  if (!match) {
+    showToast('No matching job found');
+    return;
+  }
+
+  const button = document.querySelector('.app-nav-link[data-tab="' + match.target.tab + '"]');
+  switchTab(button, match.target.tab, { refresh: false });
+
+  const details = match.card.closest('details');
+  if (details) details.open = true;
+
+  match.card.classList.add('job-search-hit');
+  match.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => {
+    match.card.classList.remove('job-search-hit');
+  }, 2200);
+  showToast('Job found');
+}
+
+function bindJobSearch() {
+  const button = document.getElementById('job-search-btn');
+  const input = document.getElementById('job-search-input');
+  if (!button || !input) return;
+
+  button.addEventListener('click', runOwnerJobSearch);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      runOwnerJobSearch();
+    }
+  });
+}
+
+function _ownerNormalize(value) {
+  return (value || '').toString().trim().toLowerCase();
+}
+
+function _ownerFilterPanels() {
+  return ['tab-projects-active-panel', 'tab-projects-closed-panel'];
+}
+
+function _ownerFilterCards() {
+  const cards = [];
+  _ownerFilterPanels().forEach(panelId => {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.querySelectorAll('.card[data-job-search]').forEach(card => {
+      cards.push(card);
+    });
+  });
+  return cards;
+}
+
+function _ownerPopulateFilterSelect(selectId, values, emptyLabel) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const selected = select.value;
+  const options = ['<option value="' + '' + '">' + emptyLabel + '</option>'];
+  values.forEach(value => {
+    options.push('<option value="' + value + '">' + value + '</option>');
+  });
+  select.innerHTML = options.join('');
+  select.value = values.includes(selected) ? selected : '';
+}
+
+function rebuildOwnerFilterOptions() {
+  const branches = new Set();
+  const plans = new Set();
+  const phases = new Set();
+  const years = new Set();
+
+  _ownerFilterCards().forEach(card => {
+    const branch = card.dataset.branch || '';
+    const plan = card.dataset.plan || '';
+    const phase = card.dataset.phase || '';
+    const year = card.dataset.year || '';
+    if (branch) branches.add(branch);
+    if (plan) plans.add(plan);
+    if (phase) phases.add(phase);
+    if (year) years.add(year);
+  });
+
+  _ownerPopulateFilterSelect('job-filter-branch', Array.from(branches).sort(), 'All branches');
+  _ownerPopulateFilterSelect('job-filter-plan', Array.from(plans).sort(), 'All plans');
+  _ownerPopulateFilterSelect('job-filter-phase', Array.from(phases).sort(), 'All phases');
+  _ownerPopulateFilterSelect(
+    'job-filter-year',
+    Array.from(years).sort((a, b) => Number(b) - Number(a)),
+    'All years'
+  );
+}
+
+function _ownerCardSortValue(card) {
+  const ts = Number(card.dataset.sortTs || 0);
+  if (Number.isFinite(ts) && ts > 0) return ts;
+  const order = String(card.dataset.order || '').replace(/\D/g, '');
+  return Number(order || 0);
+}
+
+function _ownerSortGroupCards(group, sortMode) {
+  const body = group.querySelector('.project-group-body');
+  if (!body) return;
+  const cards = Array.from(body.querySelectorAll('.card[data-job-search]'));
+  cards.sort((a, b) => {
+    const av = _ownerCardSortValue(a);
+    const bv = _ownerCardSortValue(b);
+    return sortMode === 'oldest' ? av - bv : bv - av;
+  });
+  cards.forEach(card => body.appendChild(card));
+}
+
+function applyOwnerFilters() {
+  const branch = _ownerNormalize(document.getElementById('job-filter-branch') && document.getElementById('job-filter-branch').value);
+  const plan = _ownerNormalize(document.getElementById('job-filter-plan') && document.getElementById('job-filter-plan').value);
+  const phase = _ownerNormalize(document.getElementById('job-filter-phase') && document.getElementById('job-filter-phase').value);
+  const year = _ownerNormalize(document.getElementById('job-filter-year') && document.getElementById('job-filter-year').value);
+  const sortMode = _ownerNormalize(document.getElementById('job-filter-sort') && document.getElementById('job-filter-sort').value) || 'newest';
+
+  _ownerFilterPanels().forEach(panelId => {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    let panelVisibleCount = 0;
+    panel.querySelectorAll('.project-group').forEach(group => {
+      _ownerSortGroupCards(group, sortMode);
+      let visibleCount = 0;
+      group.querySelectorAll('.card[data-job-search]').forEach(card => {
+        let matches = true;
+        if (branch && _ownerNormalize(card.dataset.branch) !== branch) matches = false;
+        if (plan && _ownerNormalize(card.dataset.plan) !== plan) matches = false;
+        if (phase && _ownerNormalize(card.dataset.phase) !== phase) matches = false;
+        if (year && _ownerNormalize(card.dataset.year) !== year) matches = false;
+        card.style.display = matches ? '' : 'none';
+        if (matches) visibleCount += 1;
+      });
+
+      const countEl = group.querySelector('.project-group-count');
+      if (countEl) countEl.textContent = String(visibleCount);
+      group.style.display = visibleCount ? '' : 'none';
+      panelVisibleCount += visibleCount;
+    });
+
+    const sectionCount = panel.querySelector('.group-section-title .group-section-count');
+    if (sectionCount) sectionCount.textContent = '(' + panelVisibleCount + ')';
+  });
+}
+
+function bindOwnerFilters() {
+  ['job-filter-branch', 'job-filter-plan', 'job-filter-phase', 'job-filter-year', 'job-filter-sort'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.filterBound === '1') return;
+    el.dataset.filterBound = '1';
+    el.addEventListener('change', applyOwnerFilters);
+  });
+}
+
+function bindOwnerFilterRefreshOnSwap() {
+  if (!window.htmx) return;
+  document.body.addEventListener('htmx:afterSwap', event => {
+    const target = event.detail && event.detail.target;
+    if (!target) return;
+    if (target.id !== 'tab-projects-active-panel' && target.id !== 'tab-projects-closed-panel') return;
+    rebuildOwnerFilterOptions();
+    bindOwnerFilters();
+    applyOwnerFilters();
+  });
+}
+
 function initAuthHeader() {
   const user = window.STMC_USER || {};
   const nameEl = document.getElementById('hN');
@@ -238,8 +458,14 @@ function init() {
   bindExecDashboardEvents();
   bindHtmxFeedback();
   bindBellClickOutside();
+  bindJobSearch();
+  bindOwnerFilters();
+  bindOwnerFilterRefreshOnSwap();
+  rebuildOwnerFilterOptions();
+  applyOwnerFilters();
   initAuthHeader();
   initExecDashboard();
+  setOwnerSearchVisibility('dashboard');
 }
 
 init();

@@ -30,6 +30,8 @@ urlpatterns = [
     path("app/save-contract/", views.save_contract_view, name="save_contract"),
     path("manager/", views.manager_view, name="manager"),
     path("manager/builds-panel/", views.manager_builds_panel_view, name="manager_builds_panel"),
+    path("manager/builds-active-panel/", views.manager_builds_active_panel_view, name="manager_builds_active_panel"),
+    path("manager/builds-closed-panel/", views.manager_builds_closed_panel_view, name="manager_builds_closed_panel"),
     path("manager/budgets-panel/", views.manager_budgets_panel_view, name="manager_budgets_panel"),
     path("manager/draws-panel/", views.manager_draws_panel_view, name="manager_draws_panel"),
     path("manager/draws-panel/qb-refresh/", views.manager_qb_draws_refresh_view, name="manager_qb_draws_refresh"),
@@ -40,6 +42,8 @@ urlpatterns = [
     path("owner/", views.owner_view, name="owner"),
     path("owner/dashboard-panel/", views.owner_dashboard_panel_view, name="owner_dashboard_panel"),
     path("owner/all-projects-panel/", views.owner_all_projects_panel_view, name="owner_all_projects_panel"),
+    path("owner/active-projects-panel/", views.owner_active_projects_panel_view, name="owner_active_projects_panel"),
+    path("owner/closed-projects-panel/", views.owner_closed_projects_panel_view, name="owner_closed_projects_panel"),
     path("owner/payments-panel/", views.owner_payments_panel_view, name="owner_payments_panel"),
     # ── QuickBooks Online (Intuit) OAuth ──
     path("qb/connect/", views.qb_connect_view, name="qb_connect"),

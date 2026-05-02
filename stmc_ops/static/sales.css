@@ -720,3 +720,400 @@
 .required {
   color: var(--brand, #a31a1a);
 }
+
+.app-nav-link:focus-visible,
+.job-search-input:focus-visible,
+.job-search-btn:focus-visible,
+.job-filter-select:focus-visible {
+  outline: 2px solid #fecaca;
+  outline-offset: 1px;
+}
+
+.job-search-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin: 14px 0 16px;
+  padding: 10px;
+  border: 1px solid var(--g200);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+
+.job-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.job-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--g300);
+  border-radius: 9px;
+  padding: 0 10px;
+}
+
+.job-search-field:focus-within {
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 3px #fef2f2;
+}
+
+.job-search-chip {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #991b1b;
+  background: #fee2e2;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.job-search-input {
+  flex: 1;
+  min-width: 160px;
+  border: 0;
+  border-radius: 0;
+  padding: 10px 2px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  background: #fff;
+  color: var(--g800);
+}
+
+.job-search-input:focus {
+  outline: none;
+}
+
+.job-search-btn {
+  border: 1px solid #b91c1c;
+  background: #b91c1c;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.job-search-btn:hover {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+.job-filter-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.job-filter-select {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  padding: 7px 12px;
+  appearance: auto;
+}
+
+.job-filter-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.job-filter-select {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  padding: 7px 12px;
+  appearance: auto;
+}
+
+/* ── Branch / month group collapsibles (mirrors manager.css) ── */
+
+.group-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--g500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 0 10px;
+  padding: 0 2px 6px;
+  border-bottom: 1px solid var(--g200);
+}
+
+.group-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.project-group {
+  margin: 12px 0;
+  border: 1px solid var(--g200);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.project-group[open] {
+  border-color: #fca5a5;
+  box-shadow: 0 4px 14px rgba(153, 27, 27, 0.08);
+}
+
+.project-group-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g700);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fcfcfd 0%, #f8fafc 100%);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.project-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-group-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.project-group-chevron {
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.project-group[open] .project-group-chevron {
+  transform: rotate(180deg);
+  color: #b91c1c;
+}
+
+.project-group-summary:hover {
+  background: #f3f4f6;
+}
+
+.project-group-summary:focus-visible {
+  outline: 2px solid #fecaca;
+  outline-offset: -2px;
+}
+
+.project-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  min-width: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.project-group-body {
+  padding: 10px 10px 2px;
+  background: #fff;
+  border-top: 1px solid var(--g200);
+}
+
+.job-search-hit {
+  box-shadow: 0 0 0 3px #fee2e2;
+  border-color: #fca5a5 !important;
+}
+
+/* ── Toast (search feedback) ── */
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  background: #1e293b;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius, 10px);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 400;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   VIEW TOGGLE — Cards vs Table.
+   Each panel template renders BOTH a `.cards-view` and a `.table-view`
+   wrapper. This CSS hides the inactive one. The toggle button (in
+   sales/overview/index.html) flips `.view-mode-table` on the body via
+   sales.js. Default state (no class) shows cards.
+   ────────────────────────────────────────────────────────────────── */
+
+.table-view { display: none; }
+body.view-mode-table .cards-view { display: none; }
+body.view-mode-table .table-view { display: block; }
+
+.job-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--g300);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-left: auto;
+}
+.job-view-btn {
+  padding: 6px 12px;
+  background: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--g500);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.job-view-btn + .job-view-btn { border-left: 1px solid var(--g300); }
+.job-view-btn.active {
+  background: var(--red);
+  color: #fff;
+}
+.job-view-btn:not(.active):hover { background: var(--g100); color: var(--g700); }
+
+/* ──────────────────────────────────────────────────────────────────
+   COMPACT JOB TABLE — used by the table view in In Progress and Closed.
+   Inherits buildwizard.css tokens (--red, --g100..g900, --font-mono).
+   ────────────────────────────────────────────────────────────────── */
+
+.job-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.job-table th,
+.job-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--g200);
+  vertical-align: middle;
+}
+.job-table thead th {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--g500);
+  background: var(--g50);
+  font-weight: 600;
+}
+.job-table tbody tr:last-child td { border-bottom: none; }
+.job-table tbody tr:hover { background: var(--g50); }
+
+/* Expandable rows: summary <tr> + paired detail <tr> beneath. JS toggles
+   the [hidden] attribute on the detail row, which CSS reflects. */
+.job-table-expandable tbody tr.job-table-row { cursor: pointer; }
+.job-table-expandable tbody tr.job-table-row.is-expanded {
+  background: var(--g50);
+}
+.job-table-expandable tbody tr.job-table-row.is-expanded td {
+  border-bottom-color: transparent;
+}
+.row-toggle-col { width: 28px; padding-left: 12px !important; padding-right: 0 !important; }
+.row-chevron {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--g500);
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+.job-table-row.is-expanded .row-chevron { color: var(--red); }
+
+.job-table-detail[hidden] { display: none; }
+.job-table-detail > td {
+  padding: 0 !important;
+  background: var(--g50);
+  border-bottom: 2px solid var(--g200);
+}
+.job-detail-card {
+  padding: 16px 18px;
+  background: #fff;
+  border-left: 3px solid var(--red);
+  margin: 0 12px 8px;
+  border-radius: 0 8px 8px 0;
+}
+.job-detail-card .proj-hdr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.job-detail-card .proj-name { font-size: 15px; font-weight: 600; margin: 0; color: var(--g900); }
+.job-detail-card .proj-sub { font-size: 12px; color: var(--g500); margin: 2px 0 0; }
+.job-detail-card .metric-grid { margin-bottom: 12px; }
+.job-detail-card .card-actions { margin-top: 4px; }
+.job-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+.job-table .muted { color: var(--g500); }
+.job-table a { color: var(--red); text-decoration: none; font-weight: 600; }
+.job-table a:hover { text-decoration: underline; }

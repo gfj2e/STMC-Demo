@@ -1,0 +1,46 @@
+{% if all_projects_active %}
+	<div class="group-section-title">Active Projects <span class="group-section-count">({{ all_projects_active|length }})</span></div>
+	{% for group in all_projects_active_by_branch %}
+		<details class="project-group">
+			<summary class="project-group-summary">
+				<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
+				<span class="project-group-count">{{ group.count }}</span>
+			</summary>
+			<div class="project-group-body">
+				{% for project in group.projects %}
+					<div class="card" style="margin-bottom:16px;padding:14px 16px" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
+						<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+							<div>
+								<div class="job-title" style="font-size:15px;font-weight:600;color:var(--g900)">{{ project.name }}</div>
+								<div style="font-size:11px;color:var(--g500);margin-top:2px">{{ project.subtitle }}</div>
+							</div>
+							<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+						</div>
+
+						<div class="proj-kpis">
+							<div class="proj-kpi"><div class="proj-kl">Contract</div><div class="proj-kv">{{ project.total_display }}</div></div>
+							<div class="proj-kpi"><div class="proj-kl">Collected</div><div class="proj-kv" style="color:var(--green)">{{ project.paid_display }}</div></div>
+							<div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">{{ project.total_bg_display }}</div></div>
+							<div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:{{ project.margin_color }}">{{ project.margin_pct }}%</div></div>
+						</div>
+
+						<div class="ybanner">COLLECTED - {{ project.pct }}% of contract</div>
+						<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
+							<div style="height:100%;border-radius:3px;background:var(--green);width:{{ project.pct }}%"></div>
+						</div>
+
+						{% for trade in project.trades %}
+							<div class="rw">
+								<span class="rl">{{ trade.trade }}</span>
+								<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }}/{{ trade.budget_display }}</span>
+								<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+							</div>
+						{% endfor %}
+					</div>
+				{% endfor %}
+			</div>
+		</details>
+	{% endfor %}
+{% else %}
+	<div class="banner banner-empty">No active projects.</div>
+{% endif %}

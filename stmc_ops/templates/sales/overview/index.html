@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
-<link rel="stylesheet" href="{% static 'sales.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'sales.css' %}?v=6">
 </head>
 <body>
 
@@ -25,9 +25,50 @@
   {% include "sales/overview/_header.html" %}
 </div>
 
+<!-- Toast (search feedback) -->
+<div class="toast" id="toast"></div>
+
 <!-- Tab panels -->
 <div class="container">
 
+  <div id="job-search-wrap" class="job-search-wrap">
+    <div class="job-search-controls">
+      <label class="job-search-field">
+        <span class="job-search-chip">Search</span>
+        <input
+          id="job-search-input"
+          class="job-search-input"
+          type="search"
+          placeholder="customer, order #, branch"
+          aria-label="Search jobs"
+        >
+      </label>
+      <button id="job-search-btn" class="job-search-btn" type="button">Find Job</button>
+    </div>
+    <div class="job-filter-row" aria-label="Project filters">
+      <select id="job-filter-branch" class="job-filter-select" aria-label="Filter by branch">
+        <option value="">All branches</option>
+      </select>
+      <select id="job-filter-plan" class="job-filter-select" aria-label="Filter by plan">
+        <option value="">All plans</option>
+      </select>
+      <select id="job-filter-phase" class="job-filter-select" aria-label="Filter by phase">
+        <option value="">All phases</option>
+      </select>
+      <select id="job-filter-year" class="job-filter-select" aria-label="Filter by year">
+        <option value="">All years</option>
+      </select>
+      <select id="job-filter-sort" class="job-filter-select" aria-label="Sort jobs">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+      </select>
+    </div>
+  </div>
+  
+  <div class="job-view-toggle" role="group" aria-label="View mode">
+    <button id="job-view-cards" type="button" class="job-view-btn active" aria-pressed="true">Cards</button>
+    <button id="job-view-table" type="button" class="job-view-btn" aria-pressed="false">Table</button>
+  </div>
   <!-- Leads -->
   <div id="tab-leads" class="tab-panel" style="display:none">
     <div class="leads-intro">
@@ -95,6 +136,6 @@
   };
 </script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="{% static 'sales.js' %}?v=3"></script>
+<script src="{% static 'sales.js' %}?v=6"></script>
 </body>
 </html>

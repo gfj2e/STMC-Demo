@@ -313,7 +313,7 @@ def _build_manager_owner_data():
         .prefetch_related(
             "demo_trade_budgets", "demo_draws", "budget_lines__trade", "change_orders",
         )
-        .order_by("order_number")[:12]
+        .order_by("-created_at")[:80]
     )
 
     projects = []
@@ -415,6 +415,7 @@ def _build_manager_owner_data():
             "lk": lk,
             "dr": dr,
             "co": co,
+            "closed_at": job.sales_closed_at,
             # Loan-closing draw (#1) paid? Gates PM change-order creation —
             # change orders can only be authored once the sales rep has closed
             # the loan, since the contract isn't legally finalized until then.
@@ -829,6 +830,7 @@ def _build_project_ui_rows(projects):
                 "phase": project.get("ph", "estimate"),
                 "phase_label": _phase_label(project.get("ph", "estimate")),
                 "phase_pill_class": _phase_pill_class(project.get("ph", "estimate")),
+                "closed_at": project.get("closed_at"),
                 "subtitle": subtitle,
                 "total_amount": total,
                 "paid_amount": paid,
@@ -872,6 +874,43 @@ def _build_project_ui_rows(projects):
     return rows
 
 
+def _group_projects_by_branch(projects):
+    grouped = {}
+    for project in projects:
+        branch = (project.get("branch_label") or "Unassigned").strip() or "Unassigned"
+        grouped.setdefault(branch, []).append(project)
+    return [
+        {
+            "label": branch,
+            "projects": grouped[branch],
+            "count": len(grouped[branch]),
+        }
+        for branch in sorted(grouped.keys())
+    ]
+
+
+def _group_projects_by_closed_month(projects):
+    grouped = {}
+    for project in projects:
+        closed_at = project.get("closed_at")
+        if closed_at:
+            local_closed = timezone.localtime(closed_at) if timezone.is_aware(closed_at) else closed_at
+            label = local_closed.strftime("%B %Y")
+            sort_key = (local_closed.year, local_closed.month)
+        else:
+            label = "Unknown Close Month"
+            sort_key = (0, 0)
+
+        if label not in grouped:
+            grouped[label] = {"label": label, "sort_key": sort_key, "projects": []}
+        grouped[label]["projects"].append(project)
+
+    buckets = sorted(grouped.values(), key=lambda b: b["sort_key"], reverse=True)
+    for bucket in buckets:
+        bucket["count"] = len(bucket["projects"])
+    return buckets
+
+
 def _build_owner_ui_context():
     _, owner = _build_manager_owner_data()
     projects = owner.get("projects", [])
@@ -879,6 +918,8 @@ def _build_owner_ui_context():
 
     active_projects = [p for p in rows if p["phase"] != "closed"]
     closed_projects = [p for p in rows if p["phase"] == "closed"]
+    active_projects_by_branch = _group_projects_by_branch(active_projects)
+    closed_projects_by_month = _group_projects_by_closed_month(closed_projects)
 
     notif_tone_class = {"brand": "", "success": "tone-success", "warning": "tone-warning"}
     notifications = []
@@ -970,6 +1011,8 @@ def _build_owner_ui_context():
         "dashboard_active_count": len(active_projects),
         "all_projects_active": active_projects,
         "all_projects_closed": closed_projects,
+        "all_projects_active_by_branch": active_projects_by_branch,
+        "all_projects_closed_by_month": closed_projects_by_month,
         "active_projects": active_projects,
         "closed_projects": closed_projects,
     }
@@ -980,6 +1023,8 @@ def _build_manager_ui_context():
     rows = _build_project_ui_rows(manager.get("projects", []))
     active_projects = [p for p in rows if p["phase"] != "closed"]
     closed_projects = [p for p in rows if p["phase"] == "closed"]
+    active_projects_by_branch = _group_projects_by_branch(active_projects)
+    closed_projects_by_month = _group_projects_by_closed_month(closed_projects)
 
     kpis = []
     for kpi in manager.get("kpis", []):
@@ -995,6 +1040,8 @@ def _build_manager_ui_context():
         "kpis": kpis,
         "builds_active": active_projects,
         "builds_closed": closed_projects,
+        "builds_active_by_branch": active_projects_by_branch,
+        "builds_closed_by_month": closed_projects_by_month,
         "budgets_active": active_projects,
         "budgets_closed": closed_projects,
         "draws_active": active_projects,
@@ -1059,20 +1106,46 @@ def _build_sales_value_breakdown(job, p10_amount):
     }
 
 
+def _sales_in_progress_phase_label(deposit_paid, loan_closed):
+    """Lightweight pseudo-phase used by the phase filter on the sales pipeline.
+
+    The "real" phase model (estimate/framing/...) doesn't apply yet — these
+    contracts are all pre-handoff. What sales actually filters on is where
+    they are in the pre-handoff funnel."""
+    if deposit_paid and loan_closed:
+        return "Ready to Finalize"
+    if deposit_paid:
+        return "Awaiting Loan Close"
+    return "Awaiting Deposit"
+
+
 def _build_sales_in_progress_row(job):
     plan_name = job.floor_plan.name if job.floor_plan else "Custom"
+    branch_label = job.branch.label if job.branch else "Unassigned"
     p10_amount = int(_to_number(job.p10_material))
     edit_url_name = "sales_turnkey_edit" if job.job_mode == "turnkey" else "sales_shell_edit"
+    deposit_paid = _job_deposit_paid(job)
+    loan_closed = _job_loan_closed(job)
+    phase_label = _sales_in_progress_phase_label(deposit_paid, loan_closed)
+    subtitle_parts = [plan_name]
+    if job.customer_addr:
+        subtitle_parts.append(job.customer_addr)
+    if job.order_number:
+        subtitle_parts.append(f"#{job.order_number}")
     row = {
         "id": job.id,
         "name": job.customer_name or f"Build #{job.id}",
         "model_name": plan_name,
+        "branch_label": branch_label,
+        "phase_label": phase_label,
+        "subtitle": " · ".join(subtitle_parts),
+        "created_at": job.created_at,
         "address": job.customer_addr or "",
         "order_number": job.order_number or "",
         "p10_amount": p10_amount,
         "p10_display": _format_money(p10_amount),
-        "deposit_paid": _job_deposit_paid(job),
-        "loan_closed": _job_loan_closed(job),
+        "deposit_paid": deposit_paid,
+        "loan_closed": loan_closed,
         "edit_url": reverse(edit_url_name, args=[job.id]),
         "finalize_url": reverse("sales_finalize_contract", args=[job.id]),
         "job_mode": job.job_mode,
@@ -1092,12 +1165,25 @@ def _build_sales_lead_row(job):
     if created_local:
         age_days = (timezone.now() - job.created_at).days
         stale = age_days >= 21
+    branch_label = job.branch.label if job.branch else "Unassigned"
+    phase_label = "Stale Lead" if stale else "Active Lead"
+    subtitle_parts = []
+    if source_display:
+        subtitle_parts.append(source_display)
+    if job.customer_addr:
+        subtitle_parts.append(job.customer_addr)
+    if created_display:
+        subtitle_parts.append(f"Added {created_display}")
     return {
         "id": job.id,
         "name": job.customer_name or f"Lead #{job.id}",
         "phone": job.customer_phone or "",
         "email": job.customer_email or "",
         "address": job.customer_addr or "",
+        "branch_label": branch_label,
+        "phase_label": phase_label,
+        "subtitle": " · ".join(subtitle_parts),
+        "created_at": job.created_at,
         "source_display": source_display,
         "source_key": job.lead_source or "",
         "notes": job.lead_notes or "",
@@ -1112,16 +1198,26 @@ def _build_sales_lead_row(job):
 
 def _build_sales_closed_row(job):
     plan_name = job.floor_plan.name if job.floor_plan else "Custom"
+    branch_label = job.branch.label if job.branch else "Unassigned"
     p10_amount = int(_to_number(job.p10_material))
     closed_at = job.sales_closed_at
     closed_display = ""
     if closed_at:
         local_closed = timezone.localtime(closed_at) if timezone.is_aware(closed_at) else closed_at
         closed_display = local_closed.strftime("%b %d, %Y")
+    subtitle_parts = [plan_name]
+    if job.order_number:
+        subtitle_parts.append(f"#{job.order_number}")
+    if closed_display:
+        subtitle_parts.append(f"Closed {closed_display}")
     row = {
         "id": job.id,
         "name": job.customer_name or f"Build #{job.id}",
         "model_name": plan_name,
+        "branch_label": branch_label,
+        "phase_label": "Closed",
+        "subtitle": " · ".join(subtitle_parts),
+        "closed_at": closed_at,
         "order_number": job.order_number or "",
         "p10_amount": p10_amount,
         "p10_display": _format_money(p10_amount),
@@ -1165,6 +1261,10 @@ def _build_sales_ui_context(request=None):
     lead_rows = [_build_sales_lead_row(job) for job in lead_jobs]
     in_progress_rows = [_build_sales_in_progress_row(job) for job in in_progress_jobs]
     closed_rows = [_build_sales_closed_row(job) for job in closed_this_month_jobs]
+
+    lead_rows_by_branch = _group_projects_by_branch(lead_rows)
+    in_progress_rows_by_branch = _group_projects_by_branch(in_progress_rows)
+    closed_rows_by_month = _group_projects_by_closed_month(closed_rows)
 
     p10_total_amount = sum(row["p10_amount"] for row in in_progress_rows) + sum(
         row["p10_amount"] for row in closed_rows
@@ -1210,8 +1310,11 @@ def _build_sales_ui_context(request=None):
             }
         ],
         "projects_in_progress": in_progress_rows,
+        "projects_in_progress_by_branch": in_progress_rows_by_branch,
         "projects_closed": closed_rows,
+        "projects_closed_by_month": closed_rows_by_month,
         "leads": lead_rows,
+        "leads_by_branch": lead_rows_by_branch,
         "in_progress_count": len(in_progress_rows),
         "closed_count": len(closed_rows),
         "leads_count": len(lead_rows),
@@ -1412,6 +1515,36 @@ def owner_all_projects_panel_view(request):
 
 
 @role_required(AppUser.ROLE_EXEC)
+def owner_active_projects_panel_view(request):
+    if not request.htmx:
+        return redirect("owner")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/active_projects.html",
+        {
+            "all_projects_active": context["all_projects_active"],
+            "all_projects_active_by_branch": context["all_projects_active_by_branch"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_EXEC)
+def owner_closed_projects_panel_view(request):
+    if not request.htmx:
+        return redirect("owner")
+    context = _build_owner_ui_context()
+    return render(
+        request,
+        "owner/closed_projects.html",
+        {
+            "all_projects_closed": context["all_projects_closed"],
+            "all_projects_closed_by_month": context["all_projects_closed_by_month"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_EXEC)
 def owner_payments_panel_view(request):
     if not request.htmx:
         return redirect("owner")
@@ -1530,6 +1663,36 @@ def manager_builds_panel_view(request):
         {
             "builds_active": context["builds_active"],
             "builds_closed": context["builds_closed"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_builds_active_panel_view(request):
+    if not request.htmx:
+        return redirect("manager")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/active_builds.html",
+        {
+            "builds_active": context["builds_active"],
+            "builds_active_by_branch": context["builds_active_by_branch"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_builds_closed_panel_view(request):
+    if not request.htmx:
+        return redirect("manager")
+    context = _build_manager_ui_context()
+    return render(
+        request,
+        "manager/closed_builds.html",
+        {
+            "builds_closed": context["builds_closed"],
+            "builds_closed_by_month": context["builds_closed_by_month"],
         },
     )
 
@@ -1710,8 +1873,8 @@ def manager_change_order_modal_view(request):
 @require_POST
 @csrf_protect
 def manager_change_order_create_view(request):
-    """Persist a new change order from the modal form, then re-render the My
-    Builds panel so the card immediately reflects the new entry."""
+    """Persist a new change order from the modal form, then re-render the
+    Active Builds panel so the card immediately reflects the new entry."""
     try:
         job_id = int(request.POST.get("job_id") or 0)
     except (TypeError, ValueError):
@@ -1764,10 +1927,10 @@ def manager_change_order_create_view(request):
         context = _build_manager_ui_context()
         response = render(
             request,
-            "manager/my_builds.html",
+            "manager/active_builds.html",
             {
                 "builds_active": context["builds_active"],
-                "builds_closed": context["builds_closed"],
+                "builds_active_by_branch": context["builds_active_by_branch"],
             },
         )
         # Closes the modal on the client and shows a confirmation toast.
@@ -1797,7 +1960,7 @@ def manager_mark_complete_modal_view(request):
     except (TypeError, ValueError):
         return HttpResponse(status=400)
     panel = (request.GET.get("panel") or "draws").strip().lower()
-    if panel not in {"draws", "builds", "budgets"}:
+    if panel not in {"draws", "builds", "builds-active", "builds-closed", "budgets"}:
         panel = "draws"
     try:
         draw = JobDraw.objects.select_related("job").get(
@@ -1839,6 +2002,8 @@ def manager_panel_mark_complete_view(request):
         context = _build_manager_ui_context()
         template_map = {
             "builds": "manager/my_builds.html",
+            "builds-active": "manager/active_builds.html",
+            "builds-closed": "manager/closed_builds.html",
             "budgets": "manager/budgets.html",
             "draws": "manager/draws.html",
         }
@@ -1847,6 +2012,14 @@ def manager_panel_mark_complete_view(request):
             "manager/my_builds.html": {
                 "builds_active": context["builds_active"],
                 "builds_closed": context["builds_closed"],
+            },
+            "manager/active_builds.html": {
+                "builds_active": context["builds_active"],
+                "builds_active_by_branch": context["builds_active_by_branch"],
+            },
+            "manager/closed_builds.html": {
+                "builds_closed": context["builds_closed"],
+                "builds_closed_by_month": context["builds_closed_by_month"],
             },
             "manager/budgets.html": {
                 "budgets_active": context["budgets_active"],
@@ -1929,6 +2102,7 @@ def sales_in_progress_panel_view(request):
         "sales/overview/in_progress.html",
         {
             "projects_in_progress": context["projects_in_progress"],
+            "projects_in_progress_by_branch": context["projects_in_progress_by_branch"],
         },
     )
 
@@ -1943,6 +2117,7 @@ def sales_closed_panel_view(request):
         "sales/overview/closed.html",
         {
             "projects_closed": context["projects_closed"],
+            "projects_closed_by_month": context["projects_closed_by_month"],
             "p10_month_label": context["p10_month_label"],
         },
     )
@@ -2049,7 +2224,10 @@ def sales_finalize_contract_view(request, job_id):
         response = render(
             request,
             "sales/overview/in_progress.html",
-            {"projects_in_progress": context["projects_in_progress"]},
+            {
+                "projects_in_progress": context["projects_in_progress"],
+                "projects_in_progress_by_branch": context["projects_in_progress_by_branch"],
+            },
         )
         response["HX-Trigger"] = "sales-refresh"
         return response
@@ -2086,7 +2264,14 @@ def _parse_lead_followup(value):
 def _render_leads_panel(request):
     """Shared helper that renders the Leads tab HTMX fragment."""
     context = _build_sales_ui_context(request)
-    response = render(request, "sales/overview/leads.html", {"leads": context["leads"]})
+    response = render(
+        request,
+        "sales/overview/leads.html",
+        {
+            "leads": context["leads"],
+            "leads_by_branch": context["leads_by_branch"],
+        },
+    )
     response["HX-Trigger"] = "sales-refresh"
     return response
 
@@ -2100,7 +2285,10 @@ def sales_leads_panel_view(request):
     return render(
         request,
         "sales/overview/leads.html",
-        {"leads": context["leads"]},
+        {
+            "leads": context["leads"],
+            "leads_by_branch": context["leads_by_branch"],
+        },
     )
 
 

@@ -1,96 +1,254 @@
 {% if projects_in_progress %}
-  <div class="card-section-title">
-    In Progress <span class="count">({{ projects_in_progress|length }})</span>
+  <div class="group-section-title">
+    In Progress <span class="group-section-count">({{ projects_in_progress|length }})</span>
   </div>
-  {% for project in projects_in_progress %}
-    <div class="proj-card">
-      <div class="proj-hdr">
-        <div class="proj-hdr-top">
-          <div>
-            <p class="proj-name">{{ project.name }}</p>
-            <p class="proj-sub">
-              {{ project.model_name }}
-              {% if project.address %} &middot; {{ project.address }}{% endif %}
-              {% if project.order_number %} &middot; #{{ project.order_number }}{% endif %}
-            </p>
-          </div>
-          <div class="proj-hdr-meta">
-            <span class="pill pill-muted">{% if project.job_mode == 'turnkey' %}Turnkey{% else %}Shell{% endif %}</span>
-          </div>
-        </div>
 
-        <!-- Contract value breakdown -->
-        <div class="metric-grid metric-grid-4">
-          <div>
-            <div class="metric-label">Total Contracted Amount</div>
-            <div class="metric-value">{{ project.contract_total_display }}</div>
-          </div>
-          <div>
-            <div class="metric-label">P10 Material</div>
-            <div class="metric-value metric-value-green">{{ project.p10_display }}</div>
-          </div>
-          <div>
-            <div class="metric-label">P10 % of Contract</div>
-            <div class="metric-value metric-value-muted">{{ project.p10_pct_display }}</div>
-          </div>
-          <div title="Estimated at {{ project.commission_rate_display }}">
-            <div class="metric-label">Est. Commission</div>
-            <div class="metric-value metric-value-brand">{{ project.commission_display }}</div>
-          </div>
-        </div>
+  {# Cards view — branch-grouped collapsible sections #}
+  <div class="cards-view">
+    {% for group in projects_in_progress_by_branch %}
+      <details class="project-group" open>
+        <summary class="project-group-summary">
+          <span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
+          <span class="project-group-count">{{ group.count }}</span>
+        </summary>
+        <div class="project-group-body">
+          {% for project in group.projects %}
+            <div class="proj-card"
+                 data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+                 data-branch="{{ project.branch_label|default:'' }}"
+                 data-plan="{{ project.model_name|default:'' }}"
+                 data-phase="{{ project.phase_label|default:'' }}"
+                 data-year="{{ project.created_at|date:'Y'|default:'' }}"
+                 data-sort-ts="{{ project.created_at|date:'U'|default:'0' }}"
+                 data-order="{{ project.order_number|default:'' }}">
+              <div class="proj-hdr">
+                <div class="proj-hdr-top">
+                  <div>
+                    <p class="proj-name">{{ project.name }}</p>
+                    <p class="proj-sub">{{ project.subtitle }}</p>
+                  </div>
+                  <div class="proj-hdr-meta">
+                    <span class="pill pill-muted">{% if project.job_mode == 'turnkey' %}Turnkey{% else %}Shell{% endif %}</span>
+                  </div>
+                </div>
 
-        <!-- Status pills -->
-        <div class="metric-grid metric-grid-2 metric-grid-dashed">
-          <div>
-            <div class="metric-label">Good-Faith Deposit</div>
-            <div class="status-pill-wrap">
-              {% if project.deposit_paid %}
-                <span class="pill pill-success">&#10003; Paid</span>
-              {% else %}
-                <span class="pill pill-muted">&#8987; Pending</span>
-              {% endif %}
+                <!-- Contract value breakdown -->
+                <div class="metric-grid metric-grid-4">
+                  <div>
+                    <div class="metric-label">Total Contracted Amount</div>
+                    <div class="metric-value">{{ project.contract_total_display }}</div>
+                  </div>
+                  <div>
+                    <div class="metric-label">P10 Material</div>
+                    <div class="metric-value metric-value-green">{{ project.p10_display }}</div>
+                  </div>
+                  <div>
+                    <div class="metric-label">P10 % of Contract</div>
+                    <div class="metric-value metric-value-muted">{{ project.p10_pct_display }}</div>
+                  </div>
+                  <div title="Estimated at {{ project.commission_rate_display }}">
+                    <div class="metric-label">Est. Commission</div>
+                    <div class="metric-value metric-value-brand">{{ project.commission_display }}</div>
+                  </div>
+                </div>
+
+                <!-- Status pills -->
+                <div class="metric-grid metric-grid-2 metric-grid-dashed">
+                  <div>
+                    <div class="metric-label">Good-Faith Deposit</div>
+                    <div class="status-pill-wrap">
+                      {% if project.deposit_paid %}
+                        <span class="pill pill-success">&#10003; Paid</span>
+                      {% else %}
+                        <span class="pill pill-muted">&#8987; Pending</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="metric-label">Loan Closing</div>
+                    <div class="status-pill-wrap">
+                      {% if project.loan_closed %}
+                        <span class="pill pill-success">&#10003; Closed</span>
+                      {% else %}
+                        <span class="pill pill-muted">&#8987; Pending</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="proj-body card-actions">
+                <a href="{{ project.edit_url }}" class="sales-btn">
+                  Edit Contract
+                </a>
+                <button type="button"
+                        class="sales-btn sales-btn-primary"
+                        data-finalize-contract="1"
+                        hx-post="{{ project.finalize_url }}"
+                        hx-target="#tab-in-progress-panel"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Send this contract to DocuSign? This marks the deposit paid and loan closed, then moves the contract to Closed.">
+                  Send to DocuSign
+                </button>
+                <button type="button"
+                        class="sales-btn sales-btn-dark"
+                        data-finalize-contract="1"
+                        hx-post="{{ project.finalize_url }}"
+                        hx-target="#tab-in-progress-panel"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Send this contract to Interior Contracts for selections? This marks the deposit paid and loan closed, then moves the contract to Closed.">
+                  Send to Interior Contracts
+                </button>
+              </div>
             </div>
-          </div>
-          <div>
-            <div class="metric-label">Loan Closing</div>
-            <div class="status-pill-wrap">
-              {% if project.loan_closed %}
-                <span class="pill pill-success">&#10003; Closed</span>
-              {% else %}
-                <span class="pill pill-muted">&#8987; Pending</span>
-              {% endif %}
-            </div>
-          </div>
+          {% endfor %}
         </div>
-      </div>
+      </details>
+    {% endfor %}
+  </div>
 
-      <div class="proj-body card-actions">
-        <a href="{{ project.edit_url }}" class="sales-btn">
-          Edit Contract
-        </a>
-        <button type="button"
-                class="sales-btn sales-btn-primary"
-          data-finalize-contract="1"
-                hx-post="{{ project.finalize_url }}"
-                hx-target="#tab-in-progress-panel"
-                hx-swap="innerHTML"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-confirm="Send this contract to DocuSign? This marks the deposit paid and loan closed, then moves the contract to Closed.">
-          Send to DocuSign
-        </button>
-        <button type="button"
-                class="sales-btn sales-btn-dark"
-          data-finalize-contract="1"
-                hx-post="{{ project.finalize_url }}"
-                hx-target="#tab-in-progress-panel"
-                hx-swap="innerHTML"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-confirm="Send this contract to Interior Contracts for selections? This marks the deposit paid and loan closed, then moves the contract to Closed.">
-          Send to Interior Contracts
-        </button>
-      </div>
-    </div>
-  {% endfor %}
+  <!-- Table view — flat sortable table mirroring the same data + data-* attrs.
+     Same data-job-search / data-branch / data-plan / data-phase / data-year
+     so the existing client-side filter (sales.js) works on these rows too. -->
+  <div class="table-view">
+    <table class="job-table job-table-expandable">
+      <thead>
+        <tr>
+          <th class="row-toggle-col" aria-hidden="true"></th>
+          <th>Customer</th>
+          <th>Order #</th>
+          <th>Branch</th>
+          <th>Model</th>
+          <th>Status</th>
+          <th class="num">Contract</th>
+          <th class="num">P10</th>
+          <th class="num">Commission</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects_in_progress %}
+          {# Summary row — clicking it toggles the detail row below #}
+          <tr class="job-table-row"
+              data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+              data-branch="{{ project.branch_label|default:'' }}"
+              data-plan="{{ project.model_name|default:'' }}"
+              data-phase="{{ project.phase_label|default:'' }}"
+              data-year="{{ project.created_at|date:'Y'|default:'' }}"
+              data-sort-ts="{{ project.created_at|date:'U'|default:'0' }}"
+              data-order="{{ project.order_number|default:'' }}"
+              tabindex="0"
+              role="button"
+              aria-expanded="false">
+            <td class="row-toggle-col"><span class="row-chevron" aria-hidden="true">▸</span></td>
+            <td>
+              <div style="font-weight:600;">{{ project.name }}</div>
+              {% if project.address %}<div class="muted" style="font-size:11px;">{{ project.address }}</div>{% endif %}
+            </td>
+            <td class="muted">{% if project.order_number %}{{ project.order_number }}{% else %}—{% endif %}</td>
+            <td class="muted">{{ project.branch_label }}</td>
+            <td class="muted">{{ project.model_name }}</td>
+            <td>
+              {% if project.deposit_paid and project.loan_closed %}
+                <span class="pill pill-success">Ready to Finalize</span>
+              {% elif project.deposit_paid %}
+                <span class="pill pill-warning">Awaiting Loan</span>
+              {% else %}
+                <span class="pill pill-muted">Awaiting Deposit</span>
+              {% endif %}
+            </td>
+            <td class="num">{{ project.contract_total_display }}</td>
+            <td class="num" style="color:var(--green);">{{ project.p10_display }}</td>
+            <td class="num" title="{{ project.commission_rate_display }}">{{ project.commission_display }}</td>
+          </tr>
+
+          {# Detail row — same content as the card view, hidden until expanded #}
+          <tr class="job-table-detail" hidden>
+            <td colspan="9">
+              <div class="job-detail-card">
+                <div class="proj-hdr-top">
+                  <div>
+                    <p class="proj-name">{{ project.name }}</p>
+                    <p class="proj-sub">{{ project.subtitle }}</p>
+                  </div>
+                  <div class="proj-hdr-meta">
+                    <span class="pill pill-muted">{% if project.job_mode == 'turnkey' %}Turnkey{% else %}Shell{% endif %}</span>
+                  </div>
+                </div>
+
+                <div class="metric-grid metric-grid-4">
+                  <div>
+                    <div class="metric-label">Total Contracted Amount</div>
+                    <div class="metric-value">{{ project.contract_total_display }}</div>
+                  </div>
+                  <div>
+                    <div class="metric-label">P10 Material</div>
+                    <div class="metric-value metric-value-green">{{ project.p10_display }}</div>
+                  </div>
+                  <div>
+                    <div class="metric-label">P10 % of Contract</div>
+                    <div class="metric-value metric-value-muted">{{ project.p10_pct_display }}</div>
+                  </div>
+                  <div title="Estimated at {{ project.commission_rate_display }}">
+                    <div class="metric-label">Est. Commission</div>
+                    <div class="metric-value metric-value-brand">{{ project.commission_display }}</div>
+                  </div>
+                </div>
+
+                <div class="metric-grid metric-grid-2 metric-grid-dashed">
+                  <div>
+                    <div class="metric-label">Good-Faith Deposit</div>
+                    <div class="status-pill-wrap">
+                      {% if project.deposit_paid %}
+                        <span class="pill pill-success">&#10003; Paid</span>
+                      {% else %}
+                        <span class="pill pill-muted">&#8987; Pending</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="metric-label">Loan Closing</div>
+                    <div class="status-pill-wrap">
+                      {% if project.loan_closed %}
+                        <span class="pill pill-success">&#10003; Closed</span>
+                      {% else %}
+                        <span class="pill pill-muted">&#8987; Pending</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-actions">
+                  <a href="{{ project.edit_url }}" class="sales-btn">Edit Contract</a>
+                  <button type="button"
+                          class="sales-btn sales-btn-primary"
+                          data-finalize-contract="1"
+                          hx-post="{{ project.finalize_url }}"
+                          hx-target="#tab-in-progress-panel"
+                          hx-swap="innerHTML"
+                          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                          hx-confirm="Send this contract to DocuSign? This marks the deposit paid and loan closed, then moves the contract to Closed.">
+                    Send to DocuSign
+                  </button>
+                  <button type="button"
+                          class="sales-btn sales-btn-dark"
+                          data-finalize-contract="1"
+                          hx-post="{{ project.finalize_url }}"
+                          hx-target="#tab-in-progress-panel"
+                          hx-swap="innerHTML"
+                          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                          hx-confirm="Send this contract to Interior Contracts for selections? This marks the deposit paid and loan closed, then moves the contract to Closed.">
+                    Send to Interior Contracts
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% else %}
   <div class="banner banner-empty">No contracts in progress. Click <strong>New Contract</strong> to build one.</div>
 {% endif %}

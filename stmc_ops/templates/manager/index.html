@@ -14,12 +14,13 @@
 
 <!-- Nav -->
 <nav class="app-nav">
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
-    <button class="app-nav-link active" data-tab="builds" type="button">My Builds</button>
+  <div class="app-nav-left">
+    <button class="app-nav-link active" data-tab="builds-active" type="button">Active Builds</button>
+    <button class="app-nav-link" data-tab="builds-closed" type="button">Closed Builds</button>
     <button class="app-nav-link" data-tab="budgets" type="button">Budgets</button>
     <button class="app-nav-link" data-tab="draws" type="button">Draws</button>
   </div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap">
+  <div class="app-nav-right">
     <span id="hN" style="font-size:11px;color:#4b5563"></span>
     <span id="hA" style="width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#111827;color:#fff;font-size:10px;font-weight:700"></span>
     <button class="logout-link" type="button">Logout</button>
@@ -51,15 +52,61 @@
 <!-- Tab panels -->
 <div class="container">
 
-  <!-- My Builds -->
-  <div id="tab-builds" class="tab-panel">
+  <div id="job-search-wrap" class="job-search-wrap">
+    <div class="job-search-controls">
+      <label class="job-search-field">
+        <span class="job-search-chip">Search</span>
+        <input
+          id="job-search-input"
+          class="job-search-input"
+          type="search"
+          placeholder="customer, order #, branch"
+          aria-label="Search jobs"
+        >
+      </label>
+      <button id="job-search-btn" class="job-search-btn" type="button">Find Job</button>
+    </div>
+    <div class="job-filter-row" aria-label="Build filters">
+      <select id="job-filter-branch" class="job-filter-select" aria-label="Filter by branch">
+        <option value="">All branches</option>
+      </select>
+      <select id="job-filter-plan" class="job-filter-select" aria-label="Filter by plan">
+        <option value="">All plans</option>
+      </select>
+      <select id="job-filter-phase" class="job-filter-select" aria-label="Filter by phase">
+        <option value="">All phases</option>
+      </select>
+      <select id="job-filter-year" class="job-filter-select" aria-label="Filter by year">
+        <option value="">All years</option>
+      </select>
+      <select id="job-filter-sort" class="job-filter-select" aria-label="Sort jobs">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Active Builds -->
+  <div id="tab-builds-active" class="tab-panel">
     <div
-      id="tab-builds-panel"
-      hx-get="{% url 'manager_builds_panel' %}"
-      hx-trigger="load, manager-builds-refresh from:body, manager-refresh from:body"
+      id="tab-builds-active-panel"
+      hx-get="{% url 'manager_builds_active_panel' %}"
+      hx-trigger="load, manager-builds-active-refresh from:body, manager-refresh from:body"
       hx-swap="innerHTML"
     >
-      <div class="banner banner-empty">Loading builds...</div>
+      <div class="banner banner-empty">Loading active builds...</div>
+    </div>
+  </div>
+
+  <!-- Closed Builds -->
+  <div id="tab-builds-closed" class="tab-panel" style="display:none">
+    <div
+      id="tab-builds-closed-panel"
+      hx-get="{% url 'manager_builds_closed_panel' %}"
+      hx-trigger="load, manager-builds-closed-refresh from:body, manager-refresh from:body"
+      hx-swap="innerHTML"
+    >
+      <div class="banner banner-empty">Loading closed builds...</div>
     </div>
   </div>
 

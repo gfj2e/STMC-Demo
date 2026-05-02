@@ -50,6 +50,7 @@ function activateTab(tab) {
   if (navLink) navLink.classList.add('active');
 
   updateHeaderTitle(tab);
+  setSalesSearchVisibility(tab);
   document.body.dispatchEvent(new CustomEvent('sales-' + tab + '-refresh'));
 
   var url = new URL(window.location.href);
@@ -146,11 +147,406 @@ function initAuthHeader() {
   if (badgeEl) badgeEl.textContent = user.initials || initials(user.name);
 }
 
+// ── Sales search + filter (mirrors manager.js search/filter) ──────────────
+
+function showToast(message) {
+  var toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(function () {
+    toast.classList.remove('show');
+  }, 3200);
+}
+
+function setSalesSearchVisibility(tab) {
+  var searchWrap = document.getElementById('job-search-wrap');
+  if (!searchWrap) return;
+  var visibleTabs = {
+    'leads': true,
+    'in-progress': true,
+    'closed': true,
+  };
+  searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
+}
+
+function _salesFilterTargets() {
+  return [
+    { tab: 'in-progress', panelId: 'tab-in-progress-panel' },
+    { tab: 'closed', panelId: 'tab-closed-panel' },
+    { tab: 'leads', panelId: 'tab-leads-panel' },
+  ];
+}
+
+function _salesFilterCards() {
+  // Returns ALL filterable elements: card view (.proj-card) AND table rows
+  // (.job-table-row). Both carry the same data-* attributes so the same
+  // filter logic works against either rendering. The view toggle just
+  // hides whichever view isn't active via body class.
+  var nodes = [];
+  _salesFilterTargets().forEach(function (target) {
+    var panel = document.getElementById(target.panelId);
+    if (!panel) return;
+    panel.querySelectorAll('[data-job-search]').forEach(function (node) {
+      nodes.push(node);
+    });
+  });
+  return nodes;
+}
+
+function clearJobHit() {
+  document.querySelectorAll('.job-search-hit').forEach(function (node) {
+    node.classList.remove('job-search-hit');
+  });
+}
+
+function findSalesJobMatch(query) {
+  var targets = _salesFilterTargets();
+  for (var i = 0; i < targets.length; i++) {
+    var target = targets[i];
+    var panel = document.getElementById(target.panelId);
+    if (!panel) continue;
+    var cards = panel.querySelectorAll('.proj-card');
+    for (var j = 0; j < cards.length; j++) {
+      var card = cards[j];
+      var haystack = (card.getAttribute('data-job-search') || card.textContent || '').toLowerCase();
+      if (haystack.indexOf(query) !== -1) {
+        return { target: target, card: card };
+      }
+    }
+  }
+  return null;
+}
+
+function openSalesFoundCard(card) {
+  var details = card.closest('details');
+  if (details) details.open = true;
+
+  var body = card.querySelector('.proj-body');
+  var chevron = card.querySelector('.chevron');
+  if (body) body.classList.add('open');
+  if (chevron) chevron.classList.add('open');
+}
+
+function runSalesJobSearch() {
+  var input = document.getElementById('job-search-input');
+  if (!input) return;
+  var query = (input.value || '').trim().toLowerCase();
+  if (!query) {
+    showToast('Type a customer, order #, or branch to search');
+    return;
+  }
+  clearJobHit();
+  var match = findSalesJobMatch(query);
+  if (!match) {
+    showToast('No matching contract or lead found');
+    return;
+  }
+  activateTab(match.target.tab);
+  openSalesFoundCard(match.card);
+  match.card.classList.add('job-search-hit');
+  match.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(function () {
+    match.card.classList.remove('job-search-hit');
+  }, 2200);
+  showToast('Match found');
+}
+
+function bindSalesJobSearch() {
+  var button = document.getElementById('job-search-btn');
+  var input = document.getElementById('job-search-input');
+  if (!button || !input) return;
+  button.addEventListener('click', runSalesJobSearch);
+  input.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      runSalesJobSearch();
+    }
+  });
+}
+
+function _salesNormalize(value) {
+  return (value || '').toString().trim().toLowerCase();
+}
+
+function _salesPopulateFilterSelect(selectId, values, emptyLabel) {
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  var selected = select.value;
+  var options = ['<option value="">' + emptyLabel + '</option>'];
+  values.forEach(function (value) {
+    options.push('<option value="' + value + '">' + value + '</option>');
+  });
+  select.innerHTML = options.join('');
+  select.value = values.indexOf(selected) !== -1 ? selected : '';
+}
+
+function rebuildSalesFilterOptions() {
+  var branches = new Set();
+  var plans = new Set();
+  var phases = new Set();
+  var years = new Set();
+
+  _salesFilterCards().forEach(function (card) {
+    var branch = card.dataset.branch || '';
+    var plan = card.dataset.plan || '';
+    var phase = card.dataset.phase || '';
+    var year = card.dataset.year || '';
+    if (branch) branches.add(branch);
+    if (plan) plans.add(plan);
+    if (phase) phases.add(phase);
+    if (year) years.add(year);
+  });
+
+  _salesPopulateFilterSelect('job-filter-branch', Array.from(branches).sort(), 'All branches');
+  _salesPopulateFilterSelect('job-filter-plan', Array.from(plans).sort(), 'All plans');
+  _salesPopulateFilterSelect('job-filter-phase', Array.from(phases).sort(), 'All phases');
+  _salesPopulateFilterSelect(
+    'job-filter-year',
+    Array.from(years).sort(function (a, b) { return Number(b) - Number(a); }),
+    'All years'
+  );
+}
+
+function _salesCardSortValue(card) {
+  var ts = Number(card.dataset.sortTs || 0);
+  if (Number.isFinite(ts) && ts > 0) return ts;
+  var order = String(card.dataset.order || '').replace(/\D/g, '');
+  return Number(order || 0);
+}
+
+function _salesSortGroupCards(group, sortMode) {
+  var body = group.querySelector('.project-group-body');
+  if (!body) return;
+  // Sort within whichever inner wrapper holds the cards (e.g. .closed-list
+  // on the closed tab). Fall back to .project-group-body otherwise.
+  var listWrappers = body.querySelectorAll('.closed-list');
+  var containers = listWrappers.length ? Array.from(listWrappers) : [body];
+  containers.forEach(function (container) {
+    var cards = Array.from(container.querySelectorAll('.proj-card[data-job-search]'));
+    cards.sort(function (a, b) {
+      var av = _salesCardSortValue(a);
+      var bv = _salesCardSortValue(b);
+      return sortMode === 'oldest' ? av - bv : bv - av;
+    });
+    cards.forEach(function (card) { container.appendChild(card); });
+  });
+}
+
+function _salesSortTableRows(panel, sortMode) {
+  // Mirror the card sort: applies to <tbody> in the panel's .table-view.
+  // Each job is TWO rows (summary + detail). We move them as a pair so
+  // an expanded detail row stays directly beneath its own summary.
+  var tbody = panel.querySelector('.table-view tbody');
+  if (!tbody) return;
+  var rows = Array.from(tbody.querySelectorAll('tr.job-table-row'));
+  rows.sort(function (a, b) {
+    var av = _salesCardSortValue(a);
+    var bv = _salesCardSortValue(b);
+    return sortMode === 'oldest' ? av - bv : bv - av;
+  });
+  rows.forEach(function (row) {
+    tbody.appendChild(row);
+    var detail = row.nextElementSibling;
+    // After the summary moves, its old next-sibling is no longer adjacent;
+    // re-find the detail by capturing it before appending. We do that by
+    // querying the original DOM: the detail row was the immediate sibling
+    // BEFORE we re-appended. Workaround: stash a reference on the row.
+    if (row._detailRow) {
+      tbody.appendChild(row._detailRow);
+    }
+  });
+}
+
+function _bindRowDetailRefs() {
+  // Stash each summary row's paired detail row so sort can move the pair
+  // together (since appendChild changes sibling relationships).
+  document.querySelectorAll('.table-view tr.job-table-row').forEach(function (row) {
+    var detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail')) {
+      row._detailRow = detail;
+    }
+  });
+}
+
+function bindSalesTableRowToggle() {
+  // Delegate so newly-swapped panels work without re-binding. Click or
+  // keyboard (Enter/Space) on a summary row toggles its detail row.
+  // Clicks on actual interactive elements inside the row (a, button,
+  // <input>, etc.) are NOT treated as a row-toggle so links/buttons
+  // still work normally.
+  document.addEventListener('click', function (event) {
+    var summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    if (event.target.closest('a, button, input, select, label')) return;
+    _toggleTableRowDetail(summary);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    var summary = event.target.closest('tr.job-table-row');
+    if (!summary) return;
+    event.preventDefault();
+    _toggleTableRowDetail(summary);
+  });
+}
+
+function _toggleTableRowDetail(summary) {
+  var detail = summary._detailRow || summary.nextElementSibling;
+  if (!detail || !detail.classList.contains('job-table-detail')) return;
+  var willExpand = detail.hasAttribute('hidden');
+  if (willExpand) {
+    detail.removeAttribute('hidden');
+    detail.style.display = '';
+  } else {
+    detail.setAttribute('hidden', '');
+    detail.style.display = 'none';
+  }
+  summary.setAttribute('aria-expanded', String(willExpand));
+  summary.classList.toggle('is-expanded', willExpand);
+  var chev = summary.querySelector('.row-chevron');
+  if (chev) chev.textContent = willExpand ? '▾' : '▸';
+}
+
+function applySalesFilters() {
+  var branch = _salesNormalize(document.getElementById('job-filter-branch') && document.getElementById('job-filter-branch').value);
+  var plan = _salesNormalize(document.getElementById('job-filter-plan') && document.getElementById('job-filter-plan').value);
+  var phase = _salesNormalize(document.getElementById('job-filter-phase') && document.getElementById('job-filter-phase').value);
+  var year = _salesNormalize(document.getElementById('job-filter-year') && document.getElementById('job-filter-year').value);
+  var sortMode = _salesNormalize(document.getElementById('job-filter-sort') && document.getElementById('job-filter-sort').value) || 'newest';
+
+  _salesFilterTargets().forEach(function (target) {
+    var panel = document.getElementById(target.panelId);
+    if (!panel) return;
+
+    var panelVisibleCount = 0;
+    panel.querySelectorAll('.project-group').forEach(function (group) {
+      _salesSortGroupCards(group, sortMode);
+      var visibleCount = 0;
+      group.querySelectorAll('.proj-card[data-job-search]').forEach(function (card) {
+        var matches = true;
+        if (branch && _salesNormalize(card.dataset.branch) !== branch) matches = false;
+        if (plan && _salesNormalize(card.dataset.plan) !== plan) matches = false;
+        if (phase && _salesNormalize(card.dataset.phase) !== phase) matches = false;
+        if (year && _salesNormalize(card.dataset.year) !== year) matches = false;
+        card.style.display = matches ? '' : 'none';
+        if (matches) visibleCount += 1;
+      });
+
+      var countEl = group.querySelector('.project-group-count');
+      if (countEl) countEl.textContent = String(visibleCount);
+      group.style.display = visibleCount ? '' : 'none';
+      panelVisibleCount += visibleCount;
+    });
+
+    // Mirror the same filter on the flat table view (if present). Each
+    // job has TWO <tr>s: the summary row and a paired detail row hidden
+    // by default. We hide both in lockstep when a filter excludes the
+    // job, otherwise the detail row stays orphaned beneath nothing.
+    _salesSortTableRows(panel, sortMode);
+    panel.querySelectorAll('.table-view tr.job-table-row').forEach(function (row) {
+      var matches = true;
+      if (branch && _salesNormalize(row.dataset.branch) !== branch) matches = false;
+      if (plan && _salesNormalize(row.dataset.plan) !== plan) matches = false;
+      if (phase && _salesNormalize(row.dataset.phase) !== phase) matches = false;
+      if (year && _salesNormalize(row.dataset.year) !== year) matches = false;
+      row.style.display = matches ? '' : 'none';
+      var detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('job-table-detail')) {
+        if (!matches) {
+          // Filter excludes this job: hide both rows.
+          detail.style.display = 'none';
+        } else {
+          // Filter includes this job: detail visibility follows the
+          // expanded state stored in the [hidden] attribute.
+          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
+        }
+      }
+    });
+
+    var sectionCount = panel.querySelector('.group-section-title .group-section-count');
+    if (sectionCount) sectionCount.textContent = '(' + panelVisibleCount + ')';
+  });
+}
+
+// ── View toggle (Cards / Table) ──────────────────────────────────────
+// Persists across navigation via localStorage. The CSS in browse.css
+// controls visibility based on body class `view-mode-table`.
+var SALES_VIEW_KEY = 'stmc-sales-view-mode';
+
+function _applySalesViewMode(mode) {
+  var isTable = mode === 'table';
+  document.body.classList.toggle('view-mode-table', isTable);
+  var cardsBtn = document.getElementById('job-view-cards');
+  var tableBtn = document.getElementById('job-view-table');
+  if (cardsBtn) {
+    cardsBtn.classList.toggle('active', !isTable);
+    cardsBtn.setAttribute('aria-pressed', String(!isTable));
+  }
+  if (tableBtn) {
+    tableBtn.classList.toggle('active', isTable);
+    tableBtn.setAttribute('aria-pressed', String(isTable));
+  }
+}
+
+function bindSalesViewToggle() {
+  var cardsBtn = document.getElementById('job-view-cards');
+  var tableBtn = document.getElementById('job-view-table');
+  if (!cardsBtn || !tableBtn) return;
+  var saved = null;
+  try { saved = localStorage.getItem(SALES_VIEW_KEY); } catch (e) { /* private mode */ }
+  _applySalesViewMode(saved === 'table' ? 'table' : 'cards');
+
+  cardsBtn.addEventListener('click', function () {
+    _applySalesViewMode('cards');
+    try { localStorage.setItem(SALES_VIEW_KEY, 'cards'); } catch (e) {}
+  });
+  tableBtn.addEventListener('click', function () {
+    _applySalesViewMode('table');
+    try { localStorage.setItem(SALES_VIEW_KEY, 'table'); } catch (e) {}
+  });
+}
+
+function bindSalesFilters() {
+  ['job-filter-branch', 'job-filter-plan', 'job-filter-phase', 'job-filter-year', 'job-filter-sort'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el || el.dataset.filterBound === '1') return;
+    el.dataset.filterBound = '1';
+    el.addEventListener('change', applySalesFilters);
+  });
+}
+
+function bindSalesFilterRefreshOnSwap() {
+  if (!window.htmx) return;
+  document.body.addEventListener('htmx:afterSwap', function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target) return;
+    var watched = {
+      'tab-leads-panel': true,
+      'tab-in-progress-panel': true,
+      'tab-closed-panel': true,
+    };
+    if (!watched[target.id]) return;
+    rebuildSalesFilterOptions();
+    bindSalesFilters();
+    _bindRowDetailRefs();
+    applySalesFilters();
+  });
+}
+
 function init() {
   bindTabs();
   bindLogout();
   bindProjectToggles();
   bindFinalizeContractReload();
+  bindSalesJobSearch();
+  bindSalesFilters();
+  bindSalesFilterRefreshOnSwap();
+  bindSalesViewToggle();
+  bindSalesTableRowToggle();
+  _bindRowDetailRefs();
+  rebuildSalesFilterOptions();
+  applySalesFilters();
   initAuthHeader();
 }
 
