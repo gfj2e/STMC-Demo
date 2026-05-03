@@ -483,11 +483,13 @@ function _toggleTableRowDetail(summary) {
   var willExpand = detail.hasAttribute('hidden');
   if (willExpand) {
     detail.removeAttribute('hidden');
-    detail.style.display = '';
   } else {
     detail.setAttribute('hidden', '');
-    detail.style.display = 'none';
   }
+  // Don't touch inline display — CSS drives the open/close transition off
+  // the [hidden] attribute. Setting display:none would jump the row into/out
+  // of layout and kill the transition.
+  detail.style.display = '';
   summary.setAttribute('aria-expanded', String(willExpand));
   summary.classList.toggle('is-expanded', willExpand);
   var chev = summary.querySelector('.row-chevron');
@@ -550,14 +552,11 @@ function applySalesFilters() {
       row.style.display = matches ? '' : 'none';
       var detail = row.nextElementSibling;
       if (detail && detail.classList.contains('job-table-detail')) {
-        if (!matches) {
-          // Filter excludes this job: hide both rows.
-          detail.style.display = 'none';
-        } else {
-          // Filter includes this job: detail visibility follows the
-          // expanded state stored in the [hidden] attribute.
-          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
-        }
+        // Filter excludes this job: force-hide via inline display so the row
+        // can't sneak back in. Filter includes: clear the inline override and
+        // let CSS handle the open/close state off the [hidden] attribute
+        // (which is what drives the smooth expand transition).
+        detail.style.display = matches ? '' : 'none';
       }
     });
 

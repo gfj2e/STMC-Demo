@@ -918,6 +918,45 @@
   margin-left: 10px;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.co-edit-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--g300);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--g700);
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.co-edit-btn:hover {
+  border-color: var(--g400);
+  background: var(--g50);
+  color: var(--g900);
+}
+
+.co-delete-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #b91c1c;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.co-delete-btn:hover {
+  border-color: #f87171;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.co-delete-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .co-complete-btn {
@@ -1236,18 +1275,37 @@ body.view-mode-table .table-view { display: block; }
 }
 .job-table-row.is-expanded .row-chevron { color: var(--red); }
 
-.job-table-detail[hidden] { display: none; }
+/* Keep the detail <tr> in the layout (override UA [hidden]→display:none)
+   so the inner .job-detail-card can transition smoothly when expanding. */
+.job-table-detail[hidden] { display: table-row; }
 .job-table-detail > td {
   padding: 0 !important;
   background: var(--g50);
+  border-bottom: 0;
+}
+.job-table-detail:not([hidden]) > td {
   border-bottom: 2px solid var(--g200);
 }
 .job-detail-card {
-  padding: 16px 18px;
   background: #fff;
   border-left: 3px solid var(--red);
-  margin: 0 12px 8px;
   border-radius: 0 8px 8px 0;
+  max-height: 0;
+  margin: 0 12px;
+  padding: 0 18px;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease, opacity 0.22s ease,
+              padding 0.28s ease, margin 0.28s ease;
+}
+.job-table-detail:not([hidden]) .job-detail-card {
+  max-height: 3000px;
+  margin: 0 12px 8px;
+  padding: 16px 18px;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .job-detail-card { transition: none; }
 }
 .job-detail-card .proj-hdr-top {
   display: flex;

@@ -77,7 +77,9 @@
       "Bash(.venv/Scripts/python manage.py showmigrations stmc_ops)",
       "Bash(grep -nA3 \"Phase 4: PM \\\\\"Mark Complete\\\\\" is a LOCAL\\\\|status=JobDraw.STATUS_INVOICED\\\\|won_race = JobDraw\" stmc_ops/views.py)",
       "Bash(.venv/Scripts/python)",
-      "Bash(awk 'NR>=147 && NR<=151 {print NR\": \"$0}' stmc_ops/templates/owner/dashboard.html)"
+      "Bash(awk 'NR>=147 && NR<=151 {print NR\": \"$0}' stmc_ops/templates/owner/dashboard.html)",
+      "Read(//c/Users/gfj2e/Downloads/**)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

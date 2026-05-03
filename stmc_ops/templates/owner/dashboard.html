@@ -34,6 +34,9 @@
 			    data-job-search="{{ job.name|default:''|lower }} {{ job.order_number|default:''|lower }} {{ job.branch_label|default:''|lower }}"
 			    data-branch="{{ job.branch_label|default:'' }}"
 			    data-plan="{{ job.model_name|default:'' }}"
+			    data-phase="{{ job.phase_label|default:'' }}"
+			    data-year="{{ job.closed_at|date:'Y'|default:'' }}"
+			    data-sort-ts="{{ job.closed_at|date:'U'|default:'0' }}"
 			    data-order="{{ job.order_number|default:'' }}">
 				<button class="exec-job-head" type="button" data-exec-toggle="{{ job.id }}" aria-expanded="false" aria-controls="exec-job-body-{{ job.id }}">
 					<div class="exec-job-info">
@@ -60,6 +63,7 @@
 					<div class="exec-tabs" data-exec-tabs="{{ job.id }}">
 						<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="{{ job.id }}">Draws</button>
 						<button class="exec-tab" type="button" data-job-tab="bills" data-job-id="{{ job.id }}">Bills ({{ job.bills_count }})</button>
+						<button class="exec-tab" type="button" data-job-tab="cos" data-job-id="{{ job.id }}">Change Orders ({{ job.change_order_count }})</button>
 						<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="{{ job.id }}">Budget vs Actual</button>
 						<button class="exec-tab" type="button" data-job-tab="profit" data-job-id="{{ job.id }}">Profit</button>
 					</div>
@@ -190,6 +194,10 @@
 						{% endif %}
 					</div>
 
+					<div class="exec-tab-panel" data-job-panel="cos" data-job-id="{{ job.id }}" hidden>
+						{% include "owner/_change_orders_panel.html" with cos=job.change_orders %}
+					</div>
+
 					<div class="exec-tab-panel" data-job-panel="budget" data-job-id="{{ job.id }}" hidden>
 						<div class="exec-budget-note">Actuals pulled from QuickBooks. Matched to budget lines by cost code.</div>
 						<div class="exec-budget-head">
@@ -268,9 +276,13 @@
 				<tbody>
 					{% for job in dashboard_jobs %}
 						<tr class="job-table-row"
+						    data-job-id="{{ job.id }}"
 						    data-job-search="{{ job.name|default:''|lower }} {{ job.order_number|default:''|lower }} {{ job.branch_label|default:''|lower }}"
 						    data-branch="{{ job.branch_label|default:'' }}"
 						    data-plan="{{ job.model_name|default:'' }}"
+						    data-phase="{{ job.phase_label|default:'' }}"
+						    data-year="{{ job.closed_at|date:'Y'|default:'' }}"
+						    data-sort-ts="{{ job.closed_at|date:'U'|default:'0' }}"
 						    data-order="{{ job.order_number|default:'' }}"
 						    tabindex="0"
 						    role="button"
@@ -294,6 +306,7 @@
 									<div class="exec-tabs" data-exec-tabs="row-{{ job.id }}">
 										<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="row-{{ job.id }}">Draws</button>
 										<button class="exec-tab" type="button" data-job-tab="bills" data-job-id="row-{{ job.id }}">Bills ({{ job.bills_count }})</button>
+										<button class="exec-tab" type="button" data-job-tab="cos" data-job-id="row-{{ job.id }}">Change Orders ({{ job.change_order_count }})</button>
 										<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="row-{{ job.id }}">Budget vs Actual</button>
 										<button class="exec-tab" type="button" data-job-tab="profit" data-job-id="row-{{ job.id }}">Profit</button>
 									</div>
@@ -421,6 +434,10 @@
 										{% else %}
 											<div class="exec-empty">No invoices recorded yet for this job.</div>
 										{% endif %}
+									</div>
+
+									<div class="exec-tab-panel" data-job-panel="cos" data-job-id="row-{{ job.id }}" hidden>
+										{% include "owner/_change_orders_panel.html" with cos=job.change_orders %}
 									</div>
 
 									<div class="exec-tab-panel" data-job-panel="budget" data-job-id="row-{{ job.id }}" hidden>

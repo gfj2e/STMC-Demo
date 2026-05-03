@@ -1,0 +1,48 @@
+{% if cos %}
+	<table class="exec-table">
+		<thead>
+			<tr>
+				<th>CO #</th>
+				<th>Description</th>
+				<th>Created</th>
+				<th>Timing</th>
+				<th class="is-right">Amount</th>
+				<th class="is-right">New Total</th>
+				<th>Status</th>
+				<th>QB Invoice</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for co in cos %}
+				<tr class="{% if co.is_completed %}is-paid{% endif %}">
+					<td class="is-medium">#{{ co.number }}</td>
+					<td class="is-small">{{ co.description|truncatechars:120|default:"(no description)" }}</td>
+					<td class="is-small">{{ co.created|default:"—" }}</td>
+					<td class="is-small">{{ co.timing|default:"—" }}</td>
+					<td class="is-right is-mono">{{ co.amount_display }}</td>
+					<td class="is-right is-mono">{{ co.new_total_display|default:"—" }}</td>
+					<td>
+						{% if co.is_completed %}
+							<span class="exec-bill-status paid">Completed</span>
+						{% elif co.is_credit %}
+							<span class="exec-bill-status">Credit</span>
+						{% else %}
+							<span class="exec-bill-status pending">Pending</span>
+						{% endif %}
+					</td>
+					<td class="is-small">
+						{% if co.qb_invoice_status == 'sent' and co.qb_invoice_url %}
+							<a href="{{ co.qb_invoice_url }}" target="_blank" rel="noopener" class="exec-invoice-id">{{ co.qb_invoice_doc_number|default:'sent' }} ↗</a>
+						{% elif co.qb_invoice_status == 'failed_fallback' %}
+							<span class="exec-mute" title="{{ co.qb_invoice_error }}">QB unavailable</span>
+						{% else %}
+							<span class="exec-mute">—</span>
+						{% endif %}
+					</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+{% else %}
+	<div class="exec-empty">No change orders on this contract.</div>
+{% endif %}

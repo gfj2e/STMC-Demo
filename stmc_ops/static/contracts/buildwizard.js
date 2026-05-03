@@ -1362,7 +1362,6 @@ function cloudLoadJobById(jobId){
 
 /* ═══════════════════════════════════════════════════════════════
    DJANGO SAVE — POST contract to /stmc_ops/app/save-contract/
-
    Called by wizNext() when the rep clicks "Save & Submit" on the final
    step. Builds the payload save_contract_view expects, includes the full
    STATE in `rawState` for rehydration on Edit, and redirects on success.
@@ -1372,8 +1371,6 @@ function saveContract(){
     showToast("Select a model on Step 1 before submitting.");
     return;
   }
-  // Pre-flight checklist — same one shown on Step 8. Refuse to save until
-  // every item passes so the manager dashboard always gets a complete row.
   if(typeof buildSubmissionChecklist === "function"){
     var checklist = buildSubmissionChecklist();
     var failed = checklist.filter(function(it){ return !it.ok; });
@@ -1390,7 +1387,6 @@ function saveContract(){
   var shellTotal  = pn(STATE.shellContract);
   var turnkeyTotal = shellTotal + Math.max(0, intContract);
 
-  // Build draws array — the Django side expects [{n, l, a}, ...]
   var draws = [];
   try {
     var d = computeDrawAmounts({
@@ -1412,10 +1408,6 @@ function saveContract(){
     ];
   } catch(e){ console.warn("[saveContract] draw build failed:", e); }
 
-  // Build trade budgets for the manager/owner dashboards. Aggregates the
-  // ~25 granular PO lines from buildPMBudgetRows() into ~14 trade buckets,
-  // adds the sales-rep-entered labor lump as "Contractor Labor", and skips
-  // any zero-dollar trades.
   var TITLE_TO_TRADE = {
     "Cabinets":"Cabinets", "Countertops":"Countertops",
     "Flooring Materials":"Flooring", "Flooring Installation":"Flooring", "Tile":"Flooring",
@@ -1492,6 +1484,13 @@ function saveContract(){
     return r.json();
   }).then(function(resp){
     showToast("✓ Contract saved (job "+(resp.job_id||"?")+")");
+    // Clear autosave so "New Contract" starts fresh instead of restoring the
+    // contract we just submitted. Cancel any pending debounced save first to
+    // prevent it from re-writing the key after we clear it.
+    try {
+      if(typeof saveTimer !== "undefined" && saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+      localStorage.removeItem(LS_AUTOSAVE_KEY);
+    } catch(e){}
     var dest = (typeof window !== "undefined" && window.SALES_OVERVIEW_URL) || "/stmc_ops/sales/overview/";
     setTimeout(function(){ window.location.href = dest; }, 600);
   }).catch(function(err){
@@ -3457,6 +3456,93 @@ function computeInteriorTrueCost(S){
   return Math.max(0, total);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   METRIC ADJUSTMENT — Maintains margins when PMs edit plan metrics
+   ─────────────────────────────────────────────────────────────────────
+   For preset models the interior contract base (INT_CONTRACT) was set
+   using standard PLAN_METRICS values.  When a PM edits Living SF,
+   baths, doors, etc. on Step 5, the PM-side cost changes but the
+   contract price stayed flat — eroding margins.
+
+   This function computes:
+     standardCost  = what calcIntTradeBase would return for the
+                     unmodified plan metrics
+     currentCost   = what calcIntTradeBase returns with the PM's edits
+     costDelta     = currentCost − standardCost
+     adjustment    = costDelta / 0.70  (marks up to maintain 30% margin)
+
+   Only returns a positive value — if the PM reduces metrics below
+   standard (rare), no credit is applied to avoid accidental under-
+   pricing.  CAB-related trades (cabinets, countertops) are excluded
+   because those are already handled by the CAD charge delta system.
+   ═══════════════════════════════════════════════════════════════════ */
+function computeMetricAdjustment(S){
+  S = S || STATE;
+  if(isCustomFloorPlan(S)) return 0;  // custom uses reverse-margin already
+  var m = canonicalModel(S.model);
+  var pm = PLAN_METRICS[m];
+  if(!pm) return 0;  // no standard data — can't compute delta
+  var I = S.int || {};
+
+  // ── Standard drivers (from PLAN_METRICS) ──
+  var stdLiving   = pn(pm["Total Living SF"]);
+  var stdStories  = pn(pm["Stories"]) || 1;
+  var stdFullBaths= pi(pm["Bath Count"]) || 0;
+  var stdHalfBaths= pi(pm["Half Bath Count"]) || 0;
+  var stdDoors    = pi(pm["Total Door Openings"]) || 0;
+  var stdStoryMult= stdStories > 1 ? 1.15 : 1.0;
+  var stdDrywallSF= Math.round((stdLiving * 2.4 + stdDoors * 50 + stdFullBaths * 100 + stdHalfBaths * 50) * stdStoryMult * 1.05);
+  var stdTrimLF   = Math.round(stdLiving * 0.286);
+  var stdHvacTons = Math.ceil((stdLiving / 700) * 2) / 2;
+  var stdFixtures = stdFullBaths * 2 + stdHalfBaths * 2 + 4;
+  // Garage SF from slab data (standard = original slab entry)
+  var stdGarSF = 0;
+  (S.ext||{slab:[]}).slab.forEach(function(s){ if(s.n==="Garage Area") stdGarSF += pn(s.sf); });
+
+  var stdDrivers = {
+    livingSF: stdLiving, garSF: stdGarSF,
+    drywallSF: stdDrywallSF, trimLF: stdTrimLF,
+    doors: stdDoors, bathCount: stdFullBaths + stdHalfBaths,
+    fixtures: stdFixtures, hvacTons: stdHvacTons, flat: 1
+  };
+
+  // ── Current drivers (from PM's edited metrics) ──
+  var curLiving   = (I.livingSFOverride > 0) ? pn(I.livingSFOverride) : livSF(S.ext);
+  var curGarSF    = (I.garageSFOverride > 0) ? pn(I.garageSFOverride) : stdGarSF;
+  var curDrywallSF= pn(I.drywallSF);
+  var curTrimLF   = pn(I.trimLF);
+  var curDoors    = pi(I.doors);
+  var curBathCount= pi(I.fullBaths) + pi(I.halfBaths);
+  var curFixtures = pn(I.fixtures) + getSelectionFixturePoints(S);
+  var curHvacTons = pn(I.hvacTons);
+
+  var curDrivers = {
+    livingSF: curLiving, garSF: curGarSF,
+    drywallSF: curDrywallSF, trimLF: curTrimLF,
+    doors: curDoors, bathCount: curBathCount,
+    fixtures: curFixtures, hvacTons: curHvacTons, flat: 1
+  };
+
+  // ── Compute cost delta across all non-cabinet trade groups ──
+  var stdCost = 0, curCost = 0;
+  INT_TRADE_GROUPS.forEach(function(tg){
+    // Skip cabinets and countertops — handled by CAD charge system
+    if(tg.key === "cabinets" || tg.key === "countertops") return;
+    (tg.rates || []).forEach(function(rk){
+      var rc = INT_RC[rk];
+      if(!rc) return;
+      stdCost += rc.rate * (stdDrivers[rc.driver] || 0);
+      curCost += rc.rate * (curDrivers[rc.driver] || 0);
+    });
+  });
+
+  var costDelta = curCost - stdCost;
+  // Only adjust upward — don't credit below standard to avoid under-pricing
+  if(costDelta <= 0) return 0;
+  // Mark up by target margin (30%) to maintain margin on the increase
+  return Math.round(costDelta / 0.70);
+}
+
 function computeInteriorContractPrice(S){
   S = S || STATE;
   if(!S.model) return 0;
@@ -3481,11 +3567,15 @@ function computeInteriorContractPrice(S){
     trueCostNoCredit += upgrades * 0.80;
     return Math.round(trueCostNoCredit / 0.70 + flatCabCharge - effectiveCredits);
   }
-  // Preset: base + CAD + upgrades - credits (capped so never below base).
+  // Preset: base + metric adjustment + CAD + upgrades - credits.
+  // Metric adjustment captures cost increases from PM edits to plan metrics
+  // (e.g. increased Living SF, added baths, more doors) and marks them up
+  // to maintain the target 30% margin.
   var base = getIntContractForBranch(S.model);
+  var metricAdj = computeMetricAdjustment(S);
   var cadTotal = 0;
   computeCadCharges(S).forEach(function(c){ cadTotal += c.cost; });
-  return base + cadTotal + upgrades - effectiveCredits;
+  return base + metricAdj + cadTotal + upgrades - effectiveCredits;
 }
 
 function renderStep6(){
@@ -5386,7 +5476,7 @@ function renderStep8(){
   var cadTotal = 0;
   cadCharges.forEach(function(c){ cadTotal += c.cost; });
   var ctPlanCharge = isCustomFloorPlan() ? 0 : ctS.planCharge;
-  var cadBasedKPI = cadTotal + ctPlanCharge;
+  var cadBasedKPI = cadTotal + ctPlanCharge + metricAdj;
   var selUpTotal = getSelectionsUpgradesTotal();
   var effCredits = getEffectiveCredits();
   var upgradesKPI = cabS.upgradesSubtotal + ctS.upgradesSubtotal + selUpTotal - effCredits;
@@ -5428,6 +5518,8 @@ function renderStep8(){
   h +=     '<div class="total-bar"><span class="total-lbl">Total Exterior Shell Package</span><span class="total-val" id="step8-shell-total-bar">'+fmt(shellContract)+'</span></div>';
   h +=   '</div>';
   h += '</div>';
+
+  var metricAdj = computeMetricAdjustment();
 
   // ── PART B: Interior Turnkey Contract ──
   h += '<div class="card">';
@@ -5706,7 +5798,7 @@ function renderStep8(){
   var orderLabel = STATE.customer.order ? "#"+STATE.customer.order : "(no order #)";
 
   h += '<div class="card" style="border-top:4px solid var(--red)">';
-  h +=   '<div class="section-hdr" style="background:var(--red)"><span>Submit Contract Package</span><span class="badge">'+esc(orderLabel)+'</span></div>';
+  h +=   '<div class="section-hdr" style="background:var(--red)"><span>Submit Contract For Audit</span><span class="badge">'+esc(orderLabel)+'</span></div>';
   h +=   '<div class="card-pad">';
 
   // Pre-flight checklist
@@ -5743,7 +5835,7 @@ function renderStep8(){
     h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px" onclick="saveContract()">📦 Retry Submission</button>';
     h +=     '<div style="font-size:12px;color:var(--red)">⚠ '+esc(STATE.submission.error || "Submission failed")+'</div>';
   } else {
-    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px'+(allPassed?'':';opacity:.6')+'" onclick="saveContract()"'+(allPassed?'':' title="Complete all checklist items first"')+'>📦 Submit Contract Package</button>';
+    h +=     '<button class="nav-btn" style="flex:2;min-width:280px;background:var(--red);color:#fff;font-weight:700;font-size:15px;padding:14px 24px'+(allPassed?'':';opacity:.6')+'" onclick="saveContract()"'+(allPassed?'':' title="Complete all checklist items first"')+'>📦 Submit Contract For Audit</button>';
     if(!allPassed) h += '<div style="font-size:12px;color:var(--amber-dark)">Complete all checklist items above to submit.</div>';
   }
   h +=     '</div>';
@@ -6492,7 +6584,7 @@ function buildPsContractSummary(){
   var cadCharges = []; computeCadCharges().forEach(function(cc){ cadCharges.push(cc); });
   var cadTotal = 0; cadCharges.forEach(function(cc){ cadTotal += cc.cost; });
   var ctPlanCharge = isCustomFloorPlan() ? 0 : ctS.planCharge;
-  var cadBasedKPI = cadTotal + ctPlanCharge;
+  var cadBasedKPI = cadTotal + ctPlanCharge + computeMetricAdjustment();
   var selUpTotal = getSelectionsUpgradesTotal();
   var effCredits = getEffectiveCredits();
   var upgradesKPI = cabS.upgradesSubtotal + ctS.upgradesSubtotal + selUpTotal - effCredits;
@@ -9636,8 +9728,6 @@ function importStateJSON(){
   var restored = false;
   if(typeof window !== "undefined" && window.STMC_EDIT_STATE && typeof window.STMC_EDIT_STATE === "object"){
     try {
-      // mergeDeep is defined elsewhere; safely merges remote STATE into the
-      // default-shaped local STATE so any newly added fields keep their defaults.
       if(typeof mergeDeep === "function"){
         STATE = mergeDeep(defaultState(), window.STMC_EDIT_STATE);
       } else {

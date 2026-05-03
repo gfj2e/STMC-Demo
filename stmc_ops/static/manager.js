@@ -52,6 +52,7 @@ function setManagerSearchVisibility(tab) {
   var visibleTabs = {
     'builds-active': true,
     'builds-closed': true,
+    'draws': true,
   };
   searchWrap.style.display = visibleTabs[tab] ? 'flex' : 'none';
 }
@@ -61,7 +62,8 @@ function setManagerViewToggleVisibility(tab) {
   if (!toggle) return;
   var visibleTabs = {
     'builds-active': true,
-    'builds-closed': true
+    'builds-closed': true,
+    'draws': true
   }
   toggle.style.display = visibleTabs[tab] ? 'inline-flex' : 'none';
 }
@@ -223,6 +225,29 @@ function bindChangeOrderModal() {
       (d.customer || 'build') + ' (' + sign + '$' + pretty + ')'
     );
   });
+
+  // Edit flow: update view fires {"change-order-updated": {...}} after a
+  // successful save. Close the modal and toast — same shape as the create path.
+  document.body.addEventListener('change-order-updated', function (event) {
+    var d = (event && event.detail) || {};
+    closeChangeOrderModal();
+    showToast(
+      'Change Order #' + (d.number || '?') + ' updated for ' +
+      (d.customer || 'build')
+    );
+  });
+
+  // Delete flow: server fires {"change-order-deleted": {...}} after the row
+  // is removed. Close any open modal (defensive; row-level delete usually has
+  // none open) and toast.
+  document.body.addEventListener('change-order-deleted', function (event) {
+    var d = (event && event.detail) || {};
+    closeChangeOrderModal();
+    showToast(
+      'Change Order #' + (d.number || '?') + ' deleted from ' +
+      (d.customer || 'build')
+    );
+  });
 }
 
 function clearJobHit() {
@@ -242,7 +267,21 @@ function findManagerJobMatch(query) {
   var targets = [
     { tab: 'builds-active', panelId: 'tab-builds-active-panel' },
     { tab: 'builds-closed', panelId: 'tab-builds-closed-panel' },
+    { tab: 'draws', panelId: 'tab-draws-panel' },
   ];
+
+  // Prefer the tab the user is currently on so a search from the Draws
+  // tab stays on Draws instead of jumping to Active Builds (where every
+  // draw's underlying job also lives).
+  var activeTabBtn = document.querySelector('.app-nav-link.active[data-tab]');
+  var activeTab = activeTabBtn && activeTabBtn.dataset.tab;
+  if (activeTab) {
+    targets.sort(function (a, b) {
+      if (a.tab === activeTab) return -1;
+      if (b.tab === activeTab) return 1;
+      return 0;
+    });
+  }
 
   for (var i = 0; i < targets.length; i++) {
     var target = targets[i];
@@ -328,7 +367,7 @@ function _managerNormalize(value) {
 }
 
 function _managerFilterPanels() {
-  return ['tab-builds-active-panel', 'tab-builds-closed-panel'];
+  return ['tab-builds-active-panel', 'tab-builds-closed-panel', 'tab-draws-panel'];
 }
 
 function _managerFilterCards() {
@@ -439,11 +478,13 @@ function _toggleManagerTableRowDetail(summary) {
   var willExpand = detail.hasAttribute('hidden');
   if (willExpand) {
     detail.removeAttribute('hidden');
-    detail.style.display = '';
   } else {
     detail.setAttribute('hidden', '');
-    detail.style.display = 'none';
   }
+  // Don't touch inline display — CSS drives the open/close transition off
+  // the [hidden] attribute. Setting display:none would jump the row into/out
+  // of layout and kill the transition.
+  detail.style.display = '';
   summary.setAttribute('aria-expanded', String(willExpand));
   summary.classList.toggle('is-expanded', willExpand);
   var chev = summary.querySelector('.row-chevron');
@@ -553,11 +594,10 @@ function applyManagerFilters() {
       row.style.display = matches ? '' : 'none';
       var detail = row.nextElementSibling;
       if (detail && detail.classList.contains('job-table-detail')) {
-        if (!matches) {
-          detail.style.display = 'none';
-        } else {
-          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
-        }
+        // Filter excludes: hide via inline display. Filter includes: clear
+        // the override and let CSS drive the open/close transition off
+        // [hidden].
+        detail.style.display = matches ? '' : 'none';
       }
     });
 
@@ -580,11 +620,101 @@ function bindManagerFilterRefreshOnSwap() {
   document.body.addEventListener('htmx:afterSwap', function (event) {
     var target = event.detail && event.detail.target;
     if (!target) return;
-    if (target.id !== 'tab-builds-active-panel' && target.id !== 'tab-builds-closed-panel') return;
+    if (
+      target.id !== 'tab-builds-active-panel' &&
+      target.id !== 'tab-builds-closed-panel' &&
+      target.id !== 'tab-draws-panel'
+    ) return;
     rebuildManagerFilterOptions();
     bindManagerFilters();
     _bindManagerRowDetailRefs();
     applyManagerFilters();
+  });
+}
+
+// ── Preserve open/expanded state across HTMX panel swaps ─────────────
+// When a draw is marked complete or a change order is saved, the server
+// returns a fresh render of the panel — collapsing every open card and
+// table row. Snapshot which jobs were expanded before the swap and
+// re-open them after. Keyed by data-job-id (added to both .proj-card
+// and tr.job-table-row in the templates).
+var _MANAGER_PANEL_OPEN_STATE = {};
+
+function _captureManagerPanelOpenState(panel) {
+  var state = { cards: [], rows: [], groups: [] };
+  panel.querySelectorAll('.proj-card[data-job-id]').forEach(function (card) {
+    var body = card.querySelector('.proj-body');
+    if (body && body.classList.contains('open')) {
+      state.cards.push(card.dataset.jobId);
+    }
+  });
+  panel.querySelectorAll('.table-view tr.job-table-row[data-job-id]').forEach(function (row) {
+    var detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('job-table-detail') && !detail.hasAttribute('hidden')) {
+      state.rows.push(row.dataset.jobId);
+    }
+  });
+  panel.querySelectorAll('details.project-group').forEach(function (g) {
+    var summary = g.querySelector('.project-group-summary');
+    var label = summary ? summary.textContent.trim() : '';
+    state.groups.push({ label: label, open: !!g.open });
+  });
+  return state;
+}
+
+function _restoreManagerPanelOpenState(panel, state) {
+  if (!state) return;
+  state.cards.forEach(function (id) {
+    var card = panel.querySelector('.proj-card[data-job-id="' + id + '"]');
+    if (!card) return;
+    var body = card.querySelector('.proj-body');
+    var chev = card.querySelector('.chevron');
+    if (body) body.classList.add('open');
+    if (chev) chev.classList.add('open');
+  });
+  state.rows.forEach(function (id) {
+    var row = panel.querySelector('.table-view tr.job-table-row[data-job-id="' + id + '"]');
+    if (!row) return;
+    var detail = row.nextElementSibling;
+    if (!detail || !detail.classList.contains('job-table-detail')) return;
+    detail.removeAttribute('hidden');
+    detail.style.display = '';
+    row.setAttribute('aria-expanded', 'true');
+    row.classList.add('is-expanded');
+    var chev = row.querySelector('.row-chevron');
+    if (chev) chev.textContent = '▾';
+  });
+  if (state.groups.length) {
+    var groups = panel.querySelectorAll('details.project-group');
+    var labelMap = {};
+    state.groups.forEach(function (g) { labelMap[g.label] = g.open; });
+    groups.forEach(function (g) {
+      var summary = g.querySelector('.project-group-summary');
+      var label = summary ? summary.textContent.trim() : '';
+      if (label in labelMap) g.open = labelMap[label];
+    });
+  }
+}
+
+function bindManagerPanelStatePersistence() {
+  if (!window.htmx) return;
+  document.body.addEventListener('htmx:beforeSwap', function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || !target.id) return;
+    if (
+      target.id !== 'tab-builds-active-panel' &&
+      target.id !== 'tab-builds-closed-panel' &&
+      target.id !== 'tab-draws-panel'
+    ) return;
+    _MANAGER_PANEL_OPEN_STATE[target.id] = _captureManagerPanelOpenState(target);
+  });
+  document.body.addEventListener('htmx:afterSettle', function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || !target.id) return;
+    var state = _MANAGER_PANEL_OPEN_STATE[target.id];
+    if (!state) return;
+    _restoreManagerPanelOpenState(target, state);
+    delete _MANAGER_PANEL_OPEN_STATE[target.id];
   });
 }
 
@@ -621,6 +751,7 @@ function init() {
   bindJobSearch();
   bindManagerFilters();
   bindManagerFilterRefreshOnSwap();
+  bindManagerPanelStatePersistence();
   bindManagerViewToggle();
   bindManagerTableRowToggle();
   _bindManagerRowDetailRefs();

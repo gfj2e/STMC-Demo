@@ -37,6 +37,7 @@ ROLE_DASHBOARDS = {
     AppUser.ROLE_PM: "manager",
     AppUser.ROLE_EXEC: "owner",
 }
+DEMO_PM_NAME = "P. Olson"
 
 
 def _dashboard_for(user):
@@ -326,7 +327,7 @@ def _build_manager_owner_data():
         name = job.customer_name or f"Build #{job.id}"
         model_name = job.floor_plan.name if job.floor_plan else "Custom"
         customer_display = job.customer_addr or name
-        pm_name = job.sales_rep or "P. Olson"
+        pm_name = DEMO_PM_NAME
         phase = job.current_phase
 
         # Trade budgets from DB. `lk` (locked) tracks rows where a paid Bill
@@ -1087,7 +1088,9 @@ def _build_manager_ui_context():
         "builds_active_by_branch": active_projects_by_branch,
         "builds_closed_by_month": closed_projects_by_month,
         "draws_active": active_projects,
+        "draws_active_by_branch": active_projects_by_branch,
         "draws_closed": closed_projects,
+        "draws_closed_by_month": closed_projects_by_month,
     }
 
 
@@ -1755,7 +1758,9 @@ def manager_draws_panel_view(request):
         "manager/draws.html",
         {
             "draws_active": context["draws_active"],
+            "draws_active_by_branch": context["draws_active_by_branch"],
             "draws_closed": context["draws_closed"],
+            "draws_closed_by_month": context["draws_closed_by_month"],
         },
     )
 
@@ -1825,7 +1830,9 @@ def manager_qb_draws_refresh_view(request):
         "manager/draws.html",
         {
             "draws_active": context["draws_active"],
+            "draws_active_by_branch": context["draws_active_by_branch"],
             "draws_closed": context["draws_closed"],
+            "draws_closed_by_month": context["draws_closed_by_month"],
         },
     )
 
@@ -1886,6 +1893,16 @@ def manager_change_order_modal_view(request):
     draws_total = int(sum(int(_to_number(d.amount)) for d in job.demo_draws.all()))
     contract_total = draws_total or int(_to_number(job.budget_total_amount))
 
+    # Resolve the PM's full name. job.sales_rep is freeform (the wizard saves
+    # whatever the rep typed, often just a first name like "dylan"). If we can
+    # match it to a PM AppUser by case-insensitive first-name prefix, use that
+    # user's canonical full name; otherwise fall back to the raw value.
+    default_pm = DEMO_PM_NAME
+
+    # Price-of-changes default: $2,000 (typical CO baseline). New-contract-total
+    # default already includes the $2k bump so the form is consistent on open.
+    DEFAULT_PRICE_CHANGE = 2000
+
     return render(
         request,
         "manager/_change_order_modal.html",
@@ -1894,10 +1911,13 @@ def manager_change_order_modal_view(request):
             "next_number": next_number,
             "contract_total": contract_total,
             "contract_total_display": _format_money(contract_total),
-            # Default to the sales rep on file — closest analogue to "Project Manager".
-            "default_pm": job.sales_rep or "",
+            "default_pm": default_pm,
             "default_customer": job.customer_name or "",
-            "default_address": job.customer_addr or "",
+            "default_address": _job_display_address(job),
+            "default_price_change": DEFAULT_PRICE_CHANGE,
+            "default_new_total": contract_total + DEFAULT_PRICE_CHANGE,
+            "action_url": reverse("manager_change_order_create"),
+            "submit_label": "Create Change Order",
         },
     )
 
@@ -1949,7 +1969,7 @@ def manager_change_order_create_view(request):
         number=next_number,
         customer_name=(request.POST.get("customer_name") or job.customer_name or "")[:200],
         project_address=(request.POST.get("project_address") or job.customer_addr or "")[:300],
-        project_manager=(request.POST.get("project_manager") or job.sales_rep or "")[:120],
+        project_manager=DEMO_PM_NAME,
         description=description,
         price_change=price_change,
         new_contract_total=new_total,
@@ -1973,6 +1993,187 @@ def manager_change_order_create_view(request):
                 "number": next_number,
                 "customer": job.customer_name or f"Build #{job.id}",
                 "amount": f"{price_change:,.2f}",
+            },
+            "manager-refresh": {},
+        })
+        return response
+    return redirect("manager")
+
+@role_required(AppUser.ROLE_PM)
+@csrf_protect
+def manager_edit_change_order(request):
+    if not request.htmx:
+        return redirect("manager")
+    
+    try:
+        co_id = int((request.GET.get("co_id") or request.POST.get("co_id") or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid change order id"}, status=400)
+    try:
+        change_order = JobChangeOrder.objects.select_related("job").get(pk=co_id)
+    except JobChangeOrder.DoesNotExist:
+        return JsonResponse({"error": "Change order not found"}, status=404)
+
+    if change_order.completed_at:
+        return HttpResponse("Completed change orders cannot be edited.", status=409)
+
+    job = change_order.job
+    draws_total = int(sum(int(_to_number(d.amount)) for d in job.demo_draws.all()))
+    contract_total = draws_total or int(_to_number(job.budget_total_amount))
+    
+    return render(
+        request,
+        "manager/_change_order_modal.html",
+        {
+            "job": job,
+            "change_order": change_order,
+            "contract_total": contract_total,
+            "contract_total_display": _format_money(contract_total),
+            "default_pm": DEMO_PM_NAME,
+            "default_customer": change_order.customer_name or job.customer_name or "",
+            "default_address": change_order.project_address or _job_display_address(job),
+            "default_price_change": change_order.price_change,
+            "default_new_total": change_order.new_contract_total,
+            "action_url": reverse("manager_change_order_update"),
+            "submit_label": "Save Changes",
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+@require_POST
+@csrf_protect
+def manager_change_order_update_view(request):
+    try:
+        co_id = int(request.POST.get("co_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid change order id"}, status=400)
+    try:
+        change_order = JobChangeOrder.objects.select_related("job").get(pk=co_id)
+    except JobChangeOrder.DoesNotExist:
+        return JsonResponse({"error": "Change order not found"}, status=404)
+
+    if change_order.completed_at:
+        return JsonResponse({"error": "Completed change orders cannot be edited."}, status=409)
+
+    def _decimal(name, default="0"):
+        raw = (request.POST.get(name) or "").strip().replace(",", "").replace("$", "")
+        if raw == "":
+            raw = default
+        try:
+            return Decimal(raw)
+        except Exception:
+            return Decimal(default)
+
+    description = (request.POST.get("description") or "").strip()
+    price_change = _decimal("price_change")
+    new_total = _decimal("new_contract_total")
+    timing = (request.POST.get("payment_timing") or "immediately").strip()
+    valid_timings = {key for key, _ in JobChangeOrder.PAYMENT_TIMING_CHOICES}
+    if timing not in valid_timings:
+        timing = "immediately"
+
+    change_order.customer_name = (request.POST.get("customer_name") or change_order.customer_name or "")[:200]
+    change_order.project_address = (request.POST.get("project_address") or change_order.project_address or "")[:300]
+    change_order.project_manager = DEMO_PM_NAME
+    change_order.description = description
+    change_order.price_change = price_change
+    change_order.new_contract_total = new_total
+    change_order.payment_timing = timing
+    change_order.save()
+
+    if request.htmx:
+        context = _build_manager_ui_context()
+        response = render(
+            request,
+            "manager/active_builds.html",
+            {
+                "builds_active": context["builds_active"],
+                "builds_active_by_branch": context["builds_active_by_branch"],
+            },
+        )
+        import json as _json
+        response["HX-Trigger"] = _json.dumps({
+            "change-order-updated": {
+                "number": change_order.number,
+                "customer": change_order.customer_name or f"Build #{change_order.job_id}",
+                "amount": f"{price_change:,.2f}",
+            },
+            "manager-refresh": {},
+        })
+        return response
+    return redirect("manager")
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_change_order_complete_confirm_modal_view(request):
+    """Render the soft-confirmation modal for marking a CO complete. HTMX-only.
+    Mirrors `manager_mark_complete_modal_view` (draw flow) — the PM gets a
+    final review of buyer + amount before the QB-invoice POST fires."""
+    if not request.htmx:
+        return redirect("manager")
+    try:
+        co_id = int(request.GET.get("co_id") or 0)
+    except (TypeError, ValueError):
+        return HttpResponse(status=400)
+    try:
+        change_order = JobChangeOrder.objects.select_related("job").get(pk=co_id)
+    except JobChangeOrder.DoesNotExist:
+        return HttpResponse(status=404)
+    if change_order.completed_at:
+        return HttpResponse("Change order is already complete.", status=409)
+    return render(
+        request,
+        "manager/_confirm_co_complete_modal.html",
+        {
+            "change_order": change_order,
+            "job": change_order.job,
+            "amount_display": _format_money(int(_to_number(change_order.price_change))),
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+@require_POST
+@csrf_protect
+def manager_change_order_delete_view(request):
+    """Delete a non-completed change order. Completed COs are protected because
+    they may have a QB invoice attached; voiding those is a separate workflow.
+    Mirrors the active_builds.html re-render pattern used by create/update."""
+    try:
+        co_id = int(request.POST.get("co_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid change order id"}, status=400)
+    try:
+        change_order = JobChangeOrder.objects.select_related("job").get(pk=co_id)
+    except JobChangeOrder.DoesNotExist:
+        return JsonResponse({"error": "Change order not found"}, status=404)
+
+    if change_order.completed_at:
+        return JsonResponse(
+            {"error": "Completed change orders cannot be deleted."},
+            status=409,
+        )
+
+    number = change_order.number
+    customer = change_order.customer_name or change_order.job.customer_name or f"Build #{change_order.job_id}"
+    change_order.delete()
+
+    if request.htmx:
+        context = _build_manager_ui_context()
+        response = render(
+            request,
+            "manager/active_builds.html",
+            {
+                "builds_active": context["builds_active"],
+                "builds_active_by_branch": context["builds_active_by_branch"],
+            },
+        )
+        import json as _json
+        response["HX-Trigger"] = _json.dumps({
+            "change-order-deleted": {
+                "number": number,
+                "customer": customer,
             },
             "manager-refresh": {},
         })
@@ -2121,7 +2322,9 @@ def manager_panel_mark_complete_view(request):
             },
             "manager/draws.html": {
                 "draws_active": context["draws_active"],
+                "draws_active_by_branch": context["draws_active_by_branch"],
                 "draws_closed": context["draws_closed"],
+                "draws_closed_by_month": context["draws_closed_by_month"],
             },
         }
         response = render(request, template_name, partial_context[template_name])

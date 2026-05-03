@@ -3,7 +3,11 @@
 {% if all_projects_closed %}
 	<div class="group-section-title">Closed Projects <span class="group-section-count">({{ all_projects_closed|length }})</span></div>
 
-	{# Cards view — month-grouped collapsible sections (existing layout). #}
+	<!-- Cards view — month-grouped collapsible sections. Each project card
+	   mirrors the open-contracts exec card so closed contracts surface the
+	   same Draws / Bills / Change Orders / Budget vs Actual / Profit tabs.
+	   This is what lets the owner inspect what went over budget after a
+	   contract closes. -->
 	<div class="cards-view">
 		{% for group in all_projects_closed_by_month %}
 			<details class="project-group">
@@ -12,43 +16,240 @@
 					<span class="project-group-count">{{ group.count }}</span>
 				</summary>
 				<div class="project-group-body">
-					{% for project in group.projects %}
-						<div class="card" style="margin-bottom:16px;padding:14px 16px" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
-							<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-								<div>
-									<div class="job-title" style="font-size:15px;font-weight:600;color:var(--g900)">{{ project.name }}</div>
-									<div style="font-size:11px;color:var(--g500);margin-top:2px">{{ project.subtitle }}</div>
+					{% for job in group.projects %}
+						<article class="exec-job-card" data-exec-job-id="{{ job.id }}"
+						    data-job-search="{{ job.name|default:''|lower }} {{ job.order_number|default:''|lower }} {{ job.branch_label|default:''|lower }} {{ job.subtitle|default:''|lower }}"
+						    data-branch="{{ job.branch_label|default:'' }}"
+						    data-plan="{{ job.model_name|default:'' }}"
+						    data-phase="{{ job.phase_label|default:'' }}"
+						    data-year="{{ job.closed_at|date:'Y'|default:'' }}"
+						    data-sort-ts="{{ job.closed_at|date:'U'|default:'0' }}"
+						    data-order="{{ job.order_number|default:'' }}">
+							<button class="exec-job-head" type="button" data-exec-toggle="{{ job.id }}" aria-expanded="false" aria-controls="exec-job-body-{{ job.id }}">
+								<div class="exec-job-info">
+									<h3>{{ job.name }} <span class="exec-branch-chip">{{ job.branch_label }}</span></h3>
+									<div class="exec-job-sub">{{ job.model_name }} - #{{ job.order_number }}</div>
 								</div>
-								<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
-							</div>
-
-							<div class="proj-kpis">
-								<div class="proj-kpi"><div class="proj-kl">Contract</div><div class="proj-kv">{{ project.total_display }}</div></div>
-								<div class="proj-kpi"><div class="proj-kl">Collected</div><div class="proj-kv" style="color:var(--green)">{{ project.paid_display }}</div></div>
-								<div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">{{ project.total_bg_display }}</div></div>
-								<div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:{{ project.margin_color }}">{{ project.margin_pct }}%</div></div>
-							</div>
-
-							<div class="ybanner">COLLECTED - {{ project.pct }}% of contract</div>
-							<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
-								<div style="height:100%;border-radius:3px;background:var(--green);width:{{ project.pct }}%"></div>
-							</div>
-
-							{% for trade in project.trades %}
-								<div class="rw">
-									<span class="rl">{{ trade.trade }}</span>
-									<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }}/{{ trade.budget_display }}</span>
-									<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+								<div class="exec-job-right">
+									<div class="exec-job-totals">
+										<div class="exec-job-amount">{{ job.total_display }}</div>
+										<div class="exec-job-pct">{{ job.paid_display }} collected ({{ job.pct }}%)</div>
+									</div>
+									<span class="pill {{ job.phase_pill_class }}">{{ job.phase_label }}</span>
+									<span class="exec-arrow" data-exec-arrow="{{ job.id }}">▼</span>
 								</div>
-							{% endfor %}
-						</div>
+							</button>
+
+							<div class="exec-draw-bar">
+								{% for seg in job.draw_segments %}
+									<span class="exec-draw-segment {{ seg.status_class }}" data-width-pct="{{ seg.width_pct|floatformat:2 }}"></span>
+								{% endfor %}
+							</div>
+
+							<div class="exec-detail" id="exec-job-body-{{ job.id }}">
+								<div class="exec-tabs" data-exec-tabs="{{ job.id }}">
+									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="{{ job.id }}">Draws</button>
+									<button class="exec-tab" type="button" data-job-tab="bills" data-job-id="{{ job.id }}">Bills ({{ job.bills_count }})</button>
+									<button class="exec-tab" type="button" data-job-tab="cos" data-job-id="{{ job.id }}">Change Orders ({{ job.change_order_count }})</button>
+									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="{{ job.id }}">Budget vs Actual</button>
+									<button class="exec-tab" type="button" data-job-tab="profit" data-job-id="{{ job.id }}">Profit</button>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="{{ job.id }}">
+									<table class="exec-table">
+										<thead>
+											<tr>
+												<th>Draw</th>
+												<th>Due</th>
+												<th>Paid</th>
+												<th>Date</th>
+												<th>Method</th>
+												<th>Source (from QB)</th>
+											</tr>
+										</thead>
+										<tbody>
+											{% for draw in job.draws %}
+												<tr class="is-{{ draw.status_demo }}">
+													<td><span class="exec-dot {{ draw.status_demo }}"></span>{{ draw.label }}</td>
+													<td class="is-mono">{{ draw.due_display }}</td>
+													<td class="is-mono">{{ draw.paid_display }}</td>
+													<td>
+														{% if draw.is_placeholder_date %}
+															<span class="exec-mute">-</span>
+														{% else %}
+															{{ draw.date }}
+														{% endif %}
+													</td>
+													<td>
+														{% if draw.method %}
+															<span class="exec-chip">{{ draw.method }}</span>
+														{% else %}
+															<span class="exec-mute">-</span>
+														{% endif %}
+													</td>
+													<td class="exec-source">
+														{% if draw.source %}
+															{{ draw.source }}
+														{% else %}
+															<span class="exec-mute">Awaiting</span>
+														{% endif %}
+													</td>
+												</tr>
+											{% endfor %}
+											<tr class="is-total">
+												<td>TOTAL</td>
+												<td class="is-mono">{{ job.total_display }}</td>
+												<td class="is-mono">{{ job.paid_display }}</td>
+												<td colspan="3" class="exec-total-pct">{{ job.pct }}%</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="bills" data-job-id="{{ job.id }}" hidden>
+									{% if job.bills %}
+										<div class="exec-bill-summary">
+											<div class="exec-bill-box">
+												<div class="exec-bill-val">{{ job.bills_count }}</div>
+												<div class="exec-bill-lbl">Total Invoices</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val">{{ job.bills_total_display }}</div>
+												<div class="exec-bill-lbl">Total Billed</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val is-green">{{ job.bills_paid_display }}</div>
+												<div class="exec-bill-lbl">Paid</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val is-amber">{{ job.bills_pending_display }}</div>
+												<div class="exec-bill-lbl">Pending</div>
+											</div>
+										</div>
+
+										<table class="exec-table">
+											<thead>
+												<tr>
+													<th>Invoice #</th>
+													<th>Vendor</th>
+													<th>Description</th>
+													<th>Cost Code</th>
+													<th>QB Account</th>
+													<th class="is-right">Amount</th>
+													<th>Date</th>
+													<th>Branch Paid From</th>
+													<th>Status</th>
+												</tr>
+											</thead>
+											<tbody>
+												{% for bill in job.bills %}
+													<tr class="{% if bill.status == 'paid' %}is-paid{% endif %}">
+														<td>
+															{% if bill.invoice_id == "—" %}
+																<span class="exec-mute">—</span>
+															{% else %}
+																<span class="exec-invoice-id">{{ bill.invoice_id }}</span>
+															{% endif %}
+														</td>
+														<td class="is-medium">
+															{% if bill.vendor %}
+																{{ bill.vendor }}
+															{% else %}
+																<span class="exec-mute">—</span>
+															{% endif %}
+														</td>
+														<td class="is-small">{{ bill.description }}</td>
+														<td><span class="exec-cost-code">{{ bill.cost_code }}</span></td>
+														<td class="is-small">{{ bill.qb_account }}</td>
+														<td class="is-right is-mono">{{ bill.amount_display }}</td>
+														<td>
+															{% if bill.date %}
+																{{ bill.date }}
+															{% else %}
+																<span class="exec-mute">-</span>
+															{% endif %}
+														</td>
+														<td><span class="exec-branch-tag {{ bill.branch_class }}">{{ bill.branch }}</span></td>
+														<td><span class="exec-bill-status {{ bill.status }}">{{ bill.status_label }}</span></td>
+													</tr>
+												{% endfor %}
+											</tbody>
+										</table>
+									{% else %}
+										<div class="exec-empty">No invoices recorded yet for this job.</div>
+									{% endif %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="cos" data-job-id="{{ job.id }}" hidden>
+									{% include "owner/_change_orders_panel.html" with cos=job.change_orders %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="{{ job.id }}" hidden>
+									<div class="exec-budget-note">Actuals pulled from QuickBooks. Matched to budget lines by cost code.</div>
+									<div class="exec-budget-head">
+										<div class="exec-budget-col trade">Trade (Cost Code)</div>
+										<div class="exec-budget-col amt">Budget</div>
+										<div class="exec-budget-col amt">Actual</div>
+										<div class="exec-budget-col amt">Remaining</div>
+										<div class="exec-budget-col bar">Progress</div>
+									</div>
+									{% if job.trades %}
+										{% for trade in job.trades %}
+											<div class="exec-budget-row">
+												<div class="exec-budget-col trade">{{ trade.trade }} <div class="exec-cost-sub">{{ trade.cost_code }}</div></div>
+												<div class="exec-budget-col amt">{{ trade.budget_display }}</div>
+												<div class="exec-budget-col amt is-blue">{{ trade.actual_display }}</div>
+												<div class="exec-budget-col amt {% if trade.is_over %}is-red{% endif %}">{{ trade.variance_display }}</div>
+												<div class="exec-budget-col bar">
+													<div class="exec-budget-bar"><span class="exec-budget-fill {% if trade.progress_pct >= 100 %}is-green{% elif trade.progress_pct >= 80 %}is-amber{% else %}is-blue{% endif %}" data-width-pct="{{ trade.progress_pct }}"></span></div>
+												</div>
+											</div>
+										{% endfor %}
+										<div class="exec-budget-row is-total">
+											<div class="exec-budget-col trade">TOTAL</div>
+											<div class="exec-budget-col amt">{{ job.total_bg_display }}</div>
+											<div class="exec-budget-col amt is-blue">{{ job.total_ac_display }}</div>
+											<div class="exec-budget-col amt">{{ job.total_rem_display }}</div>
+											<div class="exec-budget-col bar">
+												<div class="exec-budget-bar"><span class="exec-budget-fill is-blue" data-width-pct="{{ job.pct }}"></span></div>
+											</div>
+										</div>
+									{% else %}
+										<div class="exec-empty">No budget lines were saved for this contract yet.</div>
+									{% endif %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="profit" data-job-id="{{ job.id }}" hidden>
+									<div class="exec-profit-metrics">
+										<div class="exec-metric-box">
+											<div class="exec-metric-val">{{ job.total_display }}</div>
+											<div class="exec-metric-lbl">Contract</div>
+										</div>
+										<div class="exec-metric-box">
+											<div class="exec-metric-val">{{ job.total_bg_display }}</div>
+											<div class="exec-metric-lbl">Budgeted</div>
+										</div>
+										<div class="exec-metric-box">
+											<div class="exec-metric-val is-blue">{{ job.total_ac_display }}</div>
+											<div class="exec-metric-lbl">Actual (QB)</div>
+										</div>
+										<div class="exec-metric-box is-highlight">
+											<div class="exec-metric-val is-green">{{ job.live_margin_pct }}%</div>
+											<div class="exec-metric-lbl">Margin</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</article>
 					{% endfor %}
 				</div>
 			</details>
 		{% endfor %}
 	</div>
 
-	{# Table view — flat sortable + expandable. Same data-* attributes as the cards so the existing filter/search logic works on either view. #}
+	<!-- Table view — flat sortable + expandable. Mirrors the open-contracts
+	   table so closed contracts surface the same Draws / Bills / Change
+	   Orders / Budget vs Actual / Profit tabs in the detail row. -->
 	<div class="table-view">
 		<table class="job-table job-table-expandable">
 			<thead>
@@ -65,62 +266,228 @@
 				</tr>
 			</thead>
 			<tbody>
-				{% for project in all_projects_closed %}
+				{% for job in all_projects_closed %}
 					<tr class="job-table-row"
-					    data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
-					    data-branch="{{ project.branch_label|default:'' }}"
-					    data-plan="{{ project.model_name|default:'' }}"
-					    data-phase="{{ project.phase_label|default:'' }}"
-					    data-year="{{ project.closed_at|date:'Y'|default:'' }}"
-					    data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}"
-					    data-order="{{ project.order_number|default:'' }}"
+					    data-job-id="{{ job.id }}"
+					    data-job-search="{{ job.name|default:''|lower }} {{ job.order_number|default:''|lower }} {{ job.branch_label|default:''|lower }} {{ job.subtitle|default:''|lower }}"
+					    data-branch="{{ job.branch_label|default:'' }}"
+					    data-plan="{{ job.model_name|default:'' }}"
+					    data-phase="{{ job.phase_label|default:'' }}"
+					    data-year="{{ job.closed_at|date:'Y'|default:'' }}"
+					    data-sort-ts="{{ job.closed_at|date:'U'|default:'0' }}"
+					    data-order="{{ job.order_number|default:'' }}"
 					    tabindex="0"
 					    role="button"
 					    aria-expanded="false">
 						<td class="row-toggle-col"><span class="row-chevron" aria-hidden="true">▸</span></td>
 						<td>
-							<div style="font-weight:600;">{{ project.name }}</div>
-							<div class="muted" style="font-size:11px;">{{ project.subtitle }}</div>
+							<div style="font-weight:600;">{{ job.name }}</div>
+							<div class="muted" style="font-size:11px;">{{ job.subtitle }}</div>
 						</td>
-						<td class="muted">{% if project.order_number %}{{ project.order_number }}{% else %}—{% endif %}</td>
-						<td class="muted">{{ project.branch_label }}</td>
-						<td><span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span></td>
-						<td class="num">{{ project.total_display }}</td>
-						<td class="num" style="color:var(--green);">{{ project.paid_display }}</td>
-						<td class="num" style="color:{{ project.margin_color }};">{{ project.margin_pct }}%</td>
-						<td class="num">{{ project.pct }}%</td>
+						<td class="muted">{% if job.order_number %}{{ job.order_number }}{% else %}—{% endif %}</td>
+						<td class="muted">{{ job.branch_label }}</td>
+						<td><span class="pill {{ job.phase_pill_class }}">{{ job.phase_label }}</span></td>
+						<td class="num">{{ job.total_display }}</td>
+						<td class="num" style="color:var(--green);">{{ job.paid_display }}</td>
+						<td class="num" style="color:{{ job.margin_color }};">{{ job.margin_pct }}%</td>
+						<td class="num">{{ job.pct }}%</td>
 					</tr>
 
 					<tr class="job-table-detail" hidden>
 						<td colspan="9">
 							<div class="job-detail-card">
-								<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px">
-									<div>
-										<p class="proj-name">{{ project.name }}</p>
-										<p class="proj-sub">{{ project.subtitle }}</p>
+								<div class="exec-tabs" data-exec-tabs="row-{{ job.id }}">
+									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="row-{{ job.id }}">Draws</button>
+									<button class="exec-tab" type="button" data-job-tab="bills" data-job-id="row-{{ job.id }}">Bills ({{ job.bills_count }})</button>
+									<button class="exec-tab" type="button" data-job-tab="cos" data-job-id="row-{{ job.id }}">Change Orders ({{ job.change_order_count }})</button>
+									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="row-{{ job.id }}">Budget vs Actual</button>
+									<button class="exec-tab" type="button" data-job-tab="profit" data-job-id="row-{{ job.id }}">Profit</button>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="row-{{ job.id }}">
+									<table class="exec-table">
+										<thead>
+											<tr>
+												<th>Draw</th>
+												<th>Due</th>
+												<th>Paid</th>
+												<th>Date</th>
+												<th>Method</th>
+												<th>Source (from QB)</th>
+											</tr>
+										</thead>
+										<tbody>
+											{% for draw in job.draws %}
+												<tr class="is-{{ draw.status_demo }}">
+													<td><span class="exec-dot {{ draw.status_demo }}"></span>{{ draw.label }}</td>
+													<td class="is-mono">{{ draw.due_display }}</td>
+													<td class="is-mono">{{ draw.paid_display }}</td>
+													<td>
+														{% if draw.is_placeholder_date %}
+															<span class="exec-mute">-</span>
+														{% else %}
+															{{ draw.date }}
+														{% endif %}
+													</td>
+													<td>
+														{% if draw.method %}
+															<span class="exec-chip">{{ draw.method }}</span>
+														{% else %}
+															<span class="exec-mute">-</span>
+														{% endif %}
+													</td>
+													<td class="exec-source">
+														{% if draw.source %}
+															{{ draw.source }}
+														{% else %}
+															<span class="exec-mute">Awaiting</span>
+														{% endif %}
+													</td>
+												</tr>
+											{% endfor %}
+											<tr class="is-total">
+												<td>TOTAL</td>
+												<td class="is-mono">{{ job.total_display }}</td>
+												<td class="is-mono">{{ job.paid_display }}</td>
+												<td colspan="3" class="exec-total-pct">{{ job.pct }}%</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="bills" data-job-id="row-{{ job.id }}" hidden>
+									{% if job.bills %}
+										<div class="exec-bill-summary">
+											<div class="exec-bill-box">
+												<div class="exec-bill-val">{{ job.bills_count }}</div>
+												<div class="exec-bill-lbl">Total Invoices</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val">{{ job.bills_total_display }}</div>
+												<div class="exec-bill-lbl">Total Billed</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val is-green">{{ job.bills_paid_display }}</div>
+												<div class="exec-bill-lbl">Paid</div>
+											</div>
+											<div class="exec-bill-box">
+												<div class="exec-bill-val is-amber">{{ job.bills_pending_display }}</div>
+												<div class="exec-bill-lbl">Pending</div>
+											</div>
+										</div>
+
+										<table class="exec-table">
+											<thead>
+												<tr>
+													<th>Invoice #</th>
+													<th>Vendor</th>
+													<th>Description</th>
+													<th>Cost Code</th>
+													<th>QB Account</th>
+													<th class="is-right">Amount</th>
+													<th>Date</th>
+													<th>Branch Paid From</th>
+													<th>Status</th>
+												</tr>
+											</thead>
+											<tbody>
+												{% for bill in job.bills %}
+													<tr class="{% if bill.status == 'paid' %}is-paid{% endif %}">
+														<td>
+															{% if bill.invoice_id == "—" %}
+																<span class="exec-mute">—</span>
+															{% else %}
+																<span class="exec-invoice-id">{{ bill.invoice_id }}</span>
+															{% endif %}
+														</td>
+														<td class="is-medium">
+															{% if bill.vendor %}
+																{{ bill.vendor }}
+															{% else %}
+																<span class="exec-mute">—</span>
+															{% endif %}
+														</td>
+														<td class="is-small">{{ bill.description }}</td>
+														<td><span class="exec-cost-code">{{ bill.cost_code }}</span></td>
+														<td class="is-small">{{ bill.qb_account }}</td>
+														<td class="is-right is-mono">{{ bill.amount_display }}</td>
+														<td>
+															{% if bill.date %}
+																{{ bill.date }}
+															{% else %}
+																<span class="exec-mute">-</span>
+															{% endif %}
+														</td>
+														<td><span class="exec-branch-tag {{ bill.branch_class }}">{{ bill.branch }}</span></td>
+														<td><span class="exec-bill-status {{ bill.status }}">{{ bill.status_label }}</span></td>
+													</tr>
+												{% endfor %}
+											</tbody>
+										</table>
+									{% else %}
+										<div class="exec-empty">No invoices recorded yet for this job.</div>
+									{% endif %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="cos" data-job-id="row-{{ job.id }}" hidden>
+									{% include "owner/_change_orders_panel.html" with cos=job.change_orders %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="row-{{ job.id }}" hidden>
+									<div class="exec-budget-note">Actuals pulled from QuickBooks. Matched to budget lines by cost code.</div>
+									<div class="exec-budget-head">
+										<div class="exec-budget-col trade">Trade (Cost Code)</div>
+										<div class="exec-budget-col amt">Budget</div>
+										<div class="exec-budget-col amt">Actual</div>
+										<div class="exec-budget-col amt">Remaining</div>
+										<div class="exec-budget-col bar">Progress</div>
 									</div>
-									<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+									{% if job.trades %}
+										{% for trade in job.trades %}
+											<div class="exec-budget-row">
+												<div class="exec-budget-col trade">{{ trade.trade }} <div class="exec-cost-sub">{{ trade.cost_code }}</div></div>
+												<div class="exec-budget-col amt">{{ trade.budget_display }}</div>
+												<div class="exec-budget-col amt is-blue">{{ trade.actual_display }}</div>
+												<div class="exec-budget-col amt {% if trade.is_over %}is-red{% endif %}">{{ trade.variance_display }}</div>
+												<div class="exec-budget-col bar">
+													<div class="exec-budget-bar"><span class="exec-budget-fill {% if trade.progress_pct >= 100 %}is-green{% elif trade.progress_pct >= 80 %}is-amber{% else %}is-blue{% endif %}" data-width-pct="{{ trade.progress_pct }}"></span></div>
+												</div>
+											</div>
+										{% endfor %}
+										<div class="exec-budget-row is-total">
+											<div class="exec-budget-col trade">TOTAL</div>
+											<div class="exec-budget-col amt">{{ job.total_bg_display }}</div>
+											<div class="exec-budget-col amt is-blue">{{ job.total_ac_display }}</div>
+											<div class="exec-budget-col amt">{{ job.total_rem_display }}</div>
+											<div class="exec-budget-col bar">
+												<div class="exec-budget-bar"><span class="exec-budget-fill is-blue" data-width-pct="{{ job.pct }}"></span></div>
+											</div>
+										</div>
+									{% else %}
+										<div class="exec-empty">No budget lines were saved for this contract yet.</div>
+									{% endif %}
 								</div>
 
-								<div class="proj-kpis">
-									<div class="proj-kpi"><div class="proj-kl">Contract</div><div class="proj-kv">{{ project.total_display }}</div></div>
-									<div class="proj-kpi"><div class="proj-kl">Collected</div><div class="proj-kv" style="color:var(--green)">{{ project.paid_display }}</div></div>
-									<div class="proj-kpi"><div class="proj-kl">PM Budget</div><div class="proj-kv">{{ project.total_bg_display }}</div></div>
-									<div class="proj-kpi"><div class="proj-kl">Margin</div><div class="proj-kv" style="color:{{ project.margin_color }}">{{ project.margin_pct }}%</div></div>
-								</div>
-
-								<div class="ybanner">COLLECTED - {{ project.pct }}% of contract</div>
-								<div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:10px">
-									<div style="height:100%;border-radius:3px;background:var(--green);width:{{ project.pct }}%"></div>
-								</div>
-
-								{% for trade in project.trades %}
-									<div class="rw">
-										<span class="rl">{{ trade.trade }}</span>
-										<span class="rd" style="color:{% if trade.is_over %}#DC2626{% else %}var(--g400){% endif %}">{{ trade.actual_display }}/{{ trade.budget_display }}</span>
-										<span class="rv" style="color:{% if trade.is_over %}#DC2626{% else %}var(--green){% endif %}">{{ trade.variance_display }}</span>
+								<div class="exec-tab-panel" data-job-panel="profit" data-job-id="row-{{ job.id }}" hidden>
+									<div class="exec-profit-metrics">
+										<div class="exec-metric-box">
+											<div class="exec-metric-val">{{ job.total_display }}</div>
+											<div class="exec-metric-lbl">Contract</div>
+										</div>
+										<div class="exec-metric-box">
+											<div class="exec-metric-val">{{ job.total_bg_display }}</div>
+											<div class="exec-metric-lbl">Budgeted</div>
+										</div>
+										<div class="exec-metric-box">
+											<div class="exec-metric-val is-blue">{{ job.total_ac_display }}</div>
+											<div class="exec-metric-lbl">Actual (QB)</div>
+										</div>
+										<div class="exec-metric-box is-highlight">
+											<div class="exec-metric-val is-green">{{ job.live_margin_pct }}%</div>
+											<div class="exec-metric-lbl">Margin</div>
+										</div>
 									</div>
-								{% endfor %}
+								</div>
 							</div>
 						</td>
 					</tr>

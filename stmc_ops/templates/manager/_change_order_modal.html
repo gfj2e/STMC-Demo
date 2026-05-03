@@ -1,37 +1,44 @@
 <div class="modal-overlay" id="co-modal" data-co-modal="1">
   <div class="modal co-modal" role="dialog" aria-modal="true" aria-labelledby="co-modal-title">
     <div class="modal-hdr" id="co-modal-title">
-      Change Order #{{ next_number }} — {{ job.customer_name|default:"New Build" }}
+      {% if change_order %}
+        Change Order #{{ change_order.number }} — {{ change_order.customer_name|default:default_customer|default:"New Build" }}
+      {% else %}
+        Change Order #{{ next_number }} — {{ job.customer_name|default:"New Build" }}
+      {% endif %}
     </div>
     <form
-      hx-post="{% url 'manager_change_order_create' %}"
+      {% if action_url %}hx-post="{{ action_url }}"{% else %}hx-post="{% url 'manager_change_order_create' %}"{% endif %}
       hx-target="#tab-builds-active-panel"
       hx-swap="innerHTML"
       hx-disabled-elt="find button[type='submit']"
     >
       {% csrf_token %}
       <input type="hidden" name="job_id" value="{{ job.id }}">
+      {% if change_order %}
+        <input type="hidden" name="co_id" value="{{ change_order.id }}">
+      {% endif %}
 
       <div class="modal-body">
         <div class="co-grid">
           <label class="co-field">
             <span class="co-lbl">Customer Name</span>
-            <input type="text" name="customer_name" value="{{ default_customer }}" maxlength="200" required>
+            <input type="text" name="customer_name" value="{{ change_order.customer_name|default:default_customer }}" maxlength="200" required>
           </label>
 
           <label class="co-field">
             <span class="co-lbl">Project Address</span>
-            <input type="text" name="project_address" value="{{ default_address }}" maxlength="300">
+            <input type="text" name="project_address" value="{{ change_order.project_address|default:default_address }}" maxlength="300">
           </label>
 
           <label class="co-field">
             <span class="co-lbl">Project Manager</span>
-            <input type="text" name="project_manager" value="{{ default_pm }}" maxlength="120">
+            <input type="text" name="project_manager" value="{{ change_order.project_manager|default:default_pm }}" maxlength="120" readonly>
           </label>
 
           <label class="co-field co-field-full">
             <span class="co-lbl">Description of Changes</span>
-            <textarea name="description" rows="5" placeholder="Describe the change, the reason, and any credits/charges..." required></textarea>
+            <textarea name="description" rows="5" placeholder="Describe the change, the reason, and any credits/charges..." required>{{ change_order.description|default:"" }}</textarea>
           </label>
 
           <label class="co-field">
@@ -40,9 +47,10 @@
               type="number"
               name="price_change"
               step="0.01"
-              value="0"
+              value="{% if change_order %}{{ change_order.price_change }}{% else %}{{ default_price_change }}{% endif %}"
               required
               inputmode="decimal"
+              data-co-price-change
             >
             <span class="co-hint">Use a negative value for a credit (e.g. -4145.00)</span>
           </label>
@@ -53,8 +61,10 @@
               type="number"
               name="new_contract_total"
               step="0.01"
-              value="{{ contract_total }}"
+              value="{% if change_order %}{{ change_order.new_contract_total }}{% else %}{{ default_new_total }}{% endif %}"
               inputmode="decimal"
+              data-co-new-total
+              data-base-total="{{ contract_total }}"
             >
             <span class="co-hint">Optional — leave 0 to skip (current: {{ contract_total_display }})</span>
           </label>
@@ -62,15 +72,15 @@
           <fieldset class="co-field co-field-full co-radio-group">
             <legend class="co-lbl">Payment Timing</legend>
             <label class="co-radio">
-              <input type="radio" name="payment_timing" value="material_labor">
+              <input type="radio" name="payment_timing" value="material_labor" {% if change_order and change_order.payment_timing == "material_labor" %}checked{% endif %}>
               <span>Due with Material and Labor</span>
             </label>
             <label class="co-radio">
-              <input type="radio" name="payment_timing" value="interiors">
+              <input type="radio" name="payment_timing" value="interiors" {% if change_order and change_order.payment_timing == "interiors" %}checked{% endif %}>
               <span>Due with Interiors</span>
             </label>
             <label class="co-radio">
-              <input type="radio" name="payment_timing" value="immediately" checked>
+              <input type="radio" name="payment_timing" value="immediately" {% if not change_order or change_order.payment_timing == "immediately" %}checked{% endif %}>
               <span>Due immediately</span>
             </label>
           </fieldset>
@@ -79,8 +89,24 @@
 
       <div class="modal-ftr">
         <button type="button" class="modal-btn" data-co-cancel="1">Cancel</button>
-        <button type="submit" class="modal-btn co-modal-submit">Create Change Order</button>
+        <button type="submit" class="modal-btn co-modal-submit">{{ submit_label|default:"Create Change Order" }}</button>
       </div>
     </form>
   </div>
 </div>
+<script>
+  (function () {
+    var modal = document.getElementById("co-modal");
+    if (!modal) return;
+    var price = modal.querySelector("[data-co-price-change]");
+    var newTotal = modal.querySelector("[data-co-new-total]");
+    if (!price || !newTotal) return;
+    var base = parseFloat(newTotal.getAttribute("data-base-total")) || 0;
+    function sync() {
+      var p = parseFloat(price.value);
+      if (isNaN(p)) p = 0;
+      newTotal.value = (base + p).toFixed(2).replace(/\.00$/, "");
+    }
+    price.addEventListener("input", sync);
+  })();
+</script>

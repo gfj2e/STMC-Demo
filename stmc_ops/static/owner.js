@@ -32,7 +32,7 @@ function switchTab(btn, tab, options) {
 function setOwnerSearchVisibility(tab) {
   const searchWrap = document.getElementById('job-search-wrap');
   if (searchWrap) {
-    const searchTabs = { 'projects-closed': true };
+    const searchTabs = { 'dashboard': true, 'projects-closed': true };
     searchWrap.style.display = searchTabs[tab] ? 'flex' : 'none';
   }
   const toggle = document.querySelector('.job-view-toggle');
@@ -291,15 +291,29 @@ function clearJobHit() {
 
 function findOwnerJobMatch(query) {
   // Search whichever rendering is currently visible. In cards mode look
-  // at .card; in table mode look at .job-table-row. Both carry the same
-  // data-job-search so the lookup is identical.
+  // at the card elements (.card on legacy templates, .exec-job-card on
+  // the dashboard / closed-projects rewrites); in table mode look at
+  // tr.job-table-row. All three carry data-job-search so the lookup is
+  // identical.
   const inTableMode = document.body.classList.contains('view-mode-table');
   const selector = inTableMode
     ? '.table-view tr.job-table-row[data-job-search]'
-    : '.cards-view .card[data-job-search]';
+    : '.cards-view .card[data-job-search], .cards-view .exec-job-card[data-job-search]';
   const targets = [
+    { tab: 'dashboard', panelId: 'tab-dashboard-panel' },
     { tab: 'projects-closed', panelId: 'tab-projects-closed-panel' },
   ];
+
+  // Prefer the tab the user is on so a search from Active stays on
+  // Active rather than jumping to Closed (and vice versa).
+  const activeTab = _ownerActiveTab();
+  if (activeTab) {
+    targets.sort((a, b) => {
+      if (a.tab === activeTab) return -1;
+      if (b.tab === activeTab) return 1;
+      return 0;
+    });
+  }
 
   for (const target of targets) {
     const panel = document.getElementById(target.panelId);
@@ -343,6 +357,11 @@ function runOwnerJobSearch() {
   } else {
     const details = match.card.closest('details');
     if (details) details.open = true;
+    // Expand the .exec-job-card body if it has the expand affordance.
+    const toggleBtn = match.card.querySelector('[data-exec-toggle]');
+    if (toggleBtn && toggleBtn.getAttribute('aria-expanded') !== 'true') {
+      toggleBtn.click();
+    }
   }
 
   match.card.classList.add('job-search-hit');
@@ -372,15 +391,19 @@ function _ownerNormalize(value) {
 }
 
 function _ownerFilterPanels() {
-  return ['tab-projects-closed-panel'];
+  return ['tab-dashboard-panel', 'tab-projects-closed-panel'];
 }
 
 function _ownerFilterCards() {
+  // Active dashboard cards are .exec-job-card; closed-project cards are
+  // also .exec-job-card (after the rewrite that gave closed contracts the
+  // same tabbed detail). Both carry data-job-search + data-branch / plan
+  // / phase / year so filters apply uniformly.
   const cards = [];
   _ownerFilterPanels().forEach(panelId => {
     const panel = document.getElementById(panelId);
     if (!panel) return;
-    panel.querySelectorAll('.card[data-job-search]').forEach(card => {
+    panel.querySelectorAll('.card[data-job-search], .exec-job-card[data-job-search]').forEach(card => {
       cards.push(card);
     });
   });
@@ -477,7 +500,7 @@ function applyOwnerFilters() {
     panel.querySelectorAll('.project-group').forEach(group => {
       _ownerSortGroupCards(group, sortMode);
       let visibleCount = 0;
-      group.querySelectorAll('.card[data-job-search]').forEach(card => {
+      group.querySelectorAll('.card[data-job-search], .exec-job-card[data-job-search]').forEach(card => {
         let matches = true;
         if (branch && _ownerNormalize(card.dataset.branch) !== branch) matches = false;
         if (plan && _ownerNormalize(card.dataset.plan) !== plan) matches = false;
@@ -493,6 +516,19 @@ function applyOwnerFilters() {
       panelVisibleCount += visibleCount;
     });
 
+    // Active dashboard renders cards flat (no <details> wrapper), so
+    // also filter direct .exec-job-card descendants of .cards-view that
+    // are not inside any group.
+    panel.querySelectorAll('.cards-view > .exec-job-card[data-job-search]').forEach(card => {
+      let matches = true;
+      if (branch && _ownerNormalize(card.dataset.branch) !== branch) matches = false;
+      if (plan && _ownerNormalize(card.dataset.plan) !== plan) matches = false;
+      if (phase && _ownerNormalize(card.dataset.phase) !== phase) matches = false;
+      if (year && _ownerNormalize(card.dataset.year) !== year) matches = false;
+      card.style.display = matches ? '' : 'none';
+      if (matches) panelVisibleCount += 1;
+    });
+
     // Mirror the same filter on the flat table view. Each job has TWO
     // <tr>s (summary + paired detail hidden by default). Hide both
     // together when a filter excludes the job.
@@ -506,11 +542,10 @@ function applyOwnerFilters() {
       row.style.display = matches ? '' : 'none';
       const detail = row.nextElementSibling;
       if (detail && detail.classList.contains('job-table-detail')) {
-        if (!matches) {
-          detail.style.display = 'none';
-        } else {
-          detail.style.display = detail.hasAttribute('hidden') ? 'none' : '';
-        }
+        // Filter excludes: hide via inline display. Filter includes: clear
+        // the override and let CSS drive the open/close transition off
+        // [hidden].
+        detail.style.display = matches ? '' : 'none';
       }
     });
 
@@ -535,11 +570,13 @@ function _toggleOwnerTableRowDetail(summary) {
   const willExpand = detail.hasAttribute('hidden');
   if (willExpand) {
     detail.removeAttribute('hidden');
-    detail.style.display = '';
   } else {
     detail.setAttribute('hidden', '');
-    detail.style.display = 'none';
   }
+  // Don't touch inline display — CSS drives the open/close transition off
+  // the [hidden] attribute. Setting display:none would jump the row into/out
+  // of layout and kill the transition.
+  detail.style.display = '';
   summary.setAttribute('aria-expanded', String(willExpand));
   summary.classList.toggle('is-expanded', willExpand);
   const chev = summary.querySelector('.row-chevron');
@@ -635,7 +672,10 @@ function bindOwnerFilterRefreshOnSwap() {
       placeOwnerViewToggle('projects-closed');
     }
     if (target.id === 'tab-dashboard-panel') {
+      rebuildOwnerFilterOptions();
+      bindOwnerFilters();
       _bindOwnerRowDetailRefs();
+      applyOwnerFilters();
       placeOwnerViewToggle('dashboard');
     }
   });

@@ -11,7 +11,7 @@
 				</summary>
 				<div class="project-group-body">
 					{% for project in group.projects %}
-						<div class="proj-card" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
+						<div class="proj-card" data-job-id="{{ project.id }}" data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}" data-branch="{{ project.branch_label|default:'' }}" data-plan="{{ project.model_name|default:'' }}" data-phase="{{ project.phase_label|default:'' }}" data-year="{{ project.closed_at|date:'Y'|default:'' }}" data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}" data-order="{{ project.order_number|default:'' }}">
 							<div class="proj-hdr">
 								<div class="proj-hdr-top">
 									<div>
@@ -109,25 +109,39 @@
 													<div class="co-row-action">
 														{% if co.is_completed %}
 															<span class="pill pill-success" title="Marked complete">Completed</span>
-														{% elif co.is_credit %}
-															<span class="pill" title="Credit COs are not invoiced">Credit</span>
 														{% else %}
+															<button
+																type="button"
+																class="co-edit-btn"
+																hx-get="{% url 'manager_change_order_edit' %}?co_id={{ co.id }}"
+																hx-target="#manager-modal-host"
+																hx-swap="innerHTML"
+																title="Edit this change order"
+															>Edit</button>
 															<form
 																method="post"
-																action="{% url 'manager_change_order_complete' %}"
-																hx-post="{% url 'manager_change_order_complete' %}"
+																hx-post="{% url 'manager_change_order_delete' %}"
 																hx-target="#tab-builds-active-panel"
 																hx-swap="innerHTML"
-																hx-confirm="Mark CO #{{ co.number }} complete and send a {{ co.amount_display }} invoice to {{ project.customer_display|default:'the customer' }}?"
+																hx-confirm="Delete CO #{{ co.number }}? This cannot be undone."
 																hx-disabled-elt="find button"
 																style="margin:0"
 															>
 																{% csrf_token %}
 																<input type="hidden" name="co_id" value="{{ co.id }}">
-																<button type="submit" class="co-complete-btn" data-busy-label="Sending...">
-																	Mark Complete
-																</button>
+																<button type="submit" class="co-delete-btn" title="Delete this change order" data-busy-label="Deleting...">Delete</button>
 															</form>
+															{% if co.is_credit %}
+																<span class="pill" title="Credit COs are not invoiced">Credit</span>
+															{% else %}
+																<button
+																	type="button"
+																	class="co-complete-btn"
+																	hx-get="{% url 'manager_change_order_complete_modal' %}?co_id={{ co.id }}"
+																	hx-target="#manager-modal-host"
+																	hx-swap="innerHTML"
+																>Mark Complete</button>
+															{% endif %}
 														{% endif %}
 													</div>
 												</div>
@@ -174,6 +188,7 @@
 				{% for project in builds_active %}
 					{# Summary row — clicking it toggles the detail row below #}
 					<tr class="job-table-row"
+					    data-job-id="{{ project.id }}"
 					    data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
 					    data-branch="{{ project.branch_label|default:'' }}"
 					    data-plan="{{ project.model_name|default:'' }}"
@@ -302,25 +317,39 @@
 													<div class="co-row-action">
 														{% if co.is_completed %}
 															<span class="pill pill-success" title="Marked complete">Completed</span>
-														{% elif co.is_credit %}
-															<span class="pill" title="Credit COs are not invoiced">Credit</span>
 														{% else %}
+															<button
+																type="button"
+																class="co-edit-btn"
+																hx-get="{% url 'manager_change_order_edit' %}?co_id={{ co.id }}"
+																hx-target="#manager-modal-host"
+																hx-swap="innerHTML"
+																title="Edit this change order"
+															>Edit</button>
 															<form
 																method="post"
-																action="{% url 'manager_change_order_complete' %}"
-																hx-post="{% url 'manager_change_order_complete' %}"
+																hx-post="{% url 'manager_change_order_delete' %}"
 																hx-target="#tab-builds-active-panel"
 																hx-swap="innerHTML"
-																hx-confirm="Mark CO #{{ co.number }} complete and send a {{ co.amount_display }} invoice to {{ project.customer_display|default:'the customer' }}?"
+																hx-confirm="Delete CO #{{ co.number }}? This cannot be undone."
 																hx-disabled-elt="find button"
 																style="margin:0"
 															>
 																{% csrf_token %}
 																<input type="hidden" name="co_id" value="{{ co.id }}">
-																<button type="submit" class="co-complete-btn" data-busy-label="Sending...">
-																	Mark Complete
-																</button>
+																<button type="submit" class="co-delete-btn" title="Delete this change order" data-busy-label="Deleting...">Delete</button>
 															</form>
+															{% if co.is_credit %}
+																<span class="pill" title="Credit COs are not invoiced">Credit</span>
+															{% else %}
+																<button
+																	type="button"
+																	class="co-complete-btn"
+																	hx-get="{% url 'manager_change_order_complete_modal' %}?co_id={{ co.id }}"
+																	hx-target="#manager-modal-host"
+																	hx-swap="innerHTML"
+																>Mark Complete</button>
+															{% endif %}
 														{% endif %}
 													</div>
 												</div>

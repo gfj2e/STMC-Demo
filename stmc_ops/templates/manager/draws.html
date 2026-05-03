@@ -23,106 +23,194 @@ the accountant records the Payment in QB sandbox. Focused pull, fast.
 </div>
 
 {% if draws_active %}
-	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Active <span style="font-weight:400">({{ draws_active|length }})</span></div>
-	{% for project in draws_active %}
-		<div class="proj-card">
-			<div class="proj-hdr">
-				<div class="proj-hdr-top">
-					<div>
-						<p class="proj-name">{{ project.name }}</p>
-						<p class="proj-sub">{{ project.subtitle }} · {{ project.total_display }}</p>
-					</div>
-					<div style="display:flex;align-items:center;gap:8px">
-						<span class="pill {% if project.pct >= 100 %}pill-brand{% elif project.pct >= 50 %}pill-success{% else %}pill-warning{% endif %}">{{ project.pct }}% collected</span>
-						<span class="chevron">⌄</span>
-					</div>
-				</div>
+	<div class="group-section-title">Active <span class="group-section-count">({{ draws_active|length }})</span></div>
 
-				<div class="budget-bar-track" style="margin-top:8px">
-					<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
-				</div>
+	{# Cards view — branch-grouped, mirrors active_builds.html so the shared manager.js filter / search / sort logic keys off the same data-* attrs. #}
+	<div class="cards-view">
+		{% for group in draws_active_by_branch %}
+			<details class="project-group" open>
+				<summary class="project-group-summary">
+					<span class="project-group-main"><span class="project-group-chevron" aria-hidden="true">▾</span><span>{{ group.label }}</span></span>
+					<span class="project-group-count">{{ group.count }}</span>
+				</summary>
+				<div class="project-group-body">
+					{% for project in group.projects %}
+						<div class="proj-card"
+						     data-job-id="{{ project.id }}"
+						     data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+						     data-branch="{{ project.branch_label|default:'' }}"
+						     data-plan="{{ project.model_name|default:'' }}"
+						     data-phase="{{ project.phase_label|default:'' }}"
+						     data-year="{{ project.closed_at|date:'Y'|default:'' }}"
+						     data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}"
+						     data-order="{{ project.order_number|default:'' }}">
+							<div class="proj-hdr">
+								<div class="proj-hdr-top">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }} · {{ project.total_display }}</p>
+									</div>
+									<div style="display:flex;align-items:center;gap:8px">
+										<span class="pill {% if project.pct >= 100 %}pill-brand{% elif project.pct >= 50 %}pill-success{% else %}pill-warning{% endif %}">{{ project.pct }}% collected</span>
+										<span class="chevron open">⌄</span>
+									</div>
+								</div>
 
-				<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin-top:6px">
-					<span>{{ project.paid_display }} collected</span>
-					<span>{{ project.remaining_display }} remaining</span>
-				</div>
-			</div>
+								<div class="budget-bar-track" style="margin-top:8px">
+									<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
+								</div>
 
-			<div class="proj-body">
-				<div style="padding-top:10px">
-					{% for draw in project.timeline_draws %}
-						<div class="ph">
-							<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
-							<div style="flex:1">
-								<div style="font-weight:500">{{ draw.label }}</div>
-								{% if draw.paid_date %}
-									<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
-								{% endif %}
+								<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin-top:6px">
+									<span>{{ project.paid_display }} collected</span>
+									<span>{{ project.remaining_display }} remaining</span>
+								</div>
 							</div>
-							<div style="text-align:right;min-width:55px">
-								<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
-								<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+
+							<div class="proj-body open">
+								<div style="padding-top:10px">
+									{% for draw in project.timeline_draws %}
+										<div class="ph">
+											<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+											<div style="flex:1">
+												<div style="font-weight:500">{{ draw.label }}</div>
+												{% if draw.paid_date %}
+													<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+												{% endif %}
+											</div>
+											<div style="text-align:right;min-width:55px">
+												<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+												<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+											</div>
+										</div>
+									{% endfor %}
+
+									{% if project.current_draw %}
+										<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+											<div>
+												<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+												<div style="font-size:10px;color:#3B82F6;opacity:.8">Marks invoice due</div>
+											</div>
+											<button type="button" class="btn-complete"
+											        hx-get="{% url 'manager_mark_complete_modal' %}?job_id={{ project.id }}&draw_number={{ project.current_draw.number }}&panel=draws"
+											        hx-target="#manager-modal-host"
+											        hx-swap="innerHTML">
+												Mark complete
+											</button>
+										</div>
+									{% endif %}
+								</div>
 							</div>
 						</div>
 					{% endfor %}
-
-					{% if project.current_draw %}
-						<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
-							<div>
-								<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
-								<div style="font-size:10px;color:#3B82F6;opacity:.8">Marks invoice due</div>
-							</div>
-							{# GET-loads the confirm modal into the shared manager modal host. #}
-							{# own form does the actual POST to manager_panel_complete. #}
-							<button type="button" class="btn-complete"
-							        hx-get="{% url 'manager_mark_complete_modal' %}?job_id={{ project.id }}&draw_number={{ project.current_draw.number }}&panel=draws"
-							        hx-target="#manager-modal-host"
-							        hx-swap="innerHTML">
-								Mark complete
-							</button>
-						</div>
-					{% endif %}
 				</div>
-			</div>
-		</div>
-	{% endfor %}
+			</details>
+		{% endfor %}
+	</div>
+
+	{# Table view — flat sortable + expandable. Mirror of active_builds.html. #}
+	<div class="table-view">
+		<table class="job-table job-table-expandable">
+			<thead>
+				<tr>
+					<th class="row-toggle-col" aria-hidden="true"></th>
+					<th>Build</th>
+					<th>Order #</th>
+					<th>Branch</th>
+					<th>Phase / Draw</th>
+					<th class="num">Contract</th>
+					<th class="num">Collected</th>
+					<th class="num">Progress</th>
+					<th class="num">Balance</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for project in draws_active %}
+					<tr class="job-table-row"
+					    data-job-id="{{ project.id }}"
+					    data-job-search="{{ project.name|default:''|lower }} {{ project.order_number|default:''|lower }} {{ project.branch_label|default:''|lower }} {{ project.subtitle|default:''|lower }}"
+					    data-branch="{{ project.branch_label|default:'' }}"
+					    data-plan="{{ project.model_name|default:'' }}"
+					    data-phase="{{ project.phase_label|default:'' }}"
+					    data-year="{{ project.closed_at|date:'Y'|default:'' }}"
+					    data-sort-ts="{{ project.closed_at|date:'U'|default:'0' }}"
+					    data-order="{{ project.order_number|default:'' }}"
+					    tabindex="0"
+					    role="button"
+					    aria-expanded="false">
+						<td class="row-toggle-col"><span class="row-chevron" aria-hidden="true">▸</span></td>
+						<td>
+							<div style="font-weight:600;">{{ project.name }}</div>
+							<div class="muted" style="font-size:11px;">{{ project.subtitle }}</div>
+						</td>
+						<td class="muted">{% if project.order_number %}{{ project.order_number }}{% else %}—{% endif %}</td>
+						<td class="muted">{{ project.branch_label }}</td>
+						<td>
+							{% if project.current_draw and project.current_draw.step_label %}
+								<span class="pill pill-success">{{ project.current_draw.step_label }}</span>
+							{% else %}
+								<span class="pill {{ project.phase_pill_class }}">{{ project.phase_label }}</span>
+							{% endif %}
+						</td>
+						<td class="num">{{ project.total_display }}</td>
+						<td class="num" style="color:var(--green);">{{ project.paid_display }}</td>
+						<td class="num">{{ project.pct }}%</td>
+						<td class="num" style="color:var(--green);">{{ project.remaining_display }}</td>
+					</tr>
+
+					<tr class="job-table-detail" hidden>
+						<td colspan="9">
+							<div class="job-detail-card">
+								<div class="proj-hdr-top" style="margin-bottom:10px;">
+									<div>
+										<p class="proj-name">{{ project.name }}</p>
+										<p class="proj-sub">{{ project.subtitle }}</p>
+									</div>
+									<div style="display:flex;align-items:center;gap:8px">
+										<span class="pill {% if project.pct >= 100 %}pill-brand{% elif project.pct >= 50 %}pill-success{% else %}pill-warning{% endif %}">{{ project.pct }}% collected</span>
+									</div>
+								</div>
+
+								<div class="budget-bar-track" style="margin-bottom:12px">
+									<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
+								</div>
+
+								{% for draw in project.timeline_draws %}
+									<div class="ph">
+										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+										<div style="flex:1">
+											<div style="font-weight:500">{{ draw.label }}</div>
+											{% if draw.paid_date %}
+												<div style="font-size:10px;color:var(--g400)">{{ draw.paid_date }}</div>
+											{% endif %}
+										</div>
+										<div style="text-align:right;min-width:55px">
+											<div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div>
+											<div style="font-size:9px;font-weight:600;text-transform:uppercase;color:{{ draw.status_color }}">{{ draw.status_label }}</div>
+										</div>
+									</div>
+								{% endfor %}
+
+								{% if project.current_draw %}
+									<div style="margin-top:10px;padding:10px 14px;background:#EFF6FF;border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center">
+										<div>
+											<div style="font-size:12px;font-weight:500;color:#1D4ED8">{{ project.current_draw.label }} ready?</div>
+											<div style="font-size:10px;color:#3B82F6;opacity:.8">Marks invoice due</div>
+										</div>
+										<button type="button" class="btn-complete"
+										        hx-get="{% url 'manager_mark_complete_modal' %}?job_id={{ project.id }}&draw_number={{ project.current_draw.number }}&panel=draws"
+										        hx-target="#manager-modal-host"
+										        hx-swap="innerHTML">
+											Mark complete
+										</button>
+									</div>
+								{% endif %}
+							</div>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
 {% else %}
 	<div class="banner banner-empty">No active draws.</div>
-{% endif %}
-
-{% if draws_closed %}
-	<div style="font-size:11px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--g200)">Closed <span style="font-weight:400">({{ draws_closed|length }})</span></div>
-	{% for project in draws_closed %}
-		<div class="card proj-card-closed" style="margin-bottom:16px">
-			<div style="padding:14px 16px 12px">
-				<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-					<div>
-						<div style="font-size:14px;font-weight:600">{{ project.name }}</div>
-						<div style="font-size:11px;color:var(--g500)">Model: {{ project.model_name|default:'-' }}</div>
-					</div>
-					<div style="display:flex;align-items:center;gap:6px">
-						<span class="pill pill-muted">Closed</span>
-						<span class="pill {% if project.pct >= 100 %}pill-brand{% elif project.pct >= 50 %}pill-success{% else %}pill-warning{% endif %}">{{ project.pct }}% collected</span>
-					</div>
-				</div>
-
-				<div class="budget-bar-track" style="margin-bottom:8px">
-					<div class="budget-bar-fill" style="width:{{ project.pct }}%;background:var(--green)"></div>
-				</div>
-
-				<div class="rw">
-					<span class="rl">Address</span>
-					<span class="rv" style="white-space:normal;max-width:70%;line-height:1.3">{{ project.customer_display|default:'-' }}</span>
-				</div>
-				<div class="rw">
-					<span class="rl">PM</span>
-					<span class="rv">{{ project.pm_name|default:'-' }}</span>
-				</div>
-				<div class="rw">
-					<span class="rl">Collected</span>
-					<span class="rv">{{ project.paid_display }} ({{ project.pct }}%)</span>
-				</div>
-			</div>
-		</div>
-	{% endfor %}
 {% endif %}
