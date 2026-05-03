@@ -822,6 +822,27 @@ class JobChangeOrder(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now)
 
+    # ── Completion + QB invoice push ──
+    # PM clicks "Mark Complete" → completed_at is stamped and a QB Invoice is
+    # created against the homeowner via qb_invoice.send_invoice_for_change_order.
+    # The qb_* fields mirror QbInvoiceEvent: populated on a successful push,
+    # blank on fallback (offline / API failure). qb_invoice_status uses the same
+    # vocabulary as QbInvoiceEvent so the toast UI can be reused.
+    QB_STATUS_SENT = 'sent'
+    QB_STATUS_FAILED = 'failed_fallback'
+    QB_STATUS_CHOICES = [
+        (QB_STATUS_SENT, 'Sent to QuickBooks'),
+        (QB_STATUS_FAILED, 'Local fallback (QB unavailable)'),
+    ]
+    completed_at = models.DateTimeField(null=True, blank=True)
+    qb_invoice_id = models.CharField(max_length=32, blank=True, default='')
+    qb_invoice_doc_number = models.CharField(max_length=32, blank=True, default='')
+    qb_invoice_url = models.URLField(blank=True, default='')
+    qb_invoice_status = models.CharField(
+        max_length=24, choices=QB_STATUS_CHOICES, blank=True, default=''
+    )
+    qb_invoice_error = models.CharField(max_length=500, blank=True, default='')
+
     class Meta:
         ordering = ['number']
         unique_together = ['job', 'number']
@@ -832,6 +853,18 @@ class JobChangeOrder(models.Model):
     @property
     def is_credit(self):
         return self.price_change < 0
+
+    @property
+    def is_completed(self):
+        return self.completed_at is not None
+
+    @property
+    def display_invoice_number(self):
+        """Mirror QbInvoiceEvent.display_invoice_number so the toast helper
+        can format CO invoices the same way as draw invoices."""
+        return self.qb_invoice_doc_number or (
+            f"(local CO-{self.pk})" if self.completed_at else ""
+        )
 
 
 class JobDraw(models.Model):

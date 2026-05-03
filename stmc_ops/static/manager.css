@@ -912,6 +912,54 @@
   color: #065F46;
 }
 
+.co-row-action {
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.co-complete-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.co-complete-btn:hover {
+  background: var(--green);
+  color: #fff;
+  opacity: 0.85;
+}
+
+.co-complete-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.co-row-completed {
+  background: #F0FDF4;
+}
+
+.co-invoice-link {
+  color: var(--green);
+  text-decoration: none;
+  font-weight: 600;
+}
+.co-invoice-link:hover {
+  text-decoration: underline;
+}
+
+.co-invoice-warn {
+  color: #B45309;
+}
+
 /* ── Change Order modal ── */
 
 .co-modal {
@@ -1083,6 +1131,9 @@
 }
 
 .confirm-modal-submit:hover {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
   opacity: 0.9;
 }
 

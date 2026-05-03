@@ -87,7 +87,7 @@
 										</div>
 										{% if project.change_orders %}
 											{% for co in project.change_orders %}
-												<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
+												<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}{% if co.is_completed %} co-row-completed{% endif %}">
 													<div class="co-row-num">CO #{{ co.number }}</div>
 													<div class="co-row-body">
 														<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
@@ -95,9 +95,41 @@
 															{% if co.created %}<span>{{ co.created }}</span>{% endif %}
 															{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
 															{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
+															{% if co.is_completed %}
+																<span>· Completed {{ co.completed_at }}</span>
+																{% if co.qb_invoice_status == 'sent' and co.qb_invoice_url %}
+																	<span>· <a href="{{ co.qb_invoice_url }}" target="_blank" rel="noopener" class="co-invoice-link">Invoice {{ co.qb_invoice_doc_number|default:'sent' }} ↗</a></span>
+																{% elif co.qb_invoice_status == 'failed_fallback' %}
+																	<span class="co-invoice-warn" title="{{ co.qb_invoice_error }}">· Invoice not sent — QB unavailable</span>
+																{% endif %}
+															{% endif %}
 														</div>
 													</div>
 													<div class="co-row-amt">{{ co.amount_display }}</div>
+													<div class="co-row-action">
+														{% if co.is_completed %}
+															<span class="pill pill-success" title="Marked complete">Completed</span>
+														{% elif co.is_credit %}
+															<span class="pill" title="Credit COs are not invoiced">Credit</span>
+														{% else %}
+															<form
+																method="post"
+																action="{% url 'manager_change_order_complete' %}"
+																hx-post="{% url 'manager_change_order_complete' %}"
+																hx-target="#tab-builds-active-panel"
+																hx-swap="innerHTML"
+																hx-confirm="Mark CO #{{ co.number }} complete and send a {{ co.amount_display }} invoice to {{ project.customer_display|default:'the customer' }}?"
+																hx-disabled-elt="find button"
+																style="margin:0"
+															>
+																{% csrf_token %}
+																<input type="hidden" name="co_id" value="{{ co.id }}">
+																<button type="submit" class="co-complete-btn" data-busy-label="Sending...">
+																	Mark Complete
+																</button>
+															</form>
+														{% endif %}
+													</div>
 												</div>
 											{% endfor %}
 										{% elif project.loan_closed %}
@@ -248,7 +280,7 @@
 										</div>
 										{% if project.change_orders %}
 											{% for co in project.change_orders %}
-												<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}">
+												<div class="co-row {% if co.is_credit %}co-row-credit{% else %}co-row-charge{% endif %}{% if co.is_completed %} co-row-completed{% endif %}">
 													<div class="co-row-num">CO #{{ co.number }}</div>
 													<div class="co-row-body">
 														<div class="co-row-desc">{{ co.description|truncatechars:120|default:"(no description)" }}</div>
@@ -256,9 +288,41 @@
 															{% if co.created %}<span>{{ co.created }}</span>{% endif %}
 															{% if co.timing %}<span>· {{ co.timing }}</span>{% endif %}
 															{% if co.new_total_display %}<span>· New total: {{ co.new_total_display }}</span>{% endif %}
+															{% if co.is_completed %}
+																<span>· Completed {{ co.completed_at }}</span>
+																{% if co.qb_invoice_status == 'sent' and co.qb_invoice_url %}
+																	<span>· <a href="{{ co.qb_invoice_url }}" target="_blank" rel="noopener" class="co-invoice-link">Invoice {{ co.qb_invoice_doc_number|default:'sent' }} ↗</a></span>
+																{% elif co.qb_invoice_status == 'failed_fallback' %}
+																	<span class="co-invoice-warn" title="{{ co.qb_invoice_error }}">· Invoice not sent — QB unavailable</span>
+																{% endif %}
+															{% endif %}
 														</div>
 													</div>
 													<div class="co-row-amt">{{ co.amount_display }}</div>
+													<div class="co-row-action">
+														{% if co.is_completed %}
+															<span class="pill pill-success" title="Marked complete">Completed</span>
+														{% elif co.is_credit %}
+															<span class="pill" title="Credit COs are not invoiced">Credit</span>
+														{% else %}
+															<form
+																method="post"
+																action="{% url 'manager_change_order_complete' %}"
+																hx-post="{% url 'manager_change_order_complete' %}"
+																hx-target="#tab-builds-active-panel"
+																hx-swap="innerHTML"
+																hx-confirm="Mark CO #{{ co.number }} complete and send a {{ co.amount_display }} invoice to {{ project.customer_display|default:'the customer' }}?"
+																hx-disabled-elt="find button"
+																style="margin:0"
+															>
+																{% csrf_token %}
+																<input type="hidden" name="co_id" value="{{ co.id }}">
+																<button type="submit" class="co-complete-btn" data-busy-label="Sending...">
+																	Mark Complete
+																</button>
+															</form>
+														{% endif %}
+													</div>
 												</div>
 											{% endfor %}
 										{% elif project.loan_closed %}

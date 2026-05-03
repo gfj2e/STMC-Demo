@@ -43,7 +43,7 @@ class Command(BaseCommand):
             {
                 "email": "d.robinson@stmc.com",
                 "username": "d.robinson@stmc.com",
-                "name": "Derek Robinson",
+                "name": "Danny Robinson",
                 "initials": "DR",
                 "role": "sales",
                 "title": "Sales Rep",

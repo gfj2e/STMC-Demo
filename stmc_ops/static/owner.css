@@ -1154,6 +1154,12 @@
   background: var(--green-light);
 }
 
+.exec-table tr.is-invoiced td {
+  /* Amber tint — draw was marked complete by the PM but QB hasn't observed
+     payment yet (status=INVOICED). Sits between green (paid) and red (due). */
+  background: var(--amber-light);
+}
+
 .exec-table tr.is-overdue td {
   background: var(--red-light);
 }
@@ -1179,6 +1185,10 @@
 
 .exec-dot.paid {
   background: #10b981;
+}
+
+.exec-dot.invoiced {
+  background: var(--amber);
 }
 
 .exec-dot.pending {
@@ -2085,48 +2095,3 @@ body.view-mode-table .table-view { display: block; }
   transform: translateX(-50%) translateY(0);
 }
 
-/* ── Rate card table (Rates tab) — mirrors sales.css so the owner Rates
-   panel can render the same shared owner/rates.html partial without
-   pulling in the whole sales stylesheet. ── */
-.rate-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  margin-bottom: 16px;
-}
-.rate-table th {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--g500);
-  padding: 6px 8px;
-  border-bottom: 2px solid var(--g200);
-  text-align: left;
-}
-.rate-table th.r { text-align: right; }
-.rate-table td {
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--g100);
-  font-size: 12px;
-  color: var(--g700);
-}
-.rate-table td.r {
-  text-align: right;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--g900);
-}
-.rate-table td.u {
-  text-align: right;
-  color: var(--g500);
-}
-.rate-group-hdr td {
-  background: var(--g800);
-  color: #fff;
-  font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 6px 8px;
-}

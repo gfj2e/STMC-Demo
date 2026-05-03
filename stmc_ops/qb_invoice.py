@@ -734,5 +734,143 @@ def ensure_qb_customer_for_job(job: Job) -> Optional[str]:
         logger.exception("Eager QB customer push failed for job %s", job.pk)
         return None
 
-def change_order_qb(change_order: JobChangeOrder):
-    pass
+# ─────────────────────────────────────────────────────────────
+# CHANGE ORDER → QUICKBOOKS INVOICE
+# ─────────────────────────────────────────────────────────────
+
+
+def send_invoice_for_change_order(change_order: JobChangeOrder) -> JobChangeOrder:
+    """Create a QB Invoice for `change_order` against the homeowner and stamp
+    the QB result fields (qb_invoice_id / doc_number / url / status / error)
+    onto the row. Returns the updated change_order.
+
+    Mirrors send_invoice_for_draw's contract: never raises. If QB is offline or
+    the API call fails, qb_invoice_status is set to STATUS_FAILED and
+    qb_invoice_error captures the reason -- the demo UI keeps flowing with a
+    local-only completion record.
+
+    Credits (price_change < 0) are skipped: QB Invoices can't carry a negative
+    total, and a credit memo is a separate document type. The change_order is
+    still marked as having "no invoice" via blank qb_* fields; the caller can
+    decide whether that should still count as completed.
+    """
+    job = change_order.job
+    amount = Decimal(change_order.price_change or 0)
+
+    # Credits don't generate a customer-payable invoice. Caller still gets
+    # completed_at stamped, but no QB push happens.
+    if amount <= 0:
+        change_order.qb_invoice_status = JobChangeOrder.QB_STATUS_FAILED
+        change_order.qb_invoice_error = (
+            "Credit change orders are not invoiced (negative or zero amount)."
+        )
+        change_order.save(update_fields=[
+            "qb_invoice_status", "qb_invoice_error",
+        ])
+        return change_order
+
+    connection = qb_client.get_connection()
+    if connection is None:
+        change_order.qb_invoice_status = JobChangeOrder.QB_STATUS_FAILED
+        change_order.qb_invoice_error = (
+            "QuickBooks is not connected. Reconnect via the owner dashboard."
+        )
+        change_order.save(update_fields=[
+            "qb_invoice_status", "qb_invoice_error",
+        ])
+        return change_order
+
+    try:
+        with qb_client.with_qb_client() as qb:
+            customer_id = _ensure_qb_customer(qb, job, connection)
+            item_id = _default_service_item_id(qb)
+            saved_invoice = _create_change_order_invoice_in_qb(
+                qb, customer_id, item_id, change_order, job, float(amount),
+            )
+            # DueDate today: change orders are billed "now," not deferred like
+            # draws. Best-effort -- a sandbox hiccup on DueDate doesn't fail
+            # the whole push.
+            try:
+                _set_invoice_due_date_in_qb(qb, saved_invoice, days_from_today=0)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "send_invoice_for_change_order: could not set DueDate on "
+                    "invoice %s -- continuing.", getattr(saved_invoice, "Id", "?"),
+                )
+
+            connection = qb_client.get_connection() or connection
+            change_order.qb_invoice_id = str(saved_invoice.Id)
+            change_order.qb_invoice_doc_number = str(
+                getattr(saved_invoice, "DocNumber", "") or ""
+            )
+            change_order.qb_invoice_url = qb_client.invoice_public_url(
+                connection, str(saved_invoice.Id)
+            )
+            change_order.qb_invoice_status = JobChangeOrder.QB_STATUS_SENT
+            change_order.qb_invoice_error = ""
+            change_order.save(update_fields=[
+                "qb_invoice_id", "qb_invoice_doc_number", "qb_invoice_url",
+                "qb_invoice_status", "qb_invoice_error",
+            ])
+            return change_order
+
+    except qb_client.QbNotConnected as exc:
+        logger.warning("QB not connected during change-order invoice send: %s", exc)
+        change_order.qb_invoice_status = JobChangeOrder.QB_STATUS_FAILED
+        change_order.qb_invoice_error = str(exc)[:500]
+        change_order.save(update_fields=[
+            "qb_invoice_status", "qb_invoice_error",
+        ])
+        return change_order
+
+    except Exception as exc:  
+        logger.exception(
+            "QB change-order invoice creation failed for job=%s co=%s",
+            job.pk, change_order.pk,
+        )
+        change_order.qb_invoice_status = JobChangeOrder.QB_STATUS_FAILED
+        change_order.qb_invoice_error = f"{type(exc).__name__}: {exc}"[:500]
+        change_order.save(update_fields=[
+            "qb_invoice_status", "qb_invoice_error",
+        ])
+        return change_order
+
+
+def _create_change_order_invoice_in_qb(qb, customer_id, fallback_item_id,
+                                       change_order, job, amount):
+    """Build and POST a single-line QB Invoice for a change order. Description
+    is the CO number + truncated CO description so the homeowner can see what
+    they're being billed for."""
+    from quickbooks.objects.invoice import Invoice
+    from quickbooks.objects.detailline import SalesItemLine, SalesItemLineDetail
+    from quickbooks.objects.base import Ref, EmailAddress
+
+    invoice = Invoice()
+    customer_ref = Ref()
+    customer_ref.value = customer_id
+    invoice.CustomerRef = customer_ref
+
+    desc = (change_order.description or "").strip().replace("\n", " ")
+    if len(desc) > 240:
+        desc = desc[:237] + "..."
+    description = f"Change Order #{change_order.number}"
+    if desc:
+        description = f"{description} -- {desc}"
+
+    line = SalesItemLine()
+    line.Amount = amount
+    line.Description = description
+    line.DetailType = "SalesItemLineDetail"
+    detail = SalesItemLineDetail()
+    item_ref = Ref()
+    item_ref.value = fallback_item_id
+    detail.ItemRef = item_ref
+    detail.Qty = 1
+    detail.UnitPrice = amount
+    line.SalesItemLineDetail = detail
+    invoice.Line.append(line)
+
+    invoice.PrivateNote = (
+        f"STMC job {job.pk}, change order #{change_order.number}"
+    )
+    return invoice.save(qb=qb)

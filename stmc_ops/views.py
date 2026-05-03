@@ -398,6 +398,14 @@ def _build_manager_owner_data():
                 "new_total": int(_to_number(co_row.new_contract_total)),
                 "timing": co_row.get_payment_timing_display(),
                 "created": timezone.localtime(co_row.created_at).strftime("%b %d, %Y"),
+                "completed_at": (
+                    timezone.localtime(co_row.completed_at).strftime("%b %d, %Y")
+                    if co_row.completed_at else ""
+                ),
+                "qb_invoice_doc_number": co_row.qb_invoice_doc_number,
+                "qb_invoice_url": co_row.qb_invoice_url,
+                "qb_invoice_status": co_row.qb_invoice_status,
+                "qb_invoice_error": co_row.qb_invoice_error,
             })
 
         projects.append({
@@ -678,7 +686,22 @@ def _build_project_ui_rows(projects):
             amount = int(draw.get("a") or 0)
             paid_amount = amount if status == JobDraw.STATUS_PAID else 0
             date_text = draw.get("t") or ""
-            status_demo = "paid" if status == JobDraw.STATUS_PAID else ("overdue" if status == JobDraw.STATUS_CURRENT else "pending")
+            # status_demo drives the row background + dot color in the owner
+            # Draws table. INVOICED = PM marked complete, awaiting QB-observed
+            # payment — rendered amber so it visually sits between paid (green)
+            # and the current/overdue draw (red).
+            if status == JobDraw.STATUS_PAID:
+                status_demo = "paid"
+                status_demo_label = "Paid"
+            elif status == JobDraw.STATUS_INVOICED:
+                status_demo = "invoiced"
+                status_demo_label = "Invoiced"
+            elif status == JobDraw.STATUS_CURRENT:
+                status_demo = "overdue"
+                status_demo_label = "Due"
+            else:
+                status_demo = "pending"
+                status_demo_label = "Pending"
             timeline_rows.append(_draw_timeline_row(draw))
             draw_rows.append(
                 {
@@ -692,7 +715,7 @@ def _build_project_ui_rows(projects):
                     "method": "Wire" if paid_amount else "",
                     "source": f"{branch_label} draw account" if paid_amount else "",
                     "status_demo": status_demo,
-                    "status_demo_label": "Paid" if status_demo == "paid" else ("Due" if status_demo == "overdue" else "Pending"),
+                    "status_demo_label": status_demo_label,
                     "status": status,
                     "draw_num_class": _draw_num_class(status),
                     "pill_class": _draw_status_pill_class(status),
@@ -831,6 +854,12 @@ def _build_project_ui_rows(projects):
                     if (co_row.get("new_total") or 0) > 0 else "",
                 "timing": co_row.get("timing", ""),
                 "created": co_row.get("created", ""),
+                "is_completed": bool(co_row.get("completed_at")),
+                "completed_at": co_row.get("completed_at", ""),
+                "qb_invoice_doc_number": co_row.get("qb_invoice_doc_number", ""),
+                "qb_invoice_url": co_row.get("qb_invoice_url", ""),
+                "qb_invoice_status": co_row.get("qb_invoice_status", ""),
+                "qb_invoice_error": co_row.get("qb_invoice_error", ""),
             })
 
         rows.append(
@@ -1013,20 +1042,6 @@ def _build_owner_ui_context():
         "qb_sync_error": qb_sync_error,
         "budget_total": _format_money(budget_total),
     }
-    
-    rate_card = _build_simple_rate_card()
-    interior_rates = []
-    for rate in rate_card.get("interior", []):
-        interior_rates.append(
-            {
-                "group": rate.get("g", ""),
-                "label": rate.get("l", ""),
-                "rate_display": "--"
-                if not rate.get("r")
-                else f"${float(rate.get('r', 0)):,.2f}",
-                "unit": rate.get("u", "--"),
-            }
-        )
 
     return {
         "kpis": kpis,
@@ -1044,7 +1059,6 @@ def _build_owner_ui_context():
         "all_projects_closed_by_month": closed_projects_by_month,
         "active_projects": active_projects,
         "closed_projects": closed_projects,
-        "interior_rates" : interior_rates
     }
 
 
@@ -1334,20 +1348,6 @@ def _build_sales_ui_context(request=None):
         row["p10_amount"] for row in closed_rows
     )
 
-    rate_card = _build_simple_rate_card()
-    interior_rates = []
-    for rate in rate_card.get("interior", []):
-        interior_rates.append(
-            {
-                "group": rate.get("g", ""),
-                "label": rate.get("l", ""),
-                "rate_display": "--"
-                if not rate.get("r")
-                else f"${float(rate.get('r', 0)):,.2f}",
-                "unit": rate.get("u", "--"),
-            }
-        )
-
     month_label = now.strftime("%B %Y")
 
     return {
@@ -1366,10 +1366,9 @@ def _build_sales_ui_context(request=None):
         "projects_closed_by_month": closed_rows_by_month,
         "leads": lead_rows,
         "leads_by_branch": lead_rows_by_branch,
+        "leads_count": len(lead_rows),
         "in_progress_count": len(in_progress_rows),
         "closed_count": len(closed_rows),
-        "leads_count": len(lead_rows),
-        "interior_rates": interior_rates,
     }
 
 
@@ -1450,7 +1449,12 @@ def _mark_draw_complete(job_id, draw_number):
         next_draw.save(update_fields=["status"])
         new_phase = DRAW_PHASE_MAP.get(next_draw.draw_number)
     else:
-        new_phase = "closed"
+        # PM has marked the final (punch) draw complete, but the bank
+        # hasn't released the funds yet. The build only moves to "closed"
+        # once every draw is PAID — which is observed by qb_pull when QB
+        # reports Balance == 0 on the matching invoice. See
+        # qb_pull.refresh_draw_invoices_for_job for the close transition.
+        new_phase = None
 
     if new_phase:
         Job.objects.filter(pk=job_id).update(current_phase=new_phase)
@@ -1977,6 +1981,72 @@ def manager_change_order_create_view(request):
 
 
 @role_required(AppUser.ROLE_PM)
+@require_POST
+@csrf_protect
+def manager_change_order_complete_view(request):
+    """Mark a change order complete and push a QB Invoice to the homeowner.
+
+    Race-safe via an atomic conditional UPDATE on completed_at__isnull=True --
+    a second click while the request is in flight is a no-op (we re-fetch and
+    return the existing event). Mirrors the spam-safe pattern in
+    `_mark_draw_complete`.
+
+    On success, the QB invoice URL/number is stamped on the JobChangeOrder by
+    `send_invoice_for_change_order` (which is on the never-raise contract --
+    if QB is offline, the row still flips to completed with a fallback note).
+    """
+    try:
+        co_id = int(request.POST.get("co_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid change order id"}, status=400)
+    try:
+        change_order = JobChangeOrder.objects.select_related("job").get(pk=co_id)
+    except JobChangeOrder.DoesNotExist:
+        return JsonResponse({"error": "Change order not found"}, status=404)
+
+    now = timezone.now()
+    won_race = JobChangeOrder.objects.filter(
+        pk=change_order.pk, completed_at__isnull=True,
+    ).update(completed_at=now)
+
+    if won_race:
+        # We won the race -- refresh the in-memory row so the QB push helper
+        # sees completed_at and the new fields after save.
+        change_order.refresh_from_db()
+        from . import qb_invoice as _qi
+        _qi.send_invoice_for_change_order(change_order)
+        change_order.refresh_from_db()
+
+    if request.htmx:
+        context = _build_manager_ui_context()
+        response = render(
+            request,
+            "manager/active_builds.html",
+            {
+                "builds_active": context["builds_active"],
+                "builds_active_by_branch": context["builds_active_by_branch"],
+            },
+        )
+        # Reuse the existing qb-invoice-sent toast: the manager.js handler
+        # already knows how to render it. team_name carries the CO label so
+        # the toast reads "Change Order #N invoice sent to <customer>".
+        import json as _json
+        amount_display = f"{abs(change_order.price_change):,.0f}"
+        response["HX-Trigger"] = _json.dumps({
+            "manager-refresh": {},
+            "qb-invoice-sent": {
+                "invoice_number": change_order.display_invoice_number or "(local)",
+                "team": f"Change Order #{change_order.number}",
+                "amount": amount_display,
+                "status": change_order.qb_invoice_status or JobChangeOrder.QB_STATUS_FAILED,
+                "url": change_order.qb_invoice_url,
+            },
+        })
+        return response
+    return redirect("manager")
+
+
+@role_required(AppUser.ROLE_PM)
 def manager_mark_complete_modal_view(request):
     """Render the Cancel/Confirm modal for Mark Complete. HTMX-only — swapped
     into the modal host on the Draws panel so the PM gets a soft confirmation
@@ -2084,7 +2154,6 @@ def owner_view(request):
     # session, return 401 + HX-Redirect=login, and yank the user to the
     # login page seemingly out of nowhere.
     context = _build_owner_ui_context()
-    rate_card = _build_simple_rate_card()
     # Unified QB card context — same shape as qb_status_view / qb_sync_refresh_view
     # so the {% include "owner/_qb_status.html" %} in owner/index.html hydrates
     # identically on first load and on every HTMX refresh.
@@ -2095,7 +2164,6 @@ def owner_view(request):
         {
             "kpis": context["kpis"],
             "owner_total": context["owner_total"],
-            "interior_rates": context["interior_rates"],
             **qb_ctx,
         },
     )
@@ -2164,20 +2232,6 @@ def sales_header_panel_view(request):
             "leads_count": context["leads_count"],
             "in_progress_count": context["in_progress_count"],
             "closed_count": context["closed_count"],
-        },
-    )
-
-
-@role_required(AppUser.ROLE_EXEC)
-def sales_rates_panel_view(request):
-    if not request.htmx:
-        return redirect("sales_overview")
-    context = _build_sales_ui_context(request)
-    return render(
-        request,
-        "owner/rates.html",
-        {
-            "interior_rates": context["interior_rates"],
         },
     )
 

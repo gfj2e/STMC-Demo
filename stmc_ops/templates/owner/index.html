@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
-<link rel="stylesheet" href="{% static 'owner.css' %}">
+<link rel="stylesheet" href="{% static 'owner.css' %}?v=3">
 </head>
 <body class="view-mode-table">
 
@@ -17,7 +17,6 @@
   <div class="app-nav-left">
     <button class="app-nav-link active" data-tab="dashboard" type="button">Active Contracts</button>
     <button class="app-nav-link" data-tab="projects-closed" type="button">Closed Contracts</button>
-    <button class="app-nav-link" data-tab="rates" type="button">Rates</button>
   </div>
   <div class="app-nav-right">
     <!-- Bell: polls the unread count every 30s. The inner dropdown is
@@ -131,18 +130,6 @@
       hx-swap="innerHTML"
     >
       <div class="banner banner-empty">Loading closed projects...</div>
-    </div>
-  </div>
-
-    <!-- Rate Card -->
-  <div id="tab-rates" class="tab-panel" style="display:none">
-    <div
-      id="tab-rates-panel"
-      hx-get="{% url 'sales_rates_panel' %}"
-      hx-trigger="load, sales-rates-refresh from:body, sales-refresh from:body"
-      hx-swap="innerHTML"
-    >
-      <div class="banner banner-empty">Loading rate card...</div>
     </div>
   </div>
 

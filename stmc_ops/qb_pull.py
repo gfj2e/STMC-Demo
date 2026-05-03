@@ -303,6 +303,21 @@ def refresh_draw_invoices_for_job(qb, job: Job) -> dict:
         event.save(update_fields=["paid_at"])
         counts["paid_now"] += 1
 
+    # If every draw on this job is now PAID, close the build. The previous
+    # behavior closed it as soon as the PM marked the final draw complete,
+    # but a draw being marked complete only means INVOICED — the bank can
+    # still take days to release the funds. The closed-builds list (PM and
+    # owner) now reflects fully-funded jobs, not just PM-completed ones.
+    remaining_unpaid = (
+        JobDraw.objects.filter(job_id=job.pk)
+        .exclude(status=JobDraw.STATUS_PAID)
+        .count()
+    )
+    if remaining_unpaid == 0:
+        Job.objects.filter(pk=job.pk).exclude(current_phase="closed").update(
+            current_phase="closed"
+        )
+
     return counts
 
 
