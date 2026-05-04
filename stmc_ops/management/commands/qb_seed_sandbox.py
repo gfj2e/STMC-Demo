@@ -7,9 +7,10 @@ Run after connecting a QB sandbox via the owner dashboard:
     python manage.py qb_seed_sandbox
 
 Idempotent. Safe to re-run -- existing accounts/items are matched by name
-and reused (no duplicates). The command writes a `QbItemMap` cache row per
-trade so `qb_invoice.py` (push) and `qb_pull.py` (pull) can resolve trade
-names -> QB Item Ids without re-querying QB on every operation.
+and reused (no duplicates). The Items are needed by the cost-side puller
+in `qb_pull.py`: when an accountant enters a Bill in QB with item-based
+lines, `Bill.Line[].ItemBasedExpenseLineDetail.ItemRef.name` carries the
+trade-bucket name back to STMC for matching against `JobBudgetLineItem`.
 
 What it creates:
 
@@ -35,7 +36,6 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 
 from stmc_ops import qb_client
-from stmc_ops.models import QbItemMap
 from stmc_ops.qb_cost_codes import STMC_QB_ACCOUNTS, TRADE_TO_QB_ACCOUNT
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class Command(BaseCommand):
                         matched_accounts += 1
                         self.stdout.write(self.style.HTTP_INFO(f"  [= existing] {name}  (Id: {acct.Id})"))
 
-                # ── Step 3: create or match Items, refresh QbItemMap cache ──
+                # ── Step 3: create or match Items per trade bucket ──
                 self.stdout.write(f"\n[2/2] Seeding {len(TRADE_TO_QB_ACCOUNT)} Items per trade bucket:")
                 created_items = matched_items = 0
                 for trade_name, account_name in TRADE_TO_QB_ACCOUNT.items():
@@ -100,17 +100,6 @@ class Command(BaseCommand):
                             f"  [= existing] {trade_name}  (Item Id: {item.Id} -> {account_name})"
                         ))
 
-                    # Cache for fast lookup at push/pull time.
-                    QbItemMap.objects.update_or_create(
-                        trade_name=trade_name,
-                        defaults={
-                            "qb_item_id": str(item.Id),
-                            "qb_account_id": str(parent_acct.Id),
-                            "qb_account_name": account_name,
-                            "realm_id": connection.realm_id,
-                        },
-                    )
-
         except qb_client.QbNotConnected as exc:
             raise CommandError(f"QuickBooks connection problem: {exc}")
         except Exception as exc:  # noqa: BLE001 -- show the user what happened
@@ -122,9 +111,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"OK Seed complete -- accounts: +{created_accounts} new / ={matched_accounts} existing, "
             f"items: +{created_items} new / ={matched_items} existing."
-        ))
-        self.stdout.write(self.style.SUCCESS(
-            f"  QbItemMap rows: {QbItemMap.objects.count()}"
         ))
 
     # ─────────────────────────────────────────────────────────────

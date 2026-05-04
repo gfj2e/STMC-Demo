@@ -79,6 +79,9 @@
 									</div>
 								</div>
 								<div class="co-row-amt">{{ co.amount_display }}</div>
+								<div class="co-row-action">
+									<a href="{% url 'manager_change_order_pdf' co.id %}" target="_blank" rel="noopener" class="co-pdf-btn" title="Download change order PDF">PDF</a>
+								</div>
 							</div>
 						{% endfor %}
 					{% elif project.loan_closed %}

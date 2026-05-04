@@ -183,7 +183,7 @@
 													<span class="exec-mute">-</span>
 												{% endif %}
 											</td>
-											<td><span class="exec-branch-tag {{ bill.branch_class }}">{{ bill.branch }}</span></td>
+											<td><span class="exec-branch-tag {{ bill.branch_class }}"{% if bill.branch_tooltip %} title="{{ bill.branch_tooltip }}"{% endif %}>{{ bill.branch }}</span></td>
 											<td><span class="exec-bill-status {{ bill.status }}">{{ bill.status_label }}</span></td>
 										</tr>
 									{% endfor %}
@@ -248,7 +248,7 @@
 								<div class="exec-metric-lbl">Actual (QB)</div>
 							</div>
 							<div class="exec-metric-box is-highlight">
-								<div class="exec-metric-val is-green">{{ job.live_margin_pct }}%</div>
+								<div class="exec-metric-val {{ job.live_margin_class }}">{{ job.live_margin_pct }}%</div>
 								<div class="exec-metric-lbl">Margin</div>
 							</div>
 						</div>
@@ -425,7 +425,7 @@
 																	<span class="exec-mute">-</span>
 																{% endif %}
 															</td>
-															<td><span class="exec-branch-tag {{ bill.branch_class }}">{{ bill.branch }}</span></td>
+															<td><span class="exec-branch-tag {{ bill.branch_class }}"{% if bill.branch_tooltip %} title="{{ bill.branch_tooltip }}"{% endif %}>{{ bill.branch }}</span></td>
 															<td><span class="exec-bill-status {{ bill.status }}">{{ bill.status_label }}</span></td>
 														</tr>
 													{% endfor %}
@@ -490,7 +490,7 @@
 												<div class="exec-metric-lbl">Actual (QB)</div>
 											</div>
 											<div class="exec-metric-box is-highlight">
-												<div class="exec-metric-val is-green">{{ job.live_margin_pct }}%</div>
+												<div class="exec-metric-val {{ job.live_margin_class }}">{{ job.live_margin_pct }}%</div>
 												<div class="exec-metric-lbl">Margin</div>
 											</div>
 										</div>

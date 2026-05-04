@@ -1289,6 +1289,14 @@
   border-color: var(--amber);
 }
 
+.exec-branch-tag.unmapped {
+  background: var(--g100);
+  color: var(--g600);
+  border-color: var(--g300);
+  border-style: dashed;
+  cursor: help;
+}
+
 .exec-bill-status {
   display: inline-block;
   padding: 2px 8px;
@@ -1454,6 +1462,10 @@
 
 .exec-metric-val.is-green {
   color: var(--green);
+}
+
+.exec-metric-val.is-red {
+  color: #DC2626;
 }
 
 .exec-metric-lbl {

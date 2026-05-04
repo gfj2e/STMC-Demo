@@ -11,8 +11,13 @@ This file contains the STRUCTURE seed. The model preset seed is in seed_models.p
 (generated separately from the V8 HTML and INT_CONTRACTS_APP HTML source files).
 """
 
-from django.core.management.base import BaseCommand
+import random
+from datetime import date, timedelta
 from decimal import Decimal
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
 from stmc_ops.models import (
     AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, Job,
     JobBudgetLineItem, JobTradeBudget, JobDraw,
@@ -109,11 +114,35 @@ class Command(BaseCommand):
     # BRANCHES
     # ─────────────────────────────────────────
     def seed_branches(self):
+        # qb_bank_account_id values are valid for the demo QB sandbox realm
+        # only. After connecting a different realm (or moving to production)
+        # re-map via /stmc_ops/owner/qb/bank-accounts/ — these IDs will not
+        # match any account on a different company.
         data = [
-            {"key": "summertown", "label": "Summertown Main", "conc_rate": 8, "default_miles": 0, "zone": 1},
-            {"key": "hayden_al", "label": "Hayden, AL", "conc_rate": 8, "default_miles": 0, "zone": 1},
-            {"key": "morristown", "label": "Morristown", "conc_rate": 9, "default_miles": 1, "zone": 2},
-            {"key": "hopkinsville", "label": "Hopkinsville", "conc_rate": 9, "default_miles": 1, "zone": 3},
+            {
+                "key": "summertown", "label": "Summertown Main",
+                "conc_rate": 8, "default_miles": 0, "zone": 1,
+                "qb_bank_account_id": "1150040037",
+                "qb_bank_account_name": "Summertown Main TN Branch",
+            },
+            {
+                "key": "hayden_al", "label": "Hayden, AL",
+                "conc_rate": 8, "default_miles": 0, "zone": 1,
+                "qb_bank_account_id": "1150040039",
+                "qb_bank_account_name": "Summertown Hayden AL Branch",
+            },
+            {
+                "key": "morristown", "label": "Morristown",
+                "conc_rate": 9, "default_miles": 1, "zone": 2,
+                "qb_bank_account_id": "1150040038",
+                "qb_bank_account_name": "Summertown Morristown TN Branch",
+            },
+            {
+                "key": "hopkinsville", "label": "Hopkinsville",
+                "conc_rate": 9, "default_miles": 1, "zone": 3,
+                "qb_bank_account_id": "1150040040",
+                "qb_bank_account_name": "Summertown Hopkinsville KY Branch",
+            },
         ]
         for d in data:
             Branch.objects.update_or_create(key=d["key"], defaults=d)
@@ -402,212 +431,513 @@ class Command(BaseCommand):
 
         self.stdout.write(f'  Upgrade Catalog: seeded all categories, sections, and items')
 
-    # ─────────────────────────────────────────
+    # ----------------------------------------------------------------
     # DEMO JOBS (manager/owner dashboards)
-    # ─────────────────────────────────────────
+    # ----------------------------------------------------------------
     def seed_demo_jobs(self):
-        branch_default = Branch.objects.filter(key="summertown").first() or Branch.objects.first()
-        model_lookup = {
-            "HUNTLEY 2.0": FloorPlanModel.objects.filter(name__iexact="HUNTLEY 2.0").first(),
-            "CAJUN": FloorPlanModel.objects.filter(name__iexact="CAJUN").first(),
-            "MINI PETTUS": FloorPlanModel.objects.filter(name__iexact="MINI PETTUS").first(),
-        }
+        # Wipe every existing Job - cascades to JobDraw, JobTradeBudget,
+        # JobBudgetLineItem, JobChangeOrder, QbCustomerMap, QbInvoiceEvent.
+        # The 30 contracts below become the entire demo dataset.
+        deleted, _ = Job.objects.all().delete()
+        self.stdout.write(f"  Deleted prior jobs (and cascaded children): {deleted} rows")
 
-        # Full demo project data matching STMC_Full_Platform_Demo.html PJ array
-        demo_jobs = [
-            {
-                "order_number": "DEMO-1001",
-                "customer_name": "Theiss Build",
-                "customer_display": "Julie Theiss",
-                "phase": "roughin",
-                "pm_name": "P. Olson",
-                "model_key": "HUNTLEY 2.0",
-                "contract_total": Decimal("282127.00"),
-                "p10_material": Decimal("63075.00"),
-                "adjusted_int": Decimal("219052.00"),
-                "collected": Decimal("106233.00"),
-                "trade_budgets": [
-                    ("Framing",     25000,  23800, 1),
-                    ("Roofing",      8200,      0, 2),
-                    ("Siding",       4800,      0, 3),
-                    ("Ext Trim",     6100,      0, 4),
-                    ("D&W",          2900,      0, 5),
-                    ("Cabinets",    22140,      0, 6),
-                    ("Flooring",     4032,      0, 7),
-                    ("Drywall",      9055,      0, 8),
-                    ("Paint",        6720,      0, 9),
-                    ("Trim",         7450,      0, 10),
-                    ("Electrical",  11760,      0, 11),
-                    ("Plumbing",     7200,      0, 12),
-                    ("Insulation",   6468,      0, 13),
-                    ("HVAC",        12000,      0, 14),
-                    ("General",      5375,   2875, 15),
-                ],
-                "draws": [
-                    (0, "Deposit",            2500, "p", "Feb 17"),
-                    (1, "1st \u2014 Materials", 75333, "p", "Mar 2"),
-                    (2, "2nd \u2014 Concrete",  28400, "p", "Mar 18"),
-                    (3, "3rd \u2014 Framing",   25000, "p", "Apr 18"),
-                    (4, "4th \u2014 Rough-ins", 56425, "c", ""),
-                    (5, "5th \u2014 Finishes",  56425, "x", ""),
-                    (6, "6th \u2014 Final",     38044, "x", ""),
-                ],
-            },
-            {
-                "order_number": "DEMO-1002",
-                "customer_name": "Henderson Build",
-                "customer_display": "James Henderson",
-                "phase": "interior",
-                "pm_name": "P. Olson",
-                "model_key": "CAJUN",
-                "contract_total": Decimal("318320.00"),
-                "p10_material": Decimal("71150.00"),
-                "adjusted_int": Decimal("247170.00"),
-                "collected": Decimal("224734.00"),
-                "trade_budgets": [
-                    ("Framing",     28080,  27500, 1),
-                    ("Roofing",      9600,   9200, 2),
-                    ("Siding",       5400,   5100, 3),
-                    ("Ext Trim",     7200,   6800, 4),
-                    ("D&W",          3400,   3400, 5),
-                    ("Cabinets",    24500,  23200, 6),
-                    ("Flooring",     4320,   4100, 7),
-                    ("Drywall",      9702,   9500, 8),
-                    ("Paint",        7200,      0, 9),
-                    ("Trim",         8100,      0, 10),
-                    ("Electrical",  12600,  12200, 11),
-                    ("Plumbing",     8400,   8100, 12),
-                    ("Insulation",   6930,   6800, 13),
-                    ("HVAC",        12000,  11500, 14),
-                    ("General",      5875,   4200, 15),
-                ],
-                "draws": [
-                    (0, "Deposit",            2500, "p", "Jan 5"),
-                    (1, "1st \u2014 Materials", 82000, "p", "Jan 12"),
-                    (2, "2nd \u2014 Concrete",  31590, "p", "Jan 28"),
-                    (3, "3rd \u2014 Framing",   45480, "p", "Feb 18"),
-                    (4, "4th \u2014 Rough-ins", 63664, "p", "Mar 15"),
-                    (5, "5th \u2014 Finishes",  63664, "c", ""),
-                    (6, "6th \u2014 Final",     29422, "x", ""),
-                ],
-            },
-            {
-                "order_number": "DEMO-1003",
-                "customer_name": "Cooper Ranch",
-                "customer_display": "Sarah Cooper",
-                "phase": "punch",
-                "pm_name": "P. Olson",
-                "model_key": "MINI PETTUS",
-                "contract_total": Decimal("399457.00"),
-                "p10_material": Decimal("100750.00"),
-                "adjusted_int": Decimal("298707.00"),
-                "collected": Decimal("350159.00"),
-                "trade_budgets": [
-                    ("Framing",     32000,  31200, 1),
-                    ("Roofing",     11200,  10800, 2),
-                    ("Siding",       6200,   6100, 3),
-                    ("Ext Trim",     8400,   8200, 4),
-                    ("D&W",          3800,   3650, 5),
-                    ("Cabinets",    28600,  27900, 6),
-                    ("Flooring",     4910,   4750, 7),
-                    ("Drywall",     11028,  10800, 8),
-                    ("Paint",        8184,   7900, 9),
-                    ("Trim",         9200,   8900, 10),
-                    ("Electrical",  14322,  14100, 11),
-                    ("Plumbing",     9600,   9400, 12),
-                    ("Insulation",   7877,   7600, 13),
-                    ("HVAC",        16000,  15500, 14),
-                    ("General",      5875,   5600, 15),
-                ],
-                "draws": [
-                    (0, "Deposit",            2500, "p", "Nov 1"),
-                    (1, "1st \u2014 Materials", 104000, "p", "Nov 8"),
-                    (2, "2nd \u2014 Concrete",   32742, "p", "Nov 25"),
-                    (3, "3rd \u2014 Framing",    51135, "p", "Dec 20"),
-                    (4, "4th \u2014 Rough-ins",  79891, "p", "Jan 30"),
-                    (5, "5th \u2014 Finishes",   79891, "p", "Mar 5"),
-                    (6, "6th \u2014 Final",      49298, "c", ""),
-                ],
-            },
-        ]
+        branches = {b.key: b for b in Branch.objects.all()}
+        models_by_name = {m.name: m for m in FloorPlanModel.objects.all()}
+
+        # Deterministic so reruns produce identical demo data.
+        rng = random.Random(20260504)
 
         seeded = 0
-        for row in demo_jobs:
-            model = model_lookup.get(row["model_key"])
-            budget_total = sum(t[1] for t in row["trade_budgets"])
-            budget_spent = sum(t[2] for t in row["trade_budgets"])
-
-            job, _ = Job.objects.update_or_create(
-                order_number=row["order_number"],
-                defaults={
-                    "customer_name": row["customer_name"],
-                    "customer_addr": row["customer_display"],
-                    "sales_rep": row["pm_name"],
-                    "branch": branch_default,
-                    "floor_plan": model,
-                    "job_mode": "turnkey",
-                    "p10_material": row["p10_material"],
-                    "adjusted_int_contract": row["adjusted_int"],
-                    "current_phase": row["phase"],
-                    "budget_total_amount": Decimal(str(budget_total)),
-                    "budget_spent_amount": Decimal(str(budget_spent)),
-                    "collected_amount": row["collected"],
-                    "current_draw_amount": Decimal(str(
-                        next((d[2] for d in row["draws"] if d[3] == "c"), 0)
-                    )),
-                },
-            )
-
-            # Seed trade-level budgets
-            for trade_name, budgeted, actual, sort_order in row["trade_budgets"]:
-                JobTradeBudget.objects.update_or_create(
-                    job=job,
-                    trade_name=trade_name,
-                    defaults={
-                        "budgeted": Decimal(str(budgeted)),
-                        "actual": Decimal(str(actual)),
-                        "sort_order": sort_order,
-                    },
-                )
-
-            # Seed line-item budgets — one per trade using the canonical
-            # title/BT-code/QB-account template above. Real wizard saves emit
-            # ~29 lines; the demo set is intentionally simpler so the seed
-            # stays readable.
-            job.demo_budget_lines.all().delete()
-            for idx, (trade_name, budgeted, actual, sort_order) in enumerate(row["trade_budgets"]):
-                tmpl = SEED_TRADE_LINE_TEMPLATES.get(trade_name)
-                if tmpl is None:
-                    title, bt_code, qb_account, draw_number = trade_name, trade_name, trade_name, 5
-                else:
-                    title, bt_code, qb_account, draw_number = tmpl
-                JobBudgetLineItem.objects.create(
-                    job=job,
-                    po_number=str(idx + 1).zfill(4),
-                    title=title,
-                    bt_code=bt_code,
-                    qb_account_name=qb_account,
-                    trade_bucket=trade_name,
-                    draw_number=draw_number,
-                    budgeted=Decimal(str(budgeted)),
-                    actual=Decimal(str(actual)),
-                    sort_order=sort_order,
-                )
-
-            # Seed draw schedule
-            for draw_number, label, amount, status, paid_date in row["draws"]:
-                JobDraw.objects.update_or_create(
-                    job=job,
-                    draw_number=draw_number,
-                    defaults={
-                        "label": label,
-                        "amount": Decimal(str(amount)),
-                        "status": status,
-                        "paid_date": paid_date,
-                    },
-                )
-
+        for spec in _DEMO_CONTRACT_SPECS:
+            branch = branches.get(spec["branch"]) or next(iter(branches.values()), None)
+            floor_plan = models_by_name.get(spec["model"])
+            if floor_plan is None:
+                self.stdout.write(self.style.WARNING(
+                    f"  Skipped {spec['on']} ({spec['name']}): model {spec['model']!r} not seeded."
+                ))
+                continue
+            self._build_demo_contract(spec, branch, floor_plan, rng)
             seeded += 1
 
-        self.stdout.write(f'  Demo Jobs: {seeded} (with trade budgets and draw schedules)')
+        self.stdout.write(f"  Demo Jobs: {seeded} (with trade budgets, line items, draws, and bills)")
 
+    # ----------------------------------------------------------------
+    # Internal helpers for demo contract generation
+    # ----------------------------------------------------------------
+    def _build_demo_contract(self, spec, branch, floor_plan, rng):
+        bucket = spec["bucket"]
+        phase = spec["phase"]
+
+        p10_material = Decimal(floor_plan.p10_material or 0)
+        int_contract = Decimal(floor_plan.int_contract or 0)
+        if int_contract <= 0:
+            int_contract = Decimal("180000.00")
+        contract_total = (p10_material + int_contract).quantize(Decimal("1"))
+        adjusted_int = int_contract
+
+        # Total trade budget ~ 48% of contract total - matches the legacy
+        # demo ratio of vendor/labor cost vs customer-facing contract price.
+        trade_budget_total = int(contract_total * Decimal("0.48"))
+        trade_rows = _allocate_trade_budgets(trade_budget_total)
+
+        completed_draw, in_progress_factor, base_efficiency = _PHASE_PROGRESS[bucket]
+
+        draws = _build_draw_schedule(contract_total, bucket, rng)
+
+        created_at = _job_created_at_for(bucket, draws, rng)
+        # Sales-in-progress contracts haven't been DocuSigned yet — leaving
+        # sales_closed_at null is what tags them as still-on-the-sales-side
+        # (vs. handed off to PM).
+        if bucket == "sales_in_progress":
+            sales_closed_at = None
+        else:
+            sales_closed_at = created_at + timedelta(days=rng.randint(7, 21))
+
+        trade_actuals = []
+        for trade_name, budgeted, sort_order in trade_rows:
+            draw_number = _DEMO_TRADE_DRAW.get(
+                trade_name,
+                SEED_TRADE_LINE_TEMPLATES.get(trade_name, (None, None, None, 5))[3],
+            )
+            actual = _compute_trade_actual(
+                bucket, budgeted, draw_number, completed_draw,
+                in_progress_factor, base_efficiency, rng,
+            )
+            trade_actuals.append((trade_name, budgeted, actual, sort_order, draw_number))
+
+        budget_spent = sum(t[2] for t in trade_actuals)
+        collected = sum(int(d["amount"]) for d in draws if d["status"] == "p")
+        current_draw_amount = next(
+            (int(d["amount"]) for d in draws if d["status"] == "c"), 0
+        )
+
+        job = Job.objects.create(
+            order_number=spec["on"],
+            customer_name=spec["name"],
+            customer_addr=spec["addr"],
+            sales_rep=spec.get("sales_rep", "Danny Robinson"),
+            branch=branch,
+            floor_plan=floor_plan,
+            job_mode="turnkey",
+            p10_material=p10_material,
+            adjusted_int_contract=adjusted_int,
+            current_phase=phase,
+            budget_total_amount=Decimal(str(trade_budget_total)),
+            budget_spent_amount=Decimal(str(budget_spent)),
+            collected_amount=Decimal(str(collected)),
+            current_draw_amount=Decimal(str(current_draw_amount)),
+            customer_email=_demo_email_for(spec["name"]),
+            customer_phone=_demo_phone(rng),
+            sales_closed_at=sales_closed_at,
+        )
+        # Override created_at (auto_now_add) so dashboards order by build age.
+        Job.objects.filter(pk=job.pk).update(created_at=created_at)
+
+        for trade_name, budgeted, actual, sort_order, _ in trade_actuals:
+            JobTradeBudget.objects.create(
+                job=job,
+                trade_name=trade_name,
+                budgeted=Decimal(str(budgeted)),
+                actual=Decimal(str(actual)),
+                sort_order=sort_order,
+            )
+
+        # One JobBudgetLineItem per trade. Trades with actual > 0 get
+        # synthetic qb_bill_refs so the manager Bills tab shows realistic
+        # invoice rows. Trades with no actual leave qb_bill_refs empty so
+        # the same view renders them as Pending placeholders.
+        for idx, (trade_name, budgeted, actual, sort_order, draw_number) in enumerate(trade_actuals):
+            tmpl = SEED_TRADE_LINE_TEMPLATES.get(trade_name)
+            if tmpl is None:
+                title, bt_code, qb_account, _draw = trade_name, trade_name, trade_name, draw_number
+            else:
+                title, bt_code, qb_account, _draw = tmpl
+
+            qb_bill_refs, last_paid_at = _build_bill_refs(
+                trade_name, actual, branch, created_at, rng,
+            )
+
+            JobBudgetLineItem.objects.create(
+                job=job,
+                po_number=str(idx + 1).zfill(4),
+                title=title,
+                bt_code=bt_code,
+                qb_account_name=qb_account,
+                trade_bucket=trade_name,
+                draw_number=draw_number,
+                budgeted=Decimal(str(budgeted)),
+                actual=Decimal(str(actual)),
+                qb_bill_refs=qb_bill_refs,
+                last_paid_at=last_paid_at,
+                sort_order=sort_order,
+            )
+
+        for d in draws:
+            JobDraw.objects.create(
+                job=job,
+                draw_number=d["draw_number"],
+                label=d["label"],
+                amount=Decimal(str(d["amount"])),
+                status=d["status"],
+                paid_date=d["paid_date"],
+            )
+
+
+# =================================================================
+# Demo contract specs + helpers
+# =================================================================
+#
+# 35 named contracts spanning the full sales-to-close lifecycle. Order
+# numbers are 6-digit (100001..100035) to match how the office numbers
+# real builds. Buckets:
+#   sales_in_progress (5) - sales-side; sales_closed_at is null (not yet
+#                           DocuSigned, so the PM dashboard never sees them)
+#   awaiting_deposit  (2) - sales-closed; deposit draw is Current
+#   awaiting_loan     (4) - deposit paid; loan-close draw is Current
+#   active_framing    (3) - PM handoff; on the 2nd Home Draw (Concrete)
+#   active_roughin    (4) - draws 0-3 paid; 4th Home Draw current
+#   active_interior   (4) - draws 0-4 paid; 5th Home Draw current
+#   active_punch      (3) - draws 0-5 paid; 6th Home Draw current
+#   active_final      (3) - 6th Home Draw invoiced, awaiting payment
+#   closed_under      (1) - finished under budget (clear margin)
+#   closed_over       (1) - finished over budget (clear overrun)
+#   closed_normal     (5) - finished within +/-5% of budget
+
+_DEMO_CONTRACT_SPECS = [
+    # Sales side - in progress (sales rep still working, not handed off)
+    {"on": "100001", "name": "Erica Pittman",     "addr": "215 Persimmon Hollow, Summertown, TN 38483",
+     "model": "PETTUS",           "branch": "summertown",  "phase": "estimate", "bucket": "sales_in_progress"},
+    {"on": "100002", "name": "Trevor Russo",      "addr": "78 Lakeside Trail, Hayden, AL 35079",
+     "model": "CAJUN",            "branch": "hayden_al",   "phase": "estimate", "bucket": "sales_in_progress"},
+    {"on": "100003", "name": "Natalie Ortega",    "addr": "994 Old Mill Rd, Morristown, TN 37814",
+     "model": "THE HADLEY",       "branch": "morristown",  "phase": "estimate", "bucket": "sales_in_progress"},
+    {"on": "100004", "name": "Sebastian Reyna",   "addr": "631 Stillwater Dr, Hopkinsville, KY 42240",
+     "model": "BUFFALO RUN",      "branch": "hopkinsville","phase": "estimate", "bucket": "sales_in_progress"},
+    {"on": "100005", "name": "Marisa Hollis",     "addr": "1422 Crystal Brook Ln, Summertown, TN 38483",
+     "model": "WHISPERING PINES", "branch": "summertown",  "phase": "estimate", "bucket": "sales_in_progress"},
+
+    # Sales-closed but pre-loan-close (deposit/loan draws still pending)
+    {"on": "100006", "name": "Kevin Anderson",    "addr": "412 Bluff Run Rd, Hayden, AL 35079",
+     "model": "WHISPERING PINES", "branch": "hayden_al",   "phase": "estimate", "bucket": "awaiting_deposit"},
+    {"on": "100007", "name": "Rachel Bennett",    "addr": "88 Sycamore Ridge, Summertown, TN 38483",
+     "model": "THE BERKLEY",      "branch": "summertown",  "phase": "estimate", "bucket": "awaiting_deposit"},
+    {"on": "100008", "name": "Sam Carter",        "addr": "1207 Crestview Ln, Morristown, TN 37814",
+     "model": "CAJUN",            "branch": "morristown",  "phase": "estimate", "bucket": "awaiting_loan"},
+    {"on": "100009", "name": "Megan Davis",       "addr": "523 Pine Meadow Way, Hopkinsville, KY 42240",
+     "model": "BUFFALO RUN",      "branch": "hopkinsville","phase": "estimate", "bucket": "awaiting_loan"},
+    {"on": "100010", "name": "Tyler Edwards",     "addr": "76 Oakridge Dr, Hayden, AL 35079",
+     "model": "HUNTLEY 2.0",      "branch": "hayden_al",   "phase": "estimate", "bucket": "awaiting_loan"},
+    {"on": "100011", "name": "Amanda Foster",     "addr": "915 Whitetail Trace, Summertown, TN 38483",
+     "model": "COTTONWOOD BEND",  "branch": "summertown",  "phase": "estimate", "bucket": "awaiting_loan"},
+
+    # PM side - just handed off (on the 2nd Home Draw - Concrete)
+    {"on": "100012", "name": "Marcus Garcia",     "addr": "330 Maple Hollow, Summertown, TN 38483",
+     "model": "MAPLE GROVE",      "branch": "summertown",  "phase": "framing",  "bucket": "active_framing"},
+    {"on": "100013", "name": "Jordan Hayes",      "addr": "612 Hickory Pass, Morristown, TN 37814",
+     "model": "PETTUS",           "branch": "morristown",  "phase": "framing",  "bucket": "active_framing"},
+    {"on": "100014", "name": "Brooke Iverson",    "addr": "147 Cedar Bluff Dr, Hopkinsville, KY 42240",
+     "model": "NORTHVIEW LODGE",  "branch": "hopkinsville","phase": "framing",  "bucket": "active_framing"},
+
+    # PM side - rough-in stage
+    {"on": "100015", "name": "Wesley Jackson",    "addr": "508 Roebuck Rd, Hayden, AL 35079",
+     "model": "CAJUN",            "branch": "hayden_al",   "phase": "roughin",  "bucket": "active_roughin"},
+    {"on": "100016", "name": "Jessica Kim",       "addr": "29 Briar Patch Ln, Summertown, TN 38483",
+     "model": "RIVERVIEW COTTAGE","branch": "summertown",  "phase": "roughin",  "bucket": "active_roughin"},
+    {"on": "100017", "name": "Brandon Lawson",    "addr": "844 Tanglewood Ct, Morristown, TN 37814",
+     "model": "BUFFALO RUN",      "branch": "morristown",  "phase": "roughin",  "bucket": "active_roughin"},
+    {"on": "100018", "name": "Olivia Mitchell",   "addr": "1130 Stoneybrook Dr, Hopkinsville, KY 42240",
+     "model": "HUNTLEY",          "branch": "hopkinsville","phase": "roughin",  "bucket": "active_roughin"},
+
+    # PM side - interior finishes
+    {"on": "100019", "name": "Caleb Nelson",      "addr": "67 Magnolia Bend, Hayden, AL 35079",
+     "model": "MINI PETTUS",      "branch": "hayden_al",   "phase": "interior", "bucket": "active_interior"},
+    {"on": "100020", "name": "Sophia Owens",      "addr": "418 Wildwood Trail, Summertown, TN 38483",
+     "model": "MARTIN LODGE",     "branch": "summertown",  "phase": "interior", "bucket": "active_interior"},
+    {"on": "100021", "name": "Rohan Patel",       "addr": "203 River Glen Rd, Morristown, TN 37814",
+     "model": "COTTONWOOD BEND",  "branch": "morristown",  "phase": "interior", "bucket": "active_interior"},
+    {"on": "100022", "name": "Shelby Quinn",      "addr": "925 Greenbriar Ave, Hopkinsville, KY 42240",
+     "model": "PETTUS",           "branch": "hopkinsville","phase": "interior", "bucket": "active_interior"},
+
+    # PM side - punch
+    {"on": "100023", "name": "Diego Reyes",       "addr": "311 Hidden Springs Ln, Hayden, AL 35079",
+     "model": "CAJUN",            "branch": "hayden_al",   "phase": "punch",    "bucket": "active_punch"},
+    {"on": "100024", "name": "Chloe Stewart",     "addr": "1502 Dogwood Way, Summertown, TN 38483",
+     "model": "THE HADLEY",       "branch": "summertown",  "phase": "punch",    "bucket": "active_punch"},
+    {"on": "100025", "name": "Logan Thompson",    "addr": "740 Falcon Ridge, Morristown, TN 37814",
+     "model": "WESTVIEW MANOR",   "branch": "morristown",  "phase": "punch",    "bucket": "active_punch"},
+
+    # PM side - final draw invoiced, awaiting payment
+    {"on": "100026", "name": "Madison Underwood", "addr": "85 Sunrise Ct, Hopkinsville, KY 42240",
+     "model": "BUFFALO RUN",      "branch": "hopkinsville","phase": "final",    "bucket": "active_final"},
+    {"on": "100027", "name": "Tristan Vance",     "addr": "1245 Persimmon Trail, Hayden, AL 35079",
+     "model": "PETTUS",           "branch": "hayden_al",   "phase": "final",    "bucket": "active_final"},
+    {"on": "100028", "name": "Hannah Walters",    "addr": "356 Quail Hollow Dr, Summertown, TN 38483",
+     "model": "NORTHVIEW LODGE",  "branch": "summertown",  "phase": "final",    "bucket": "active_final"},
+
+    # Closed: under budget (1) and over budget (1) for the executive view
+    {"on": "100029", "name": "Daniel Xu",         "addr": "112 Tall Pines Rd, Morristown, TN 37814",
+     "model": "CAJUN",            "branch": "morristown",  "phase": "closed",   "bucket": "closed_under"},
+    {"on": "100030", "name": "Audrey Young",      "addr": "967 Bellridge Way, Hopkinsville, KY 42240",
+     "model": "MINI PETTUS",      "branch": "hopkinsville","phase": "closed",   "bucket": "closed_over"},
+
+    # Closed: routine completions
+    {"on": "100031", "name": "Brett Zimmerman",   "addr": "224 Westshore Blvd, Hayden, AL 35079",
+     "model": "THE BERKLEY",      "branch": "hayden_al",   "phase": "closed",   "bucket": "closed_normal"},
+    {"on": "100032", "name": "Kayla Adams",       "addr": "1040 Foxglove Ln, Summertown, TN 38483",
+     "model": "HUNTLEY 2.0",      "branch": "summertown",  "phase": "closed",   "bucket": "closed_normal"},
+    {"on": "100033", "name": "Nathan Brooks",     "addr": "62 Spring Branch Rd, Morristown, TN 37814",
+     "model": "PETTUS",           "branch": "morristown",  "phase": "closed",   "bucket": "closed_normal"},
+    {"on": "100034", "name": "Vanessa Coleman",   "addr": "488 Birchwood Park, Hopkinsville, KY 42240",
+     "model": "COTTONWOOD BEND",  "branch": "hopkinsville","phase": "closed",   "bucket": "closed_normal"},
+    {"on": "100035", "name": "Eric Dawson",       "addr": "1311 Honeysuckle Trail, Hayden, AL 35079",
+     "model": "MAPLE GROVE",      "branch": "hayden_al",   "phase": "closed",   "bucket": "closed_normal"},
+]
+
+
+# Trade allocation as a percentage of total trade budget, mirroring the
+# split used by the original DEMO-1001/2/3 contracts.
+_TRADE_BUDGET_MIX = [
+    ("Framing",     1, 0.181),
+    ("Roofing",     2, 0.059),
+    ("Siding",      3, 0.035),
+    ("Ext Trim",    4, 0.044),
+    ("D&W",         5, 0.021),
+    ("Cabinets",    6, 0.160),
+    ("Flooring",    7, 0.029),
+    ("Drywall",     8, 0.066),
+    ("Paint",       9, 0.049),
+    ("Trim",       10, 0.054),
+    ("Electrical", 11, 0.085),
+    ("Plumbing",   12, 0.052),
+    ("Insulation", 13, 0.047),
+    ("HVAC",       14, 0.087),
+    ("General",    15, 0.039),
+]
+
+
+# Trade name -> draw number when that trade is principally billed.
+# Mirrors how SEED_TRADE_LINE_TEMPLATES assigns draws for interior trades,
+# and adds explicit values for exterior trades (Framing/Roofing/Siding/etc.)
+# that don't appear in the interior-focused template.
+_DEMO_TRADE_DRAW = {
+    "Framing":     3,
+    "Roofing":     3,
+    "Siding":      3,
+    "Ext Trim":    3,
+    "D&W":         3,
+    "Cabinets":    5,
+    "Flooring":    5,
+    "Drywall":     5,
+    "Paint":       5,
+    "Trim":        5,
+    "Electrical":  4,
+    "Plumbing":    4,
+    "Insulation":  4,
+    "HVAC":        4,
+    "General":     6,
+}
+
+
+# Phase progress: (completed_draw, in_progress_factor, base_efficiency)
+_PHASE_PROGRESS = {
+    "sales_in_progress": (0, 0.00, 1.00),
+    "awaiting_deposit":  (0, 0.00, 1.00),
+    "awaiting_loan":     (0, 0.00, 1.00),
+    # PM has just been handed the build - 2nd Home Draw (Concrete) is the
+    # current draw. Exterior trades (Framing/Roofing/Siding/Ext Trim/D&W,
+    # draw_number=3) are early-in-progress.
+    "active_framing":    (2, 0.30, 1.00),
+    "active_roughin":    (4, 0.55, 1.00),
+    "active_interior":   (5, 0.70, 1.00),
+    "active_punch":      (6, 0.90, 1.00),
+    "active_final":      (6, 1.00, 1.00),
+    "closed_normal":     (6, 1.00, 1.00),
+    "closed_under":      (6, 1.00, 0.88),
+    "closed_over":       (6, 1.00, 1.18),
+}
+
+
+_VENDORS_BY_TRADE = {
+    "Framing":     ["Sturdy Build Framing", "Pioneer Framing Co"],
+    "Roofing":     ["Tennessee Roofing Group", "Apex Metal Roofs"],
+    "Siding":      ["Southern Siding LLC", "Heritage Exteriors"],
+    "Ext Trim":    ["Heritage Exteriors", "BoardWright Trim"],
+    "D&W":         ["BuildersFirstSource", "Doors & More"],
+    "Cabinets":    ["Stone Hill Cabinets", "Tennessee Custom Cabinetry"],
+    "Flooring":    ["Hardwood Source", "Floor Express"],
+    "Drywall":     ["South Coast Drywall", "BuildPro Materials"],
+    "Paint":       ["Crisp Coat Painting", "Pro Painters Inc"],
+    "Trim":        ["Heartwood Trim Co", "Doors & More"],
+    "Electrical":  ["Voltage Electric", "Bright Spark Electric"],
+    "Plumbing":    ["Crystal Clear Plumbing", "Mainline Plumbing"],
+    "Insulation":  ["ThermaSeal Insulation", "Foam Pros"],
+    "HVAC":        ["Cool Breeze HVAC", "Climate Control Inc"],
+    "General":     ["County Permit Office", "City Inspections"],
+}
+
+
+_STATUS_PATTERN_BY_BUCKET = {
+    "sales_in_progress": ["x", "x", "x", "x", "x", "x", "x"],  # not yet handed off
+    "awaiting_deposit":  ["c", "x", "x", "x", "x", "x", "x"],
+    "awaiting_loan":     ["p", "c", "x", "x", "x", "x", "x"],
+    # 2nd Home Draw (Concrete) is the first draw the PM owns - deposit and
+    # 1st Home Draw (Loan Close) are paid before handoff.
+    "active_framing":    ["p", "p", "c", "x", "x", "x", "x"],
+    "active_roughin":    ["p", "p", "p", "p", "c", "x", "x"],
+    "active_interior":   ["p", "p", "p", "p", "p", "c", "x"],
+    "active_punch":      ["p", "p", "p", "p", "p", "p", "c"],
+    "active_final":      ["p", "p", "p", "p", "p", "p", "i"],
+    "closed_normal":     ["p", "p", "p", "p", "p", "p", "p"],
+    "closed_under":      ["p", "p", "p", "p", "p", "p", "p"],
+    "closed_over":       ["p", "p", "p", "p", "p", "p", "p"],
+}
+
+
+def _allocate_trade_budgets(total):
+    rows = []
+    running = 0
+    for trade_name, sort_order, pct in _TRADE_BUDGET_MIX[:-1]:
+        amt = int(round(total * pct))
+        rows.append((trade_name, amt, sort_order))
+        running += amt
+    last_name, last_sort, _ = _TRADE_BUDGET_MIX[-1]
+    rows.append((last_name, max(0, total - running), last_sort))
+    return rows
+
+
+def _build_draw_schedule(contract_total, bucket, rng):
+    """Build a 7-row draw schedule (Deposit + 6 progress draws) sized off
+    the contract total. Status flags follow the bucket lifecycle stage."""
+    deposit = 2500
+    remaining = int(contract_total) - deposit
+    pct = [0.27, 0.10, 0.15, 0.20, 0.20, 0.08]
+    amounts = [int(round(remaining * p)) for p in pct]
+    amounts[-1] = remaining - sum(amounts[:-1])
+
+    # Match the wizard's "Nth Home Draw (Phase)" format - qb_invoice
+    # `_phase_label_for` extracts the parenthetical for QB invoice
+    # descriptions, so this format keeps the QB push path readable too.
+    labels = [
+        "Deposit",
+        "1st Home Draw (Loan Close)",
+        "2nd Home Draw (Concrete)",
+        "3rd Home Draw (Framing Completion)",
+        "4th Home Draw (Rough-Ins)",
+        "5th Home Draw (Finishes)",
+        "6th Home Draw (Final)",
+    ]
+    statuses = _STATUS_PATTERN_BY_BUCKET[bucket]
+
+    today = date.today()
+    base = today - timedelta(days=rng.randint(150, 240))
+    paid_dates = []
+    cursor = base
+    for _ in range(7):
+        cursor += timedelta(days=rng.randint(18, 32))
+        paid_dates.append(cursor)
+
+    schedule = []
+    for i in range(7):
+        amount = deposit if i == 0 else amounts[i - 1]
+        status = statuses[i]
+        d = paid_dates[i] if status == "p" else None
+        schedule.append({
+            "draw_number": i,
+            "label": labels[i],
+            "amount": amount,
+            "status": status,
+            "paid_date": d.strftime("%b %d") if d else "",
+            "_paid_date_full": d,
+        })
+    return schedule
+
+
+def _compute_trade_actual(bucket, budgeted, draw_number, completed_draw,
+                           in_progress_factor, base_efficiency, rng):
+    """Pick a sensible actual-spend amount given the contract lifecycle."""
+    if completed_draw == 0 and in_progress_factor == 0:
+        return 0  # awaiting_* — nothing on the cost side yet
+    if draw_number > completed_draw + 1:
+        return 0
+    if draw_number == completed_draw + 1:
+        ratio = in_progress_factor * rng.uniform(0.85, 1.05)
+        return int(round(budgeted * ratio))
+    if bucket == "closed_normal":
+        eff = rng.uniform(0.94, 1.05)
+    elif bucket == "closed_under":
+        eff = rng.uniform(0.82, 0.92)
+    elif bucket == "closed_over":
+        eff = rng.uniform(1.10, 1.28)
+    else:
+        eff = base_efficiency * rng.uniform(0.95, 1.04)
+    return int(round(budgeted * eff))
+
+
+def _build_bill_refs(trade_name, actual, branch, job_created_at, rng):
+    """Synthesize 1-2 QB Bill refs that sum to `actual`."""
+    if actual <= 0:
+        return [], None
+    vendors = _VENDORS_BY_TRADE.get(trade_name, [f"{trade_name} Vendor"])
+    bill_count = 1 if actual < 6000 else rng.randint(1, 2)
+    if bill_count == 1:
+        amounts = [actual]
+    else:
+        first = int(round(actual * rng.uniform(0.30, 0.55)))
+        amounts = [first, actual - first]
+
+    refs = []
+    last_paid = None
+    base_doc = rng.randint(20100, 20999)
+    paid_from_id = (branch.qb_bank_account_id if branch else "") or ""
+    paid_from_name = (branch.qb_bank_account_name if branch else "") or ""
+    for i, amt in enumerate(amounts):
+        bill_id = str(rng.randint(1_000_000_000, 9_999_999_999))
+        line_id = str(rng.randint(1, 99))
+        days_ago = rng.randint(7, 110)
+        txn_dt = (timezone.now() - timedelta(days=days_ago)).date()
+        if txn_dt < job_created_at.date():
+            txn_dt = job_created_at.date() + timedelta(days=14 + i * 7)
+        paid_at = timezone.now() - timedelta(days=max(1, days_ago - rng.randint(2, 10)))
+        refs.append({
+            "bill_id": bill_id,
+            "line_id": line_id,
+            "doc_number": f"INV-{base_doc + i}",
+            "vendor": vendors[i % len(vendors)],
+            "txn_date": txn_dt.strftime("%b %d, %Y"),
+            "amount": float(amt),
+            "paid_from_account_id": paid_from_id,
+            "paid_from_account_name": paid_from_name,
+        })
+        if last_paid is None or paid_at > last_paid:
+            last_paid = paid_at
+    return refs, last_paid
+
+
+def _job_created_at_for(bucket, draws, rng):
+    """Pick a Job.created_at older for further-along contracts so the
+    dashboard's `-created_at` ordering surfaces a believable mix."""
+    today = timezone.now()
+    paid_dates = [d.get("_paid_date_full") for d in draws if d.get("_paid_date_full")]
+    if paid_dates:
+        from datetime import datetime
+        oldest = min(paid_dates)
+        anchor = timezone.make_aware(
+            datetime.combine(oldest, datetime.min.time())
+        ) - timedelta(days=rng.randint(10, 30))
+        return anchor
+    days_back = {
+        "awaiting_deposit": (3, 18),
+        "awaiting_loan":    (10, 35),
+    }.get(bucket, (60, 180))
+    return today - timedelta(days=rng.randint(*days_back))
+
+
+def _demo_email_for(name):
+    parts = name.lower().split()
+    if len(parts) >= 2:
+        return f"{parts[0][0]}.{parts[-1]}@example.com"
+    return f"{parts[0]}@example.com"
+
+
+def _demo_phone(rng):
+    return f"({rng.randint(200, 989)}) {rng.randint(200, 989)}-{rng.randint(1000, 9999)}"

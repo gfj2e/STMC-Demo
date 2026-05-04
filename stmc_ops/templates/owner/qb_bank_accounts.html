@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Branch ↔ QB Bank Accounts — STMC</title>
+{% load static %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}">
+<link rel="stylesheet" href="{% static 'owner.css' %}?v=4">
+<style>
+  .qb-map-wrap { max-width: 880px; margin: 32px auto; padding: 0 24px; }
+  .qb-map-head { margin-bottom: 16px; }
+  .qb-map-head h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .qb-map-head p { color: var(--g600); margin: 0; font-size: 13px; }
+  .qb-map-card { background: #fff; border: 1px solid var(--g200); border-radius: 8px; padding: 24px; }
+  .qb-map-table { width: 100%; border-collapse: collapse; }
+  .qb-map-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--g600); padding: 8px 10px; border-bottom: 1px solid var(--g200); }
+  .qb-map-table td { padding: 10px; border-bottom: 1px solid var(--g100); vertical-align: middle; }
+  .qb-map-table tr:last-child td { border-bottom: 0; }
+  .qb-map-table select { width: 100%; padding: 6px 10px; border: 1px solid var(--g300); border-radius: 5px; font-size: 13px; background: #fff; }
+  .qb-map-cur { font-size: 12px; color: var(--g600); }
+  .qb-map-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+  .qb-map-warn { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  .qb-map-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  .qb-back { display: inline-block; margin-bottom: 12px; color: var(--g600); font-size: 13px; text-decoration: none; }
+  .qb-back:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="qb-map-wrap">
+  <a class="qb-back" href="{% url 'owner' %}">← Back to Owner Dashboard</a>
+
+  <div class="qb-map-head">
+    <h1>Branch ↔ QuickBooks Bank Accounts</h1>
+    <p>Map each branch to the QB Bank or Credit Card account that pays its bills. Bills paid from the mapped account will display under the branch in the Bills tab.</p>
+  </div>
+
+  {% if not qb_connected %}
+    <div class="qb-map-warn">
+      QuickBooks isn't connected. <a href="{% url 'owner' %}">Connect from the Owner dashboard</a> first, then return here.
+    </div>
+  {% elif fetch_error %}
+    <div class="qb-map-warn">
+      Couldn't fetch QB accounts: {{ fetch_error }}
+    </div>
+  {% elif not accounts %}
+    <div class="qb-map-info">
+      QuickBooks returned no Bank or Credit Card accounts. Create one in QuickBooks (Chart of Accounts → New → Bank), then refresh this page.
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'qb_bank_accounts' %}">
+    {% csrf_token %}
+    <div class="qb-map-card">
+      <table class="qb-map-table">
+        <thead>
+          <tr>
+            <th style="width: 35%">Branch</th>
+            <th style="width: 65%">QB Bank / Credit Card Account</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for branch in branches %}
+            <tr>
+              <td>
+                <strong>{{ branch.label }}</strong>
+                {% if branch.qb_bank_account_name %}
+                  <div class="qb-map-cur">Currently: {{ branch.qb_bank_account_name }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <select name="branch_{{ branch.pk }}" {% if not qb_connected or fetch_error %}disabled{% endif %}>
+                  <option value="">— Unmapped —</option>
+                  {% for acct in accounts %}
+                    <option value="{{ acct.id }}|{{ acct.name }}"
+                            {% if acct.id == branch.qb_bank_account_id %}selected{% endif %}>
+                      {{ acct.name }} ({{ acct.type }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="2" style="text-align: center; color: var(--g500); padding: 24px">
+                No branches have been seeded yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="qb-map-actions">
+      <span style="font-size: 12px; color: var(--g600);">
+        After saving, click "Refresh from QuickBooks" on the dashboard to re-pull bills with the new mapping.
+      </span>
+      <button type="submit" class="qb-btn qb-btn-primary"
+              {% if not qb_connected or fetch_error %}disabled{% endif %}>
+        Save Mappings
+      </button>
+    </div>
+  </form>
+</div>
+</body>
+</html>

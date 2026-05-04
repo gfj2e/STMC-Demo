@@ -1,3 +1,4 @@
+import os
 import re
 import time
 from decimal import Decimal, InvalidOperation
@@ -639,6 +640,48 @@ def _branch_badge_class(branch_label):
     return "summertown"
 
 
+def _branches_by_qb_account_id():
+    """{qb_account_id: Branch} for branches that have been mapped to a QB
+    Bank/Credit Card account. Used by the Bills tab to resolve a Bill's
+    BillPayment.BankAccountRef → which branch's money paid the bill.
+    """
+    return {
+        b.qb_bank_account_id: b
+        for b in Branch.objects.exclude(qb_bank_account_id="")
+    }
+
+
+def _resolve_bill_paid_from(paid_from_account_id, paid_from_account_name,
+                            branch_map, job_branch_label, *, status):
+    """Pick what to show in the "Branch Paid From" column for one bill row.
+
+    Paid bills resolve via the BillPayment's BankAccountRef → mapped Branch.
+    A bill paid from an unmapped account renders as "Unmapped" with the QB
+    account name as a tooltip so the user knows what to map. Pending /
+    not-yet-paid rows fall back to the job's branch label so the column
+    isn't blank during planning.
+    """
+    if status == "pending" or not paid_from_account_id:
+        label = job_branch_label or "Summertown"
+        return {
+            "label": label,
+            "class": _branch_badge_class(label),
+            "tooltip": "",
+        }
+    branch = branch_map.get(paid_from_account_id)
+    if branch is not None:
+        return {
+            "label": branch.label,
+            "class": _branch_badge_class(branch.label),
+            "tooltip": paid_from_account_name or branch.qb_bank_account_name,
+        }
+    return {
+        "label": "Unmapped",
+        "class": "unmapped",
+        "tooltip": paid_from_account_name or paid_from_account_id,
+    }
+
+
 def _bill_status_label(status):
     if status == "paid":
         return "Paid"
@@ -649,6 +692,7 @@ def _bill_status_label(status):
 
 def _build_project_ui_rows(projects):
     rows = []
+    branch_map = _branches_by_qb_account_id()
     for project in projects:
         draws = project.get("dr", [])
         total = int(project.get("ct") or 0)
@@ -808,6 +852,11 @@ def _build_project_ui_rows(projects):
                         amt = int(round(float(ref.get("amount") or 0)))
                     except (TypeError, ValueError):
                         amt = 0
+                    pf = _resolve_bill_paid_from(
+                        ref.get("paid_from_account_id", ""),
+                        ref.get("paid_from_account_name", ""),
+                        branch_map, branch_label, status="paid",
+                    )
                     bills.append({
                         "invoice_id": ref.get("doc_number") or (
                             f"#{ref.get('bill_id')}" if ref.get("bill_id") else "—"
@@ -819,8 +868,9 @@ def _build_project_ui_rows(projects):
                         "amount": amt,
                         "amount_display": _format_money(amt),
                         "date": ref.get("txn_date") or "",
-                        "branch": branch_label,
-                        "branch_class": _branch_badge_class(branch_label),
+                        "branch": pf["label"],
+                        "branch_class": pf["class"],
+                        "branch_tooltip": pf["tooltip"],
                         "status": "paid",
                         "status_label": _bill_status_label("paid"),
                     })
@@ -830,6 +880,9 @@ def _build_project_ui_rows(projects):
                 ln_actual = int(ln.actual or 0)
                 remaining = max(0, ln_budget - ln_actual)
                 if remaining > 0 and not refs:
+                    pf = _resolve_bill_paid_from(
+                        "", "", branch_map, branch_label, status="pending",
+                    )
                     bills.append({
                         "invoice_id": "—",
                         "vendor": "",
@@ -839,8 +892,9 @@ def _build_project_ui_rows(projects):
                         "amount": remaining,
                         "amount_display": _format_money(remaining),
                         "date": "",
-                        "branch": branch_label,
-                        "branch_class": _branch_badge_class(branch_label),
+                        "branch": pf["label"],
+                        "branch_class": pf["class"],
+                        "branch_tooltip": pf["tooltip"],
                         "status": "pending",
                         "status_label": _bill_status_label("pending"),
                     })
@@ -858,6 +912,10 @@ def _build_project_ui_rows(projects):
                     vendor = tb.qb_bill_vendor or f"{trade_name} Vendor"
                     date_text = tb.qb_bill_txn_date.strftime("%b %d, %Y") if tb.qb_bill_txn_date else ""
                     actual_status = "review" if actual > budget else "paid"
+                    pf = _resolve_bill_paid_from(
+                        tb.qb_paid_from_account_id, tb.qb_paid_from_account_name,
+                        branch_map, branch_label, status=actual_status,
+                    )
                     bills.append(
                         {
                             "invoice_id": invoice_id,
@@ -868,13 +926,17 @@ def _build_project_ui_rows(projects):
                             "amount": actual,
                             "amount_display": _format_money(actual),
                             "date": date_text,
-                            "branch": branch_label,
-                            "branch_class": _branch_badge_class(branch_label),
+                            "branch": pf["label"],
+                            "branch_class": pf["class"],
+                            "branch_tooltip": pf["tooltip"],
                             "status": actual_status,
                             "status_label": _bill_status_label(actual_status),
                         }
                     )
                 elif remaining_budget > 0:
+                    pf = _resolve_bill_paid_from(
+                        "", "", branch_map, branch_label, status="pending",
+                    )
                     bills.append(
                         {
                             "invoice_id": "—",
@@ -885,8 +947,9 @@ def _build_project_ui_rows(projects):
                             "amount": remaining_budget,
                             "amount_display": _format_money(remaining_budget),
                             "date": "",
-                            "branch": branch_label,
-                            "branch_class": _branch_badge_class(branch_label),
+                            "branch": pf["label"],
+                            "branch_class": pf["class"],
+                            "branch_tooltip": pf["tooltip"],
                             "status": "pending",
                             "status_label": _bill_status_label("pending"),
                         }
@@ -898,7 +961,13 @@ def _build_project_ui_rows(projects):
 
         margin_pct = int(round(((total - total_bg) / total) * 100, 0)) if total > 0 and total_bg > 0 else 0
         margin_color = "var(--green)" if margin_pct >= 30 else ("var(--amber)" if margin_pct >= 15 else "#DC2626")
-        live_margin_pct = round(((total - total_ac) / total) * 100, 1) if total > 0 else 0
+        # Live margin = budget preserved vs. actual cost. Calculated against
+        # the BUDGETED amount (not the contract) so over-budget jobs read as
+        # negative — a closed contract that overran trade budgets should
+        # show a negative margin even if the customer's contract value is
+        # still well above actual cost.
+        live_margin_pct = round(((total_bg - total_ac) / total_bg) * 100, 1) if total_bg > 0 else 0
+        live_margin_class = "is-green" if live_margin_pct >= 0 else "is-red"
 
         # Per-job budget health (was previously only aggregated on the
         # PM KPI strip). Each contract gets its own status so the PM can
@@ -994,6 +1063,7 @@ def _build_project_ui_rows(projects):
                 "margin_pct": margin_pct,
                 "margin_color": margin_color,
                 "live_margin_pct": live_margin_pct,
+                "live_margin_class": live_margin_class,
                 "budget_health_pct": budget_health_pct,
                 "budget_health_label": budget_health_label,
                 "budget_health_pill_class": budget_health_pill_class,
@@ -2361,6 +2431,76 @@ def manager_change_order_delete_view(request):
 
 
 @role_required(AppUser.ROLE_PM)
+def manager_change_order_pdf_view(request, co_id):
+    """Render the printable Change Order PDF for the PM to download.
+
+    Mirrors the manager_pdf_print_view pattern: a stripped-down host
+    page that auto-fires window.print() so the user picks "Save as PDF"
+    in the browser dialog. Layout matches the company's paper Change
+    Order form (Version 2.2 February 20th, 2025).
+    """
+    change_order = (
+        JobChangeOrder.objects.select_related("job", "job__branch")
+        .filter(pk=co_id)
+        .first()
+    )
+    if change_order is None:
+        return redirect("manager")
+
+    job = change_order.job
+    price = change_order.price_change or Decimal("0")
+    abs_price_display = f"${abs(price):,.2f}"
+    price_display = (
+        f"-{abs_price_display}" if price < 0 else abs_price_display
+    )
+    new_total = change_order.new_contract_total or Decimal("0")
+    new_total_display = f"${new_total:,.2f}" if new_total > 0 else "N/A"
+    invoice_number = (
+        change_order.qb_invoice_doc_number
+        or job.order_number
+        or f"CO-{change_order.id:04d}"
+    )
+
+    timing = change_order.payment_timing or "immediately"
+    completed_date_display = ""
+    if change_order.completed_at:
+        completed_date_display = timezone.localtime(
+            change_order.completed_at
+        ).strftime("%-m/%-d/%Y" if os.name != "nt" else "%#m/%#d/%Y")
+
+    return render(
+        request,
+        "manager/change_order_print.html",
+        {
+            "co": change_order,
+            "job": job,
+            "co_number_display": change_order.number,
+            "customer_name": (
+                change_order.customer_name
+                or job.customer_name
+                or ""
+            ),
+            "project_address": (
+                change_order.project_address
+                or _job_display_address(job)
+                or ""
+            ),
+            "project_manager": (
+                change_order.project_manager
+                or DEMO_PM_NAME
+            ),
+            "description": change_order.description or "",
+            "price_display": price_display,
+            "new_total_display": new_total_display,
+            "timing": timing,
+            "invoice_number": invoice_number,
+            "completed_date_display": completed_date_display,
+            "filename_hint": f"CO_{change_order.number}_{(job.order_number or job.id)}",
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
 @require_POST
 @csrf_protect
 def manager_change_order_complete_view(request):
@@ -3452,6 +3592,67 @@ def qb_status_view(request):
     """HTMX partial: renders the unified QuickBooks card.
     Used on the owner dashboard and re-fetched after connect/disconnect."""
     return render(request, "owner/_qb_status.html", _qb_status_context())
+
+
+# ─────────────────────────────────────────────────────────────
+# BRANCH ↔ QB BANK ACCOUNT MAPPING
+# ─────────────────────────────────────────────────────────────
+#
+# Each Branch can be tied to one QB Bank or Credit Card account. When the
+# nightly puller observes a BillPayment whose BankAccountRef matches the
+# branch's mapped account, the Bills tab renders that bill under the branch
+# instead of falling back to "Unmapped". GET shows the form; POST saves
+# all branches' picks in one shot.
+
+
+@role_required(AppUser.ROLE_EXEC)
+@csrf_protect
+def qb_bank_accounts_view(request):
+    from . import qb_client
+    from . import qb_pull
+
+    branches = list(Branch.objects.all().order_by("label"))
+
+    if request.method == "POST":
+        # Each branch posts as `branch_<id>` whose value is either "" (unset)
+        # or "<account_id>|<account_name>" — name is included so we don't
+        # need to re-query QB to populate the cached display name.
+        for branch in branches:
+            field = f"branch_{branch.pk}"
+            raw = (request.POST.get(field) or "").strip()
+            if not raw:
+                acct_id, acct_name = "", ""
+            else:
+                if "|" in raw:
+                    acct_id, acct_name = raw.split("|", 1)
+                else:
+                    acct_id, acct_name = raw, ""
+            if (branch.qb_bank_account_id != acct_id
+                    or branch.qb_bank_account_name != acct_name):
+                branch.qb_bank_account_id = acct_id
+                branch.qb_bank_account_name = acct_name
+                branch.save(update_fields=[
+                    "qb_bank_account_id", "qb_bank_account_name",
+                ])
+        return redirect("qb_bank_accounts")
+
+    accounts = []
+    fetch_error = ""
+    if qb_client.is_connected():
+        try:
+            with qb_client.with_qb_client() as qb:
+                accounts = qb_pull.list_payment_accounts(qb)
+        except qb_client.QbNotConnected as exc:
+            fetch_error = str(exc)
+        except Exception as exc:  # noqa: BLE001
+            fetch_error = f"{type(exc).__name__}: {exc}"
+
+    return render(request, "owner/qb_bank_accounts.html", {
+        "branches": branches,
+        "accounts": accounts,
+        "qb_connected": qb_client.is_connected(),
+        "fetch_error": fetch_error,
+    })
 
 
 # ─────────────────────────────────────────────────────────────

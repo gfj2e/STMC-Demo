@@ -45,6 +45,7 @@ urlpatterns = [
     path("manager/change-order/confirm-modal/", views.manager_change_order_complete_confirm_modal_view, name="manager_change_order_complete_modal"),
     path("manager/change-order/complete/", views.manager_change_order_complete_view, name="manager_change_order_complete"),
     path("manager/change-order/delete/", views.manager_change_order_delete_view, name="manager_change_order_delete"),
+    path("manager/change-order/<int:co_id>/pdf/", views.manager_change_order_pdf_view, name="manager_change_order_pdf"),
     path("owner/", views.owner_view, name="owner"),
     path("owner/dashboard-panel/", views.owner_dashboard_panel_view, name="owner_dashboard_panel"),
     path("owner/all-projects-panel/", views.owner_all_projects_panel_view, name="owner_all_projects_panel"),
@@ -55,6 +56,7 @@ urlpatterns = [
     path("qb/disconnect/", views.qb_disconnect_view, name="qb_disconnect"),
     path("owner/qb-status/", views.qb_status_view, name="qb_status"),
     path("owner/qb-sync/refresh/", views.qb_sync_refresh_view, name="qb_sync_refresh"),
+    path("owner/qb/bank-accounts/", views.qb_bank_accounts_view, name="qb_bank_accounts"),
     # ── Owner bell notifications ──
     path("owner/notifications/bell/", views.owner_notifications_bell_view,
          name="owner_notifications_bell"),

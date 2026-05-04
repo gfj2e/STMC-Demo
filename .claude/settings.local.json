@@ -100,7 +100,11 @@
       "Bash(cp /tmp/test_pmbudget.pdf \"C:\\\\\\\\Users\\\\\\\\gfj2e\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\test_pmbudget.pdf\")",
       "Bash(ls -la \"C:\\\\\\\\Users\\\\\\\\gfj2e\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\test_pmbudget.pdf\")",
       "Bash(xxd)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/stmc_ops/login/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/stmc_ops/login/)",
+      "Bash(.venv/Scripts/python manage.py shell -c \"from stmc_ops.models import AppUser; u=AppUser.objects.filter\\(role='exec'\\).first\\(\\); print\\(u.email if u else 'NONE'\\)\")",
+      "Bash(.venv/Scripts/python manage.py shell -c \"from stmc_ops.models import Job; j=Job.objects.exclude\\(current_phase='closed'\\).first\\(\\); print\\(j.id if j else 'none'\\)\")",
+      "Bash(.venv/Scripts/python manage.py shell -c \"from stmc_ops.models import Job; jobs = Job.objects.all\\(\\); print\\(jobs.count\\(\\)\\); [print\\(j.order_number, '|', j.customer_name\\) for j in jobs]\")",
+      "Bash(.venv/Scripts/python -c \"import ast; ast.parse\\(open\\('C:/Users/gfj2e/OneDrive/Documents/GitHub/STMC-Demo/stmc_ops/management/commands/seed_data.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
     ]
   }
 }

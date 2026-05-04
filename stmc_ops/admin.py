@@ -21,8 +21,9 @@ from .models import (
 
 @admin.register(Branch)
 class BranchAdmin(admin.ModelAdmin):
-    list_display = ("label", "key", "conc_rate", "default_miles", "zone")
-    search_fields = ("key", "label")
+    list_display = ("label", "key", "conc_rate", "default_miles", "zone",
+                    "qb_bank_account_name")
+    search_fields = ("key", "label", "qb_bank_account_name")
 
 
 @admin.register(AppUser)

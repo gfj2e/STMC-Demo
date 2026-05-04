@@ -59,6 +59,9 @@ Context:
           <a href="{{ qb_portal_url }}" target="_blank" rel="noopener" class="qb-btn qb-btn-primary">
             Open in QuickBooks
           </a>
+          <a href="{% url 'qb_bank_accounts' %}" class="qb-btn qb-btn-ghost">
+            Map Bank Accounts
+          </a>
           <form method="post" action="{% url 'qb_disconnect' %}" style="display:inline;margin:0">
             {% csrf_token %}
             <button type="submit" class="qb-btn qb-btn-ghost"

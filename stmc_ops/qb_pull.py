@@ -112,6 +112,7 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
         return counts
 
     bills = Bill.query("SELECT * FROM Bill MAXRESULTS 500", qb=qb)
+    paid_from_by_bill = _build_paid_from_index(qb)
 
     line_rows = list(job.demo_budget_lines.all())
     trade_rows = {tb.trade_name: tb for tb in job.demo_trade_budgets.all()}
@@ -171,6 +172,10 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
                 lines_by_account=lines_by_account,
             )
 
+            paid_from = paid_from_by_bill.get(bill_id) or {}
+            paid_from_id = paid_from.get("account_id", "")
+            paid_from_name = paid_from.get("account_name", "")
+
             if matched_line is not None:
                 if _bill_already_recorded(matched_line, bill_id, line_id):
                     counts["skipped"] += 1
@@ -182,6 +187,8 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
                     "vendor": vendor_name,
                     "txn_date": txn_date_iso,
                     "amount": str(amount),
+                    "paid_from_account_id": paid_from_id,
+                    "paid_from_account_name": paid_from_name,
                 }]
                 matched_line.actual = (matched_line.actual or Decimal("0")) + amount
                 matched_line.last_paid_at = timezone.now()
@@ -210,9 +217,12 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
             tb.qb_bill_doc_number = doc_number
             tb.qb_bill_vendor = vendor_name
             tb.qb_bill_txn_date = txn_date
+            tb.qb_paid_from_account_id = paid_from_id
+            tb.qb_paid_from_account_name = paid_from_name
             tb.save(update_fields=[
                 "actual", "is_complete", "qb_bill_id", "paid_at",
                 "qb_bill_doc_number", "qb_bill_vendor", "qb_bill_txn_date",
+                "qb_paid_from_account_id", "qb_paid_from_account_name",
             ])
             counts["matched"] += 1
 
@@ -293,6 +303,101 @@ def _rebuild_trade_actuals_from_lines(job):
             changed.append("is_complete")
         if changed:
             tb.save(update_fields=changed)
+
+
+def _build_paid_from_index(qb) -> dict:
+    """Walk every BillPayment in QB and return {bill_id: {account_id, account_name}}.
+
+    A BillPayment carries the bank/credit-card account the money left from
+    (`CheckPayment.BankAccountRef` or `CreditCardPayment.CCAccountRef`) and
+    a list of `LinkedTxn` rows pointing back to the Bill(s) it settled.
+
+    A Bill can be paid by multiple BillPayments (partial payments) drawn
+    from different accounts. For the demo we collapse that to a single
+    "primary" entry — the one with the largest LinkedTxn.Amount. If the
+    LinkedTxn doesn't expose Amount, we fall back to the BillPayment's own
+    TotalAmt and pick the most recent.
+
+    Never raises — failure here downgrades to "no paid-from data" (all bills
+    render as Unmapped) rather than killing the snapshot refresh.
+    """
+    from quickbooks.objects.billpayment import BillPayment
+
+    by_bill = {}
+    try:
+        payments = BillPayment.query("SELECT * FROM BillPayment MAXRESULTS 500", qb=qb)
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to query BillPayments; bills will render as Unmapped.")
+        return by_bill
+
+    for bp in payments:
+        pay_type = getattr(bp, "PayType", "") or ""
+        account_ref = None
+        if pay_type == "Check":
+            check_payment = getattr(bp, "CheckPayment", None)
+            if check_payment is not None:
+                account_ref = getattr(check_payment, "BankAccountRef", None)
+        elif pay_type == "CreditCard":
+            cc_payment = getattr(bp, "CreditCardPayment", None)
+            if cc_payment is not None:
+                account_ref = getattr(cc_payment, "CCAccountRef", None)
+        # PayType="" / "Cash" — no AccountRef on the payload; skip.
+        if account_ref is None:
+            continue
+        account_id = str(getattr(account_ref, "value", "") or "")
+        account_name = str(getattr(account_ref, "name", "") or "")
+        if not account_id:
+            continue
+
+        bp_total = Decimal(str(getattr(bp, "TotalAmt", 0) or 0))
+        for line in (getattr(bp, "Line", None) or []):
+            for linked in (getattr(line, "LinkedTxn", None) or []):
+                if (getattr(linked, "TxnType", "") or "") != "Bill":
+                    continue
+                bill_id = str(getattr(linked, "TxnId", "") or "")
+                if not bill_id:
+                    continue
+                amt = Decimal(str(getattr(line, "Amount", 0) or bp_total or 0))
+                existing = by_bill.get(bill_id)
+                if existing is None or amt > existing["amount"]:
+                    by_bill[bill_id] = {
+                        "account_id": account_id,
+                        "account_name": account_name,
+                        "amount": amt,
+                    }
+
+    return by_bill
+
+
+def list_payment_accounts(qb) -> list:
+    """Return all QB Bank + Credit Card accounts, suitable for a Branch
+    mapping dropdown. Sorted by name. Never raises — returns [] on failure.
+
+    Each entry: {id, name, type} where type is 'Bank' or 'Credit Card'.
+    """
+    from quickbooks.objects.account import Account
+
+    out = []
+    try:
+        # python-quickbooks doesn't expose an OR in the SELECT cleanly, so
+        # we run two narrow queries and concatenate.
+        for acct_type in ("Bank", "Credit Card"):
+            accts = Account.query(
+                f"SELECT Id, Name, AccountType FROM Account "
+                f"WHERE AccountType = '{acct_type}' MAXRESULTS 200",
+                qb=qb,
+            )
+            for a in accts:
+                out.append({
+                    "id": str(getattr(a, "Id", "") or ""),
+                    "name": str(getattr(a, "Name", "") or ""),
+                    "type": acct_type,
+                })
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to list QB payment accounts")
+        return []
+    out.sort(key=lambda r: (r["type"], r["name"].lower()))
+    return out
 
 
 def _extract_line_target(line):

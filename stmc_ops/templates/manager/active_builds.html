@@ -112,6 +112,13 @@
 													</div>
 													<div class="co-row-amt">{{ co.amount_display }}</div>
 													<div class="co-row-action">
+														<a
+															href="{% url 'manager_change_order_pdf' co.id %}"
+															target="_blank"
+															rel="noopener"
+															class="co-pdf-btn"
+															title="Download change order PDF"
+														>PDF</a>
 														{% if co.is_completed %}
 															<span class="pill pill-success" title="Marked complete">Completed</span>
 														{% else %}
@@ -326,6 +333,13 @@
 													</div>
 													<div class="co-row-amt">{{ co.amount_display }}</div>
 													<div class="co-row-action">
+														<a
+															href="{% url 'manager_change_order_pdf' co.id %}"
+															target="_blank"
+															rel="noopener"
+															class="co-pdf-btn"
+															title="Download change order PDF"
+														>PDF</a>
 														{% if co.is_completed %}
 															<span class="pill pill-success" title="Marked complete">Completed</span>
 														{% else %}

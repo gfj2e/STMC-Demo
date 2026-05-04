@@ -24,12 +24,27 @@ import json
 # ═══════════════════════════════════════════════════════════════
 
 class Branch(models.Model):
-    """Branch locations that affect concrete zone, miles tier, and default rates."""
+    """Branch locations that affect concrete zone, miles tier, and default rates.
+
+    `qb_bank_account_id` ties this branch to a QuickBooks Bank or Credit Card
+    account. When a Bill is paid via `BillPayment` whose `BankAccountRef` /
+    `CCAccountRef` matches this Id, the bill renders under this branch on the
+    Bills tab. Unset = no mapping (the bill renders as "Unmapped"). Mapped via
+    the exec-only page at /stmc_ops/qb/bank-accounts/.
+    """
     key = models.CharField(max_length=30, unique=True)  # e.g. "summertown"
     label = models.CharField(max_length=100)             # e.g. "Summertown Main"
     conc_rate = models.DecimalField(max_digits=6, decimal_places=2, default=8)
     default_miles = models.IntegerField(default=0)       # 0=under100, 1=over100
     zone = models.IntegerField(default=1)                # 1, 2, or 3
+    qb_bank_account_id = models.CharField(
+        max_length=32, blank=True, default="",
+        help_text="QB Account.Id of the Bank/Credit Card account this branch pays bills from.",
+    )
+    qb_bank_account_name = models.CharField(
+        max_length=128, blank=True, default="",
+        help_text="QB Account.Name (cached for display) of the mapped bank account.",
+    )
 
     class Meta:
         verbose_name_plural = "Branches"
@@ -783,6 +798,14 @@ class JobTradeBudget(models.Model):
         null=True, blank=True,
         help_text="Timestamp the puller observed Balance == 0 on the matching Bill."
     )
+    qb_paid_from_account_id = models.CharField(
+        max_length=32, blank=True, default="",
+        help_text="QB Account.Id of the Bank/Credit Card account the matching BillPayment drew from."
+    )
+    qb_paid_from_account_name = models.CharField(
+        max_length=128, blank=True, default="",
+        help_text="QB Account.Name of the BillPayment's BankAccountRef (cached for display)."
+    )
 
     class Meta:
         ordering = ['sort_order', 'trade_name']
@@ -985,33 +1008,6 @@ class QbCustomerMap(models.Model):
 
     def __str__(self):
         return f"Job {self.job_id} → QB Customer {self.qb_customer_id}"
-
-
-class QbItemMap(models.Model):
-    """Cache: trade-bucket name → QB Item Id + Account Id.
-
-    Populated by `python manage.py qb_seed_sandbox` after the QB connection
-    is live. The seed creates one Item per JobTradeBudget trade bucket
-    (Cabinets, Drywall, Electrical, ...) so the puller can match Bill lines
-    1:1 even when multiple buckets share an Account (Cabinets/Countertops
-    both → "Cabinets and Ctops"). Realm-aware so a QB company switch
-    invalidates stale entries — mirrors `QbCustomerMap`.
-    """
-    trade_name = models.CharField(
-        max_length=64, unique=True,
-        help_text="JobTradeBudget.trade_name (e.g. 'Cabinets')"
-    )
-    qb_item_id = models.CharField(max_length=32)
-    qb_account_id = models.CharField(max_length=32)
-    qb_account_name = models.CharField(
-        max_length=128,
-        help_text="QB Chart of Accounts name (e.g. 'Cabinets and Ctops')"
-    )
-    realm_id = models.CharField(max_length=64)
-    created_at = models.DateTimeField(default=timezone.now)
-
-    def __str__(self):
-        return f"{self.trade_name} → Item {self.qb_item_id} / Acct {self.qb_account_name}"
 
 
 class QbInvoiceEvent(models.Model):
