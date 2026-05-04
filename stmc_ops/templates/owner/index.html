@@ -58,37 +58,43 @@
 <!-- Tab panels -->
 <div class="container">
 
-  <div id="job-search-wrap" class="job-search-wrap">
-    <div class="job-search-controls">
-      <label class="job-search-field">
-        <span class="job-search-chip">Search</span>
-        <input
-          id="job-search-input"
-          class="job-search-input"
-          type="search"
-          placeholder="customer, order #, branch"
-          aria-label="Search jobs"
-        >
-      </label>
-      <button id="job-search-btn" class="job-search-btn" type="button">Find Job</button>
-    </div>
-    <div class="job-filter-row" aria-label="Project filters">
-      <select id="job-filter-branch" class="job-filter-select" aria-label="Filter by branch">
-        <option value="">All branches</option>
-      </select>
-      <select id="job-filter-plan" class="job-filter-select" aria-label="Filter by plan">
-        <option value="">All plans</option>
-      </select>
-      <select id="job-filter-phase" class="job-filter-select" aria-label="Filter by phase">
-        <option value="">All phases</option>
-      </select>
-      <select id="job-filter-year" class="job-filter-select" aria-label="Filter by year">
-        <option value="">All years</option>
-      </select>
-      <select id="job-filter-sort" class="job-filter-select" aria-label="Sort jobs">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-      </select>
+  <!-- Search/filter wrap is repositioned by owner.js at runtime: it gets
+       moved beneath each tab's anchor (under the QB status on Active
+       Contracts; at the top of the Closed Contracts panel). This div is
+       just the parking home so the element exists in the DOM. -->
+  <div id="owner-search-wrap-home">
+    <div id="job-search-wrap" class="job-search-wrap">
+      <div class="job-search-controls">
+        <label class="job-search-field">
+          <span class="job-search-chip">Search</span>
+          <input
+            id="job-search-input"
+            class="job-search-input"
+            type="search"
+            placeholder="customer, order #, branch"
+            aria-label="Search jobs"
+          >
+        </label>
+        <button id="job-search-btn" class="job-search-btn" type="button">Find Job</button>
+      </div>
+      <div class="job-filter-row" aria-label="Project filters">
+        <select id="job-filter-branch" class="job-filter-select" aria-label="Filter by branch">
+          <option value="">All branches</option>
+        </select>
+        <select id="job-filter-plan" class="job-filter-select" aria-label="Filter by plan">
+          <option value="">All plans</option>
+        </select>
+        <select id="job-filter-phase" class="job-filter-select" aria-label="Filter by phase">
+          <option value="">All phases</option>
+        </select>
+        <select id="job-filter-year" class="job-filter-select" aria-label="Filter by year">
+          <option value="">All years</option>
+        </select>
+        <select id="job-filter-sort" class="job-filter-select" aria-label="Sort jobs">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -111,6 +117,7 @@
     >
       {% include "owner/_qb_status.html" %}
     </div>
+    <div id="owner-dashboard-search-anchor"></div>
     <div
       id="tab-dashboard-panel"
       hx-get="{% url 'owner_dashboard_panel' %}"
@@ -123,6 +130,7 @@
 
   <!-- Closed Projects -->
   <div id="tab-projects-closed" class="tab-panel" style="display:none">
+    <div id="owner-closed-search-anchor"></div>
     <div
       id="tab-projects-closed-panel"
       hx-get="{% url 'owner_closed_projects_panel' %}"
@@ -146,6 +154,6 @@
   };
 </script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="{% static 'owner.js' %}?v=4"></script>
+<script src="{% static 'owner.js' %}?v=5"></script>
 </body>
 </html>

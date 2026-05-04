@@ -1,6 +1,6 @@
 import re
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 
@@ -22,6 +22,7 @@ from .models import (
     FloorPlanModel,
     InteriorRateCard,
     Job,
+    JobBudgetLineItem,
     JobChangeOrder,
     JobDraw,
     JobTradeBudget,
@@ -321,7 +322,6 @@ def _build_manager_owner_data():
     contract_total = 0
     collected_total = 0
     awaiting_total = 0
-    budget_health_scores = []
 
     for job in jobs:
         name = job.customer_name or f"Build #{job.id}"
@@ -360,9 +360,6 @@ def _build_manager_owner_data():
                 bg["Total Budget"] = fallback_budget
                 ac["Total Budget"] = fallback_spent
 
-        budget_total = sum(bg.values()) if bg else _to_number(job.budget_total_amount)
-        budget_spent = sum(ac.values()) if ac else _to_number(job.budget_spent_amount)
-
         # Draw schedule from DB
         dr = []
         for draw in job.demo_draws.all():
@@ -377,11 +374,6 @@ def _build_manager_owner_data():
         # Contract total = sum of all draws
         contract = int(sum(d["a"] for d in dr)) if dr else _to_number(_estimate_job_contract(job))
         collected = int(sum(d["a"] for d in dr if d["s"] == "p")) if dr else _to_number(job.collected_amount)
-
-        if budget_total > 0:
-            utilization = (budget_spent / budget_total) * 100
-            score = _clamp(100 - max(0, utilization - 100), 0, 100)
-            budget_health_scores.append(score)
 
         contract_total += contract
         collected_total += collected
@@ -436,20 +428,17 @@ def _build_manager_owner_data():
     contract_total = sum(p["ct"] for p in projects if p["ph"] != "closed")
     collected_total = sum(sum(d["a"] for d in p["dr"] if d["s"] == "p") for p in projects if p["ph"] != "closed")
     awaiting_total = sum(max(0, p["ct"] - sum(d["a"] for d in p["dr"] if d["s"] == "p")) for p in projects if p["ph"] != "closed")
-    avg_budget_health = (sum(budget_health_scores) / len(budget_health_scores)) if budget_health_scores else 0
     draws_pending = sum(
         1 for p in projects if any(d["s"] == "c" for d in p["dr"])
     )
-    budget_health_pct = int(round(avg_budget_health, 0))
-    if budget_health_pct >= 80:
-        budget_health_label = "On Track"
-        budget_health_tone = "success"
-    elif budget_health_pct >= 50:
-        budget_health_label = "At Risk"
-        budget_health_tone = "warning"
-    else:
-        budget_health_label = "Over Budget"
-        budget_health_tone = "danger"
+
+    active_projects = [p for p in projects if p["ph"] != "closed"]
+    over_budget_count = sum(
+        1 for p in active_projects
+        if sum(p["bg"].values()) > 0 and sum(p["ac"].values()) > sum(p["bg"].values())
+    )
+    over_budget_value = f"{over_budget_count}"
+    over_budget_tone = "danger" if over_budget_count else "success"
 
     # Build notifications from current draws
     notifications = []
@@ -465,7 +454,7 @@ def _build_manager_owner_data():
     manager = {
         "kpis": [
             {"label": "My builds", "value": str(active_builds)},
-            {"label": "Budget health", "value": budget_health_label, "tone": budget_health_tone, "sm": True},
+            {"label": "Builds over budget", "value": over_budget_value, "tone": over_budget_tone},
             {"label": "Draws pending", "value": str(draws_pending), "tone": "warning" if draws_pending else "success"},
         ],
         "projects": projects,
@@ -736,6 +725,18 @@ def _build_project_ui_rows(projects):
         total_bg = 0
         total_ac = 0
         locked_map = project.get("lk") or {}
+
+        # Per-line budget detail keyed by trade_bucket so the manager UI can
+        # drill down from the 14-trade rollup into the 29 PM-Budget rows the
+        # wizard actually creates.
+        project_id = project.get("id")
+        line_rows_by_bucket = {}
+        all_line_rows = []
+        if project_id:
+            for ln in JobBudgetLineItem.objects.filter(job_id=project_id):
+                line_rows_by_bucket.setdefault(ln.trade_bucket, []).append(ln)
+                all_line_rows.append(ln)
+
         for trade in trades:
             budget = int((project.get("bg") or {}).get(trade, 0) or 0)
             actual = int((project.get("ac") or {}).get(trade, 0) or 0)
@@ -743,6 +744,26 @@ def _build_project_ui_rows(projects):
             total_bg += budget
             total_ac += actual
             is_paid = bool(locked_map.get(trade))
+
+            line_views = []
+            for ln in line_rows_by_bucket.get(trade, []):
+                ln_budgeted = int(ln.budgeted or 0)
+                ln_actual = int(ln.actual or 0)
+                line_views.append({
+                    "po_number": ln.po_number,
+                    "title": ln.title,
+                    "bt_code": ln.bt_code,
+                    "qb_account": ln.qb_account_name,
+                    "draw_number": ln.draw_number,
+                    "budget_amount": ln_budgeted,
+                    "actual_amount": ln_actual,
+                    "budget_display": _format_money(ln_budgeted),
+                    "actual_display": _format_money(ln_actual),
+                    "variance_display": _format_money(ln_budgeted - ln_actual),
+                    "is_over": ln_actual > ln_budgeted,
+                    "is_paid": bool(ln.qb_bill_refs),
+                })
+
             trade_rows.append(
                 {
                     "trade": trade,
@@ -759,15 +780,16 @@ def _build_project_ui_rows(projects):
                     # Template renders a "Paid" pill instead of the dim
                     # "$0 / $budgeted" pair when set.
                     "is_paid": is_paid,
+                    "lines": line_views,
+                    "lines_count": len(line_views),
                 }
             )
 
-        # Bills tab data. Paid rows pull their identity from the matching
-        # QB Bill (cached on JobTradeBudget by qb_pull.refresh_actuals_for_job).
-        # Unpaid trades render as a "pending" placeholder with no invoice number,
-        # so the column never shows a fabricated identifier.
+        # Bills tab data. Real paid bills come from JobBudgetLineItem.qb_bill_refs
+        # (multiple bills per line accumulate as separate rows here, with the
+        # line's BT cost code carried in the Cost Code column). Falls back to
+        # JobTradeBudget for legacy demo data without per-line detail.
         bills = []
-        project_id = project.get("id")
         if project_id:
             tb_by_trade = {
                 tb.trade_name: tb
@@ -775,53 +797,100 @@ def _build_project_ui_rows(projects):
             }
         else:
             tb_by_trade = {}
-        for trade in trade_rows:
-            trade_name = trade["trade"]
-            budget = trade["budget_amount"]
-            actual = trade["actual_amount"]
-            remaining_budget = max(0, budget - actual)
-            tb = tb_by_trade.get(trade_name)
 
-            if tb is not None and tb.is_complete and tb.qb_bill_id:
-                # Paid in QB — show real invoice metadata.
-                invoice_id = tb.qb_bill_doc_number or f"#{tb.qb_bill_id}"
-                vendor = tb.qb_bill_vendor or f"{trade_name} Vendor"
-                date_text = tb.qb_bill_txn_date.strftime("%b %d, %Y") if tb.qb_bill_txn_date else ""
-                actual_status = "review" if actual > budget else "paid"
-                bills.append(
-                    {
-                        "invoice_id": invoice_id,
-                        "vendor": vendor,
-                        "description": f"{trade_name} actual cost entry",
-                        "cost_code": trade["cost_code"],
-                        "qb_account": trade_name,
-                        "amount": actual,
-                        "amount_display": _format_money(actual),
-                        "date": date_text,
+        if all_line_rows:
+            for ln in all_line_rows:
+                refs = ln.qb_bill_refs or []
+                for ref in refs:
+                    if not isinstance(ref, dict):
+                        continue
+                    try:
+                        amt = int(round(float(ref.get("amount") or 0)))
+                    except (TypeError, ValueError):
+                        amt = 0
+                    bills.append({
+                        "invoice_id": ref.get("doc_number") or (
+                            f"#{ref.get('bill_id')}" if ref.get("bill_id") else "—"
+                        ),
+                        "vendor": ref.get("vendor") or "",
+                        "description": ln.title,
+                        "cost_code": ln.bt_code or ln.trade_bucket or "",
+                        "qb_account": ln.qb_account_name or ln.trade_bucket or "",
+                        "amount": amt,
+                        "amount_display": _format_money(amt),
+                        "date": ref.get("txn_date") or "",
                         "branch": branch_label,
                         "branch_class": _branch_badge_class(branch_label),
-                        "status": actual_status,
-                        "status_label": _bill_status_label(actual_status),
-                    }
-                )
-            elif remaining_budget > 0:
-                # No paid QB bill yet — placeholder row, no fabricated invoice #.
-                bills.append(
-                    {
+                        "status": "paid",
+                        "status_label": _bill_status_label("paid"),
+                    })
+                # Show a pending placeholder for lines with budget remaining
+                # and no bill yet.
+                ln_budget = int(ln.budgeted or 0)
+                ln_actual = int(ln.actual or 0)
+                remaining = max(0, ln_budget - ln_actual)
+                if remaining > 0 and not refs:
+                    bills.append({
                         "invoice_id": "—",
                         "vendor": "",
-                        "description": f"{trade_name} budgeted remaining",
-                        "cost_code": trade["cost_code"],
-                        "qb_account": trade_name,
-                        "amount": remaining_budget,
-                        "amount_display": _format_money(remaining_budget),
+                        "description": ln.title,
+                        "cost_code": ln.bt_code or ln.trade_bucket or "",
+                        "qb_account": ln.qb_account_name or ln.trade_bucket or "",
+                        "amount": remaining,
+                        "amount_display": _format_money(remaining),
                         "date": "",
                         "branch": branch_label,
                         "branch_class": _branch_badge_class(branch_label),
                         "status": "pending",
                         "status_label": _bill_status_label("pending"),
-                    }
-                )
+                    })
+        else:
+            # Legacy fallback — JobTradeBudget-only bills (no line detail).
+            for trade in trade_rows:
+                trade_name = trade["trade"]
+                budget = trade["budget_amount"]
+                actual = trade["actual_amount"]
+                remaining_budget = max(0, budget - actual)
+                tb = tb_by_trade.get(trade_name)
+
+                if tb is not None and tb.is_complete and tb.qb_bill_id:
+                    invoice_id = tb.qb_bill_doc_number or f"#{tb.qb_bill_id}"
+                    vendor = tb.qb_bill_vendor or f"{trade_name} Vendor"
+                    date_text = tb.qb_bill_txn_date.strftime("%b %d, %Y") if tb.qb_bill_txn_date else ""
+                    actual_status = "review" if actual > budget else "paid"
+                    bills.append(
+                        {
+                            "invoice_id": invoice_id,
+                            "vendor": vendor,
+                            "description": f"{trade_name} actual cost entry",
+                            "cost_code": trade["cost_code"],
+                            "qb_account": trade_name,
+                            "amount": actual,
+                            "amount_display": _format_money(actual),
+                            "date": date_text,
+                            "branch": branch_label,
+                            "branch_class": _branch_badge_class(branch_label),
+                            "status": actual_status,
+                            "status_label": _bill_status_label(actual_status),
+                        }
+                    )
+                elif remaining_budget > 0:
+                    bills.append(
+                        {
+                            "invoice_id": "—",
+                            "vendor": "",
+                            "description": f"{trade_name} budgeted remaining",
+                            "cost_code": trade["cost_code"],
+                            "qb_account": trade_name,
+                            "amount": remaining_budget,
+                            "amount_display": _format_money(remaining_budget),
+                            "date": "",
+                            "branch": branch_label,
+                            "branch_class": _branch_badge_class(branch_label),
+                            "status": "pending",
+                            "status_label": _bill_status_label("pending"),
+                        }
+                    )
 
         bills_total = sum(row["amount"] for row in bills)
         bills_paid = sum(row["amount"] for row in bills if row["status"] == "paid")
@@ -830,6 +899,26 @@ def _build_project_ui_rows(projects):
         margin_pct = int(round(((total - total_bg) / total) * 100, 0)) if total > 0 and total_bg > 0 else 0
         margin_color = "var(--green)" if margin_pct >= 30 else ("var(--amber)" if margin_pct >= 15 else "#DC2626")
         live_margin_pct = round(((total - total_ac) / total) * 100, 1) if total > 0 else 0
+
+        # Per-job budget health (was previously only aggregated on the
+        # PM KPI strip). Each contract gets its own status so the PM can
+        # see at a glance which jobs are running hot.
+        if total_bg > 0:
+            utilization = (total_ac / total_bg) * 100
+            budget_health_pct = int(round(utilization))
+            if utilization > 100:
+                budget_health_label = "Over Budget"
+                budget_health_pill_class = "pill-danger"
+            elif utilization > 90:
+                budget_health_label = "At Risk"
+                budget_health_pill_class = "pill-warning"
+            else:
+                budget_health_label = "On Track"
+                budget_health_pill_class = "pill-success"
+        else:
+            budget_health_pct = 0
+            budget_health_label = "N/A"
+            budget_health_pill_class = "pill-muted"
 
         current_draw_label = ""
         if current_draw and current_draw.get("l"):
@@ -901,9 +990,13 @@ def _build_project_ui_rows(projects):
                 "total_ac_display": _format_money(total_ac),
                 "total_rem_display": _format_money(total_bg - total_ac),
                 "total_rem_negative": (total_bg - total_ac) < 0,
+                "total_progress_pct": int(round((total_ac / total_bg) * 100)) if total_bg > 0 else 0,
                 "margin_pct": margin_pct,
                 "margin_color": margin_color,
                 "live_margin_pct": live_margin_pct,
+                "budget_health_pct": budget_health_pct,
+                "budget_health_label": budget_health_label,
+                "budget_health_pill_class": budget_health_pill_class,
                 "is_overdue": overdue_draw,
                 "status_chip_class": "od" if overdue_draw else "act",
                 "status_chip_label": "Payment Due" if overdue_draw else "Active",
@@ -1724,26 +1817,112 @@ def manager_builds_closed_panel_view(request):
     )
 
 
-@role_required(AppUser.ROLE_PM)
-def manager_budget_print_view(request, job_id):
-    """Generate the PM Budget PDF for an in-progress job.
+# PM-side PDFs map to the wizard's existing print* functions. We host the
+# wizard JS in a stripped-down page (manager/budget_print.html), rehydrate
+# STATE from the job's saved wizard_state, then dispatch on `kind` to call
+# the right helper. html2pdf intercepts the wizard's window.print() call
+# so the PM gets a real download instead of the browser print dialog.
+PM_PDF_KINDS = {
+    "pmbudget": {
+        "fn": "printPMBudgetPDF",
+        "label": "PM Budget",
+        "description": "Internal PM labor + budget breakdown across all trades.",
+        "icon": "📊",
+    },
+    "upgrades": {
+        "fn": "printUpgradesPDF",
+        "label": "Customer Upgrades",
+        "description": "Customer-facing upgrade summary with itemized pricing.",
+        "icon": "📄",
+    },
+    "drawschedule": {
+        "fn": "printDrawSchedulePDF",
+        "label": "Draw Schedule",
+        "description": "Six-draw payment schedule for the bank/customer.",
+        "icon": "📅",
+    },
+    "contracts": {
+        "fn": "printContractsPDF",
+        "label": "Contracts Summary",
+        "description": "Legacy contracts summary (kept for reference).",
+        "icon": "📋",
+    },
+}
 
-    Rather than reimplementing the multi-page PDF layout the wizard
-    already produces (Step 9 — "PM Budget PDF"), this view loads the
-    wizard's JS+CSS in a stripped-down host page, rehydrates STATE from
-    the job's saved ``wizard_state``, and invokes the wizard's existing
-    ``printPMBudgetPDF()`` function so the PM gets the exact same PDF
-    a sales rep would print from the wizard's final step.
+
+@role_required(AppUser.ROLE_PM)
+def manager_pdf_print_view(request, job_id, kind):
+    """Generic PM-side PDF host page.
+
+    Rather than reimplementing each multi-page PDF layout the wizard
+    already produces, this view loads the wizard's JS+CSS in a
+    stripped-down host page, rehydrates STATE from the job's saved
+    ``wizard_state``, and invokes the wizard's existing ``print*PDF()``
+    helper for the requested ``kind``. The page calls ``window.print()``
+    so the user picks "Save as PDF" in the browser dialog.
     """
+    if kind not in PM_PDF_KINDS:
+        return redirect("manager")
     job = Job.objects.filter(pk=job_id).first()
     if job is None or not job.wizard_state:
         return redirect("manager")
+    spec = PM_PDF_KINDS[kind]
     return render(
         request,
         "manager/budget_print.html",
         {
             "job": job,
             "wizard_state": job.wizard_state,
+            "pdf_kind": kind,
+            "pdf_fn": spec["fn"],
+            "pdf_label": spec["label"],
+        },
+    )
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_budget_print_view(request, job_id):
+    """Backwards-compatible alias for the old PM Budget print URL.
+
+    The original `<a class="budget-print-btn">` and any bookmarks point
+    here. Delegate to the generic PDF print view with kind=pmbudget so
+    behavior is unchanged.
+    """
+    return manager_pdf_print_view(request, job_id, "pmbudget")
+
+
+@role_required(AppUser.ROLE_PM)
+def manager_pdf_picker_modal_view(request):
+    """HTMX modal listing every PM-side PDF available for a contract.
+
+    The PM clicks "PDFs" on an active build card; this returns the modal
+    HTML with one download link per kind in PM_PDF_KINDS. Each link
+    target=_blank opens the print host page, which downloads the PDF
+    via the html2pdf flow.
+    """
+    if not request.htmx:
+        return redirect("manager")
+    job_id = request.GET.get("job_id")
+    job = Job.objects.filter(pk=job_id).first() if job_id else None
+    if job is None:
+        return redirect("manager")
+    pdfs = [
+        {
+            "kind": kind,
+            "label": spec["label"],
+            "description": spec["description"],
+            "icon": spec["icon"],
+            "url": reverse("manager_pdf_print", args=[job.id, kind]),
+        }
+        for kind, spec in PM_PDF_KINDS.items()
+    ]
+    return render(
+        request,
+        "manager/_pdf_picker_modal.html",
+        {
+            "job": job,
+            "pdfs": pdfs,
+            "wizard_ready": bool(job.wizard_state),
         },
     )
 
@@ -2759,6 +2938,7 @@ def save_contract_view(request):
     labor_budget = int(body.get("laborBudget") or 0)
     draws_payload = body.get("draws") or []
     trade_budgets_payload = body.get("tradeBudgets") or []
+    budget_lines_payload = body.get("budgetLines") or []
     budget_total_payload = int(body.get("budgetTotal") or 0)
     contract_meta = body.get("contractMeta") or {}
 
@@ -2802,6 +2982,10 @@ def save_contract_view(request):
     # sales-rep-entered shell + computed interior contract.
     contract_total = turnkey_total or shell_total
     budget_total = budget_total_payload
+    if budget_total <= 0 and budget_lines_payload:
+        budget_total = int(
+            sum(float(row.get("cost") or 0) for row in budget_lines_payload)
+        )
     if budget_total <= 0 and trade_budgets_payload:
         budget_total = int(
             sum(int(row.get("budgeted") or 0) for row in trade_budgets_payload)
@@ -2915,7 +3099,46 @@ def save_contract_view(request):
             )
 
     # Keep owner/manager budget tabs populated for contracts saved from the wizard.
-    if trade_budgets_payload:
+    # When the wizard sends per-line budget rows (the canonical 29-row PM Budget
+    # shape), they're the source of truth — JobTradeBudget is rebuilt as a rollup
+    # from those lines so dashboards keep working without their own queries.
+    if budget_lines_payload:
+        from .qb_cost_codes import LINE_TITLE_TO_TRADE
+        job.demo_budget_lines.all().delete()
+        job.demo_trade_budgets.all().delete()
+        rollup = {}
+        for idx, row in enumerate(budget_lines_payload):
+            title = (row.get("title") or "").strip()
+            if not title:
+                continue
+            try:
+                cost = Decimal(str(row.get("cost") or 0))
+            except (InvalidOperation, TypeError):
+                cost = Decimal(0)
+            trade = LINE_TITLE_TO_TRADE.get(title, "")
+            JobBudgetLineItem.objects.create(
+                job=job,
+                po_number=str(row.get("po_number") or "")[:8],
+                title=title[:120],
+                bt_code=(row.get("bt_code") or "")[:64],
+                qb_account_name=(row.get("qb_account") or "")[:128],
+                trade_bucket=trade[:40],
+                draw_number=int(row.get("draw") or 0),
+                budgeted=cost,
+                sort_order=int(row.get("sort_order") or idx),
+            )
+            if trade and cost > 0:
+                rollup[trade] = rollup.get(trade, Decimal(0)) + cost
+        for sort_idx, (trade_name, total) in enumerate(rollup.items()):
+            JobTradeBudget.objects.create(
+                job=job,
+                trade_name=trade_name,
+                budgeted=int(total),
+                actual=0,
+                sort_order=sort_idx,
+            )
+    elif trade_budgets_payload:
+        # Legacy path — old wizard build with no budgetLines payload.
         job.demo_trade_budgets.all().delete()
         for idx, row in enumerate(trade_budgets_payload):
             trade_name = str(row.get("trade") or "").strip()

@@ -31,13 +31,24 @@
 								</div>
 							</div>
 							<div class="proj-body">
-								{% for draw in project.timeline_draws %}
-									<div class="ph">
-										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
-										<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
-										<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
-									</div>
-								{% endfor %}
+								<div class="exec-tabs" data-exec-tabs="closed-card-{{ project.id }}">
+									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="closed-card-{{ project.id }}">Draws</button>
+									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="closed-card-{{ project.id }}">Budget</button>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="closed-card-{{ project.id }}">
+									{% for draw in project.timeline_draws %}
+										<div class="ph">
+											<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+											<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+											<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+										</div>
+									{% endfor %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="closed-card-{{ project.id }}" hidden>
+									{% include "manager/_budget_panel.html" with project=project %}
+								</div>
 							</div>
 						</div>
 					{% endfor %}
@@ -108,13 +119,24 @@
 								</div>
 								<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
 
-								{% for draw in project.timeline_draws %}
-									<div class="ph">
-										<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
-										<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
-										<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
-									</div>
-								{% endfor %}
+								<div class="exec-tabs" data-exec-tabs="closed-row-{{ project.id }}">
+									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="closed-row-{{ project.id }}">Draws</button>
+									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="closed-row-{{ project.id }}">Budget</button>
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="closed-row-{{ project.id }}">
+									{% for draw in project.timeline_draws %}
+										<div class="ph">
+											<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
+											<div style="flex:1"><div style="font-weight:500">{{ draw.label }}</div></div>
+											<div style="text-align:right;min-width:55px"><div style="font-family:var(--font-mono);font-weight:500">{{ draw.amount_display }}</div></div>
+										</div>
+									{% endfor %}
+								</div>
+
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="closed-row-{{ project.id }}" hidden>
+									{% include "manager/_budget_panel.html" with project=project %}
+								</div>
 							</div>
 						</td>
 					</tr>

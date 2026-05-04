@@ -535,6 +535,11 @@
   color: var(--g600);
 }
 
+.pill-danger {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
 /* ── Budget progress bar ── */
 
 .budget-bar-wrap {
@@ -1181,6 +1186,78 @@
   cursor: not-allowed;
 }
 
+/* ── PDF picker modal ── Lists every PM-side PDF available for the
+   contract; each row is an <a target="_blank"> that opens the print
+   host page (which downloads the PDF via html2pdf). */
+.pdf-picker-modal {
+  max-width: 540px;
+}
+
+.pdf-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pdf-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--g200);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--g800);
+  transition: all 0.15s ease;
+}
+
+.pdf-picker-item:hover {
+  border-color: var(--red);
+  background: #FEF2F2;
+  color: var(--g900);
+}
+
+.pdf-picker-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.pdf-picker-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pdf-picker-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g900);
+}
+
+.pdf-picker-desc {
+  font-size: 11px;
+  color: var(--g500);
+  line-height: 1.4;
+}
+
+.pdf-picker-cta {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--g500);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pdf-picker-item:hover .pdf-picker-cta {
+  color: var(--red);
+}
+
 /* ──────────────────────────────────────────────────────────────────
    VIEW TOGGLE — Cards vs Table.
    Mirrors the sales-side implementation. Each panel template renders
@@ -1322,6 +1399,7 @@ body.view-mode-table .table-view { display: block; }
    new tab and triggers window.print(). */
 .budget-print-btn {
   text-decoration: none;
+  font-family: inherit;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1333,6 +1411,7 @@ body.view-mode-table .table-view { display: block; }
   border-radius: 999px;
   transition: all 0.15s ease;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .budget-print-btn:hover {
@@ -1376,4 +1455,105 @@ body.view-mode-table .table-view { display: block; }
 
 .exec-tab-panel {
   overflow-x: auto;
+}
+
+/* Budget vs Actual table — mirrors owner.css .exec-budget-* so the PM
+   "Budget vs Actual" tab renders identically to the owner dashboard. */
+.exec-budget-note {
+  padding: 10px 14px 4px;
+  font-size: 10px;
+  color: var(--g500);
+}
+
+.exec-budget-head,
+.exec-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--g100);
+  font-size: 11px;
+}
+
+.exec-budget-head {
+  background: var(--g100);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--g700);
+  text-transform: uppercase;
+}
+
+.exec-budget-row:hover {
+  background: var(--g50);
+}
+
+.exec-budget-row.is-total {
+  font-weight: 700;
+  background: var(--g100);
+  border-top: 2px solid var(--g300);
+}
+
+.exec-budget-col.trade {
+  flex: 1;
+  min-width: 160px;
+}
+
+.exec-budget-col.amt {
+  width: 110px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.exec-budget-col.amt.is-blue {
+  color: var(--blue);
+}
+
+.exec-budget-col.amt.is-red {
+  color: #DC2626;
+}
+
+.exec-budget-col.bar {
+  width: 140px;
+}
+
+.exec-cost-sub {
+  font-size: 9px;
+  color: var(--g500);
+}
+
+.exec-budget-bar {
+  height: 6px;
+  background: var(--g200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.exec-budget-fill {
+  height: 100%;
+  display: block;
+  width: 0;
+}
+
+.exec-budget-fill.is-blue {
+  background: var(--blue);
+}
+
+.exec-budget-fill.is-amber {
+  background: var(--amber);
+}
+
+.exec-budget-fill.is-green {
+  background: #10b981;
+}
+
+.exec-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--g500);
+}
+
+@media (max-width: 768px) {
+  .exec-budget-col.amt {
+    width: 90px;
+  }
 }

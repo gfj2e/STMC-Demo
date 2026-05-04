@@ -1,0 +1,39 @@
+<div class="modal-overlay" data-co-modal="1">
+  <div class="modal pdf-picker-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-picker-title">
+    <div class="modal-hdr" id="pdf-picker-title">
+      Download PDFs &mdash; {{ job.customer_name|default:"Build" }}
+    </div>
+    <div class="modal-body">
+      {% if not wizard_ready %}
+        <p class="confirm-note" style="margin-top:0">
+          This contract was saved before the wizard tracked full state.
+          PDFs are unavailable for this build.
+        </p>
+      {% else %}
+        <p class="confirm-lead" style="margin-top:0;margin-bottom:12px">
+          Pick a PDF to download. Each opens a one-shot tab that builds and
+          downloads the PDF using the same renderer the wizard uses.
+        </p>
+        <div class="pdf-picker-list">
+          {% for pdf in pdfs %}
+            <a class="pdf-picker-item"
+               href="{{ pdf.url }}"
+               target="_blank"
+               rel="noopener"
+               title="{{ pdf.description }}">
+              <span class="pdf-picker-icon" aria-hidden="true">{{ pdf.icon }}</span>
+              <span class="pdf-picker-text">
+                <span class="pdf-picker-label">{{ pdf.label }}</span>
+                <span class="pdf-picker-desc">{{ pdf.description }}</span>
+              </span>
+              <span class="pdf-picker-cta" aria-hidden="true">Download &rarr;</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="modal-ftr">
+      <button type="button" class="modal-btn" data-co-cancel="1">Close</button>
+    </div>
+  </div>
+</div>

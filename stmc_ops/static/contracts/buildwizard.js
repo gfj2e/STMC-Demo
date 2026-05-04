@@ -1408,6 +1408,7 @@ function saveContract(){
     ];
   } catch(e){ console.warn("[saveContract] draw build failed:", e); }
 
+  // Mirrored server-side in qb_cost_codes.py LINE_TITLE_TO_TRADE — keep in lockstep.
   var TITLE_TO_TRADE = {
     "Cabinets":"Cabinets", "Countertops":"Countertops",
     "Flooring Materials":"Flooring", "Flooring Installation":"Flooring", "Tile":"Flooring",
@@ -1423,7 +1424,19 @@ function saveContract(){
     "Permits":"Permits & General",
     "Final Clean":"Permits & General",
     "Contract Allowance Expense":"Permits & General",
-    "Dumpster Allowance":"Permits & General"
+    "Dumpster Allowance":"Permits & General",
+    // Exterior labor + concrete → Contractor Labor (the wizard's lump labor bucket)
+    "Concrete":"Contractor Labor",
+    "Framing":"Contractor Labor",
+    "Sheathing on Roof":"Contractor Labor",
+    "Roof":"Contractor Labor",
+    "Metal Install":"Contractor Labor",
+    "Rock":"Contractor Labor",
+    "Door and Window Install":"Contractor Labor",
+    "Cupola":"Contractor Labor",
+    "Decks/Porch":"Contractor Labor",
+    "Shop/Detached Garage — Material":"Contractor Labor",
+    "Shop/Detached Garage — Concrete & Labor":"Contractor Labor"
   };
   var TRADE_ORDER = [
     "Contractor Labor","Cabinets","Countertops","Flooring","Drywall","Paint",
@@ -1451,6 +1464,25 @@ function saveContract(){
     }
   });
 
+  // Per-line PM Budget rows. Server (save_contract_view) prefers these over
+  // tradeBudgets when present and rebuilds JobTradeBudget from this list.
+  var budgetLines = [];
+  try {
+    if (typeof buildPMBudgetRows === "function") {
+      (buildPMBudgetRows() || []).forEach(function(r, idx){
+        budgetLines.push({
+          po_number: r.poNum,
+          title:     r.title,
+          bt_code:   r.btCode,
+          qb_account: r.qbAccount,
+          draw:      parseInt(r.draw, 10) || 0,
+          cost:      Math.round(pn(r.cost) * 100) / 100,
+          sort_order: idx
+        });
+      });
+    }
+  } catch(e){ console.warn("[saveContract] line aggregation failed:", e); }
+
   var payload = {
     leadId: window.STMC_EDIT_JOB_ID || null,
     jobId:  window.STMC_EDIT_JOB_ID || null,
@@ -1467,6 +1499,7 @@ function saveContract(){
     contractMeta: STATE.contractMeta || {},
     draws: draws,
     tradeBudgets: tradeBudgets,
+    budgetLines: budgetLines,
     budgetTotal: turnkeyTotal,
     rawState: STATE
   };

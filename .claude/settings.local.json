@@ -79,7 +79,28 @@
       "Bash(.venv/Scripts/python)",
       "Bash(awk 'NR>=147 && NR<=151 {print NR\": \"$0}' stmc_ops/templates/owner/dashboard.html)",
       "Read(//c/Users/gfj2e/Downloads/**)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(awk 'NR>=43 && NR<=49 {gsub\\(/\\\\t/, \"[T]\"\\); print NR\": \"$0}' stmc_ops/templates/manager/active_builds.html)",
+      "Bash(/c/msys64/usr/bin/pacman -Q)",
+      "Bash(winget --version)",
+      "Bash(winget search *)",
+      "Bash(winget install *)",
+      "Bash(.venv/Scripts/python -c 'from weasyprint import HTML; pdf = HTML\\(string='\\\\''<h1>hello</h1><p>world</p>'\\\\''\\).write_pdf\\(\\); print\\('\\\\''PDF bytes:'\\\\'', len\\(pdf\\)\\)')",
+      "Bash(grep -E \"^pdf$|pdf/\")",
+      "Bash(.venv/Scripts/python -m pip uninstall -y weasyprint pillow pyphen pydyf cssselect2 fonttools tinycss2 tinyhtml5 webencodings brotli zopfli)",
+      "Bash(winget uninstall *)",
+      "Bash(winget list *)",
+      "Bash(.venv/Scripts/python -c \"import weasyprint\")",
+      "Bash(rm -f edge_test.pdf)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" --headless=new --disable-gpu --no-margins --virtual-time-budget=2000 --print-to-pdf=edge_test.pdf \"data:text/html,<h1>hello</h1><p>vector text test</p>\")",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" --headless=new --disable-gpu --no-margins --virtual-time-budget=2000 \"--print-to-pdf=C:\\\\\\\\Users\\\\\\\\gfj2e\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\edge_test.pdf\" \"data:text/html,<h1>hello</h1><p>vector text test</p>\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8000/stmc_ops/login/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8765/stmc_ops/login/)",
+      "Bash(curl -s http://127.0.0.1:8765/stmc_ops/login/)",
+      "Bash(cp /tmp/test_pmbudget.pdf \"C:\\\\\\\\Users\\\\\\\\gfj2e\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\test_pmbudget.pdf\")",
+      "Bash(ls -la \"C:\\\\\\\\Users\\\\\\\\gfj2e\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\test_pmbudget.pdf\")",
+      "Bash(xxd)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/stmc_ops/login/)"
     ]
   }
 }

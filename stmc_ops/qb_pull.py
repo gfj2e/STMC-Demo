@@ -29,7 +29,15 @@ from typing import Optional
 
 from django.utils import timezone
 
-from .models import Job, JobDraw, JobTradeBudget, QbCustomerMap, QbInvoiceEvent, QbSyncSnapshot
+from .models import (
+    Job,
+    JobBudgetLineItem,
+    JobDraw,
+    JobTradeBudget,
+    QbCustomerMap,
+    QbInvoiceEvent,
+    QbSyncSnapshot,
+)
 from . import qb_client
 from .qb_cost_codes import QB_ACCOUNT_TO_TRADES
 
@@ -69,27 +77,26 @@ def fetch_month_payments(qb) -> Decimal:
     return total
 
 def refresh_actuals_for_job(qb, job: Job) -> dict:
-    """Pull paid Bills from QB for `job` and stamp matching JobTradeBudget rows.
+    """Pull paid Bills from QB for `job` and reconcile against budget data.
 
-    Match logic:
-      * Filter Bills where any line's `CustomerRef.value == job's cached
-        QB Customer Id` (`QbCustomerMap`). Skip if no map row -- the eager
-        push hasn't fired yet.
-      * For each Bill where `Balance == 0` (fully paid):
-          - Item-based line: extract `ItemRef.name`, match to a
-            JobTradeBudget by exact `trade_name`.
-          - Account-based line (fallback): extract `AccountRef.name`,
-            look up in QB_ACCOUNT_TO_TRADES. Credit only if exactly
-            ONE trade maps to that account; log + skip if ambiguous.
-      * If matching JobTradeBudget exists AND `is_complete == False`:
-        stamp `actual = line.Amount`, set `is_complete = True`,
-        `qb_bill_id = bill.Id`, `paid_at = now()`. Save.
-      * If `is_complete == True` already: skip (lock-on-first-payment).
+    Two-tier matching:
+      1. **Line-level first** — match each paid Bill line to a
+         JobBudgetLineItem (the canonical 29-row PM Budget detail). Tiebreak
+         within a trade bucket by BT-code substring in the bill description,
+         then by largest remaining (budgeted - actual). Multiple bills hitting
+         the same line accumulate via `qb_bill_refs` keyed on (bill_id, line_id).
+      2. **Trade fallback** — when no JobBudgetLineItem exists for the job
+         (legacy demo data) OR the line resolves to no bucket, credit the
+         JobTradeBudget row directly using the original lock-on-first-payment
+         behavior.
 
-    Returns `{matched: int, skipped: int, ambiguous: int}` for logging.
+    After processing, recomputes JobTradeBudget.actual per bucket as the sum
+    of JobBudgetLineItem.actual for that bucket so dashboards stay consistent.
 
-    Raises on any QB error -- caller in `refresh_snapshot` wraps in
-    try/except and downgrades the snapshot to STALE on failure.
+    Returns `{matched, skipped, ambiguous}` for logging.
+
+    Raises on any QB error -- caller in `refresh_snapshot` wraps in try/except
+    and downgrades the snapshot to STALE on failure.
     """
     from quickbooks.objects.bill import Bill
 
@@ -104,51 +111,91 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
     if not customer_id:
         return counts
 
-    # Pull all Bills tagged to this customer. QB's query language doesn't
-    # support filtering by nested CustomerRef on Line directly, so we fetch
-    # candidate Bills and filter client-side. For a sandbox with a few
-    # hundred Bills this is one round-trip and ~200ms.
-    #
-    # NOTE: There's no top-level CustomerRef on a Bill in QBO -- the
-    # CustomerRef lives on the Line.AccountBasedExpenseLineDetail or
-    # Line.ItemBasedExpenseLineDetail. So we have to scan and filter.
     bills = Bill.query("SELECT * FROM Bill MAXRESULTS 500", qb=qb)
 
-    # Pre-load all trade-budget rows for this job in a single query.
+    line_rows = list(job.demo_budget_lines.all())
     trade_rows = {tb.trade_name: tb for tb in job.demo_trade_budgets.all()}
-    if not trade_rows:
+    if not line_rows and not trade_rows:
         return counts
 
+    # Group line items by trade bucket and by qb account name once for fast
+    # candidate lookup inside the per-bill loop.
+    lines_by_bucket = {}
+    lines_by_account = {}
+    for ln in line_rows:
+        if ln.trade_bucket:
+            lines_by_bucket.setdefault(ln.trade_bucket, []).append(ln)
+        if ln.qb_account_name:
+            lines_by_account.setdefault(ln.qb_account_name, []).append(ln)
+
     for bill in bills:
-        # Only fully-paid bills count -- "lock on first payment" behavior.
         if Decimal(str(getattr(bill, "Balance", 0) or 0)) != Decimal("0"):
             continue
 
+        bill_id = str(getattr(bill, "Id", "") or "")
+        doc_number = str(getattr(bill, "DocNumber", "") or "")
+        vendor_ref = getattr(bill, "VendorRef", None)
+        vendor_name = (getattr(vendor_ref, "name", "") or "") if vendor_ref else ""
+        txn_date_raw = getattr(bill, "TxnDate", None)
+        try:
+            txn_date = (
+                datetime.strptime(txn_date_raw, "%Y-%m-%d").date()
+                if txn_date_raw else None
+            )
+        except (TypeError, ValueError):
+            txn_date = None
+        txn_date_iso = txn_date.isoformat() if txn_date else ""
+
         for line in (bill.Line or []):
-            line_customer_id, line_trade = _extract_line_target(line)
+            target = _extract_line_target(line)
+            line_customer_id = target["customer_id"]
             if line_customer_id is None:
-                # Paid bill with no Customer reference — the accountant likely
-                # forgot to tag the line with a job, OR the QB sandbox setting
-                # "Track expenses and items by customer" is OFF (so the
-                # Customer column isn't appearing on Bill forms). Either way
-                # we can't attribute it. Log once per offending bill so the
-                # owner dashboard owner knows to follow up.
                 logger.warning(
                     "QB Bill %s (paid, $%s, item=%s) has no CustomerRef -- "
-                    "edit the bill in QB to set Customer = the job, or check "
-                    "that 'Track expenses and items by customer' is ON in "
-                    "Account and Settings -> Expenses.",
-                    getattr(bill, "Id", "?"),
+                    "edit the bill in QB to set Customer = the job.",
+                    bill_id or "?",
                     getattr(line, "Amount", "?"),
-                    line_trade or "(unknown)",
+                    target["item_name"] or "(unknown)",
                 )
                 continue
             if line_customer_id != customer_id:
                 continue
+
+            line_id = str(getattr(line, "Id", "") or "")
+            amount = Decimal(str(getattr(line, "Amount", 0) or 0))
+            description = str(getattr(line, "Description", "") or "")
+
+            matched_line = _pick_line_for_bill_line(
+                target, description,
+                lines_by_bucket=lines_by_bucket,
+                lines_by_account=lines_by_account,
+            )
+
+            if matched_line is not None:
+                if _bill_already_recorded(matched_line, bill_id, line_id):
+                    counts["skipped"] += 1
+                    continue
+                matched_line.qb_bill_refs = list(matched_line.qb_bill_refs or []) + [{
+                    "bill_id": bill_id,
+                    "line_id": line_id,
+                    "doc_number": doc_number,
+                    "vendor": vendor_name,
+                    "txn_date": txn_date_iso,
+                    "amount": str(amount),
+                }]
+                matched_line.actual = (matched_line.actual or Decimal("0")) + amount
+                matched_line.last_paid_at = timezone.now()
+                matched_line.save(update_fields=[
+                    "qb_bill_refs", "actual", "last_paid_at",
+                ])
+                counts["matched"] += 1
+                continue
+
+            # ── Trade-bucket fallback (legacy path) ──
+            line_trade = target["trade_bucket"]
             if not line_trade:
                 counts["ambiguous"] += 1
                 continue
-
             tb = trade_rows.get(line_trade)
             if tb is None:
                 counts["skipped"] += 1
@@ -156,73 +203,148 @@ def refresh_actuals_for_job(qb, job: Job) -> dict:
             if tb.is_complete:
                 counts["skipped"] += 1
                 continue
-
-            tb.actual = Decimal(str(getattr(line, "Amount", 0) or 0))
+            tb.actual = amount
             tb.is_complete = True
-            tb.qb_bill_id = str(bill.Id)
+            tb.qb_bill_id = bill_id
             tb.paid_at = timezone.now()
-            # Capture human-readable bill metadata for the owner Bills tab.
-            # DocNumber is the user-facing invoice number on the QB Bill;
-            # VendorRef.name + TxnDate round out the row.
-            tb.qb_bill_doc_number = str(getattr(bill, "DocNumber", "") or "")
-            vendor_ref = getattr(bill, "VendorRef", None)
-            tb.qb_bill_vendor = (getattr(vendor_ref, "name", "") or "") if vendor_ref else ""
-            txn_date = getattr(bill, "TxnDate", None)
-            try:
-                tb.qb_bill_txn_date = datetime.strptime(txn_date, "%Y-%m-%d").date() if txn_date else None
-            except (TypeError, ValueError):
-                tb.qb_bill_txn_date = None
+            tb.qb_bill_doc_number = doc_number
+            tb.qb_bill_vendor = vendor_name
+            tb.qb_bill_txn_date = txn_date
             tb.save(update_fields=[
                 "actual", "is_complete", "qb_bill_id", "paid_at",
                 "qb_bill_doc_number", "qb_bill_vendor", "qb_bill_txn_date",
             ])
             counts["matched"] += 1
 
+    # Roll line actuals up into JobTradeBudget so legacy templates keep working.
+    if line_rows:
+        _rebuild_trade_actuals_from_lines(job)
+
     return counts
 
 
-def _extract_line_target(line):
-    """Pick the CustomerRef and trade name (matching JobTradeBudget.trade_name)
-    out of a Bill line's detail block.
+def _pick_line_for_bill_line(target, description, *, lines_by_bucket, lines_by_account):
+    """Choose the best JobBudgetLineItem for a Bill line.
 
-    Returns `(customer_id, trade_name)` where either may be None if the
-    line doesn't carry the relevant ref. `trade_name` is None for
-    ambiguous Account-based lines (account shared between multiple trades).
+    Strategy: start with candidates whose trade_bucket matches the resolved
+    bucket (Item path), or whose qb_account_name matches the AccountRef.name
+    (Account path). Tiebreak by BT-code substring in description, then by
+    largest remaining (budgeted - actual).
     """
-    # Item-based line: ItemBasedExpenseLineDetail with ItemRef + CustomerRef
+    candidates = []
+    bucket = target["trade_bucket"]
+    account = target["account_name"]
+    if bucket and bucket in lines_by_bucket:
+        candidates = lines_by_bucket[bucket]
+    elif account and account in lines_by_account:
+        candidates = lines_by_account[account]
+
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    desc_lc = (description or "").lower()
+    bt_hits = [c for c in candidates if c.bt_code and c.bt_code.lower() in desc_lc]
+    if len(bt_hits) == 1:
+        return bt_hits[0]
+    pool = bt_hits if bt_hits else candidates
+
+    def remaining(c):
+        return (c.budgeted or Decimal("0")) - (c.actual or Decimal("0"))
+    pool_sorted = sorted(pool, key=lambda c: (remaining(c), -c.sort_order), reverse=True)
+    return pool_sorted[0]
+
+
+def _bill_already_recorded(line_row, bill_id, line_id):
+    refs = line_row.qb_bill_refs or []
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        if ref.get("bill_id") == bill_id and ref.get("line_id") == line_id:
+            return True
+    return False
+
+
+def _rebuild_trade_actuals_from_lines(job):
+    """Recompute JobTradeBudget.actual per bucket = sum of line.actual.
+
+    Also stamps `is_complete` when any bill landed (kept for legacy
+    templates that read this field). Single-row updates per bucket.
+    """
+    bucket_totals = {}
+    bucket_paid = {}
+    for ln in job.demo_budget_lines.all():
+        if not ln.trade_bucket:
+            continue
+        bucket_totals[ln.trade_bucket] = bucket_totals.get(ln.trade_bucket, Decimal("0")) + (ln.actual or Decimal("0"))
+        if ln.qb_bill_refs:
+            bucket_paid[ln.trade_bucket] = True
+
+    for tb in job.demo_trade_budgets.all():
+        new_actual = bucket_totals.get(tb.trade_name, Decimal("0"))
+        new_complete = bool(bucket_paid.get(tb.trade_name))
+        changed = []
+        if tb.actual != new_actual:
+            tb.actual = new_actual
+            changed.append("actual")
+        if new_complete and not tb.is_complete:
+            tb.is_complete = True
+            changed.append("is_complete")
+        if changed:
+            tb.save(update_fields=changed)
+
+
+def _extract_line_target(line):
+    """Resolve a Bill line into routing targets used by the matcher.
+
+    Returns a dict with keys:
+      customer_id   — the line's CustomerRef.value (None if missing)
+      item_name     — ItemRef.name when this is an item-based line
+      account_name  — AccountRef.name when this is an account-based line
+      trade_bucket  — the resolved trade-bucket name (1:1 from Item.Name,
+                      or via QB_ACCOUNT_TO_TRADES when the account maps to
+                      exactly one bucket). None if ambiguous.
+    """
+    out = {
+        "customer_id": None,
+        "item_name": None,
+        "account_name": None,
+        "trade_bucket": None,
+    }
+
     item_detail = getattr(line, "ItemBasedExpenseLineDetail", None)
     if item_detail is not None:
         cust_ref = getattr(item_detail, "CustomerRef", None)
         item_ref = getattr(item_detail, "ItemRef", None)
-        cust_id = getattr(cust_ref, "value", None) if cust_ref else None
-        # ItemRef.name matches JobTradeBudget.trade_name 1:1 because the
-        # seed command creates one Item per trade bucket (e.g. "Cabinets",
-        # "Drywall") -- see qb_seed_sandbox._ensure_service_item.
+        out["customer_id"] = getattr(cust_ref, "value", None) if cust_ref else None
         item_name = getattr(item_ref, "name", None) if item_ref else None
-        return cust_id, item_name
+        out["item_name"] = item_name
+        # Item.Name == JobTradeBudget.trade_name 1:1 (qb_seed_sandbox seeds
+        # one Item per trade bucket).
+        out["trade_bucket"] = item_name
+        return out
 
-    # Account-based fallback: AccountRef.name -> reverse-map to trade(s).
     acct_detail = getattr(line, "AccountBasedExpenseLineDetail", None)
     if acct_detail is not None:
         cust_ref = getattr(acct_detail, "CustomerRef", None)
         acct_ref = getattr(acct_detail, "AccountRef", None)
-        cust_id = getattr(cust_ref, "value", None) if cust_ref else None
+        out["customer_id"] = getattr(cust_ref, "value", None) if cust_ref else None
         acct_name = getattr(acct_ref, "name", None) if acct_ref else None
-        if not acct_name:
-            return cust_id, None
-        candidates = QB_ACCOUNT_TO_TRADES.get(acct_name, [])
-        if len(candidates) == 1:
-            return cust_id, candidates[0]
-        # Ambiguous (account shared between trades like Cabinets+Countertops).
-        # Log and let the caller increment the ambiguous counter.
-        logger.warning(
-            "Bill line uses Account '%s' which maps to multiple trades %s; "
-            "accountant should re-enter using the Item picker. Skipping.",
-            acct_name, candidates,
-        )
-        return cust_id, None
+        out["account_name"] = acct_name
+        if acct_name:
+            candidates = QB_ACCOUNT_TO_TRADES.get(acct_name, [])
+            if len(candidates) == 1:
+                out["trade_bucket"] = candidates[0]
+            elif len(candidates) > 1:
+                logger.warning(
+                    "Bill line uses Account '%s' which maps to multiple trades %s; "
+                    "tiebreak will rely on description / line-level account match.",
+                    acct_name, candidates,
+                )
+        return out
 
-    return None, None
+    return out
 
 
 # ─────────────────────────────────────────────────────────────

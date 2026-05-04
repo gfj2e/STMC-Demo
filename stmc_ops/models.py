@@ -792,6 +792,37 @@ class JobTradeBudget(models.Model):
         return f"{self.job.customer_name} — {self.trade_name}"
 
 
+class JobBudgetLineItem(models.Model):
+    """One PM Budget LINE row (29 per job) as built by the wizard's
+    buildPMBudgetRows(). Source of truth for cost-code attribution; the
+    14-bucket JobTradeBudget is rebuilt from these on every save and on
+    every QB Bill pull.
+
+    `qb_bill_refs` accumulates {bill_id, doc_number, vendor, txn_date,
+    amount, line_id} dicts. Idempotency is keyed on bill_id+line_id so
+    refreshing the puller never double-counts.
+    """
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='demo_budget_lines')
+    po_number = models.CharField(max_length=8)
+    title = models.CharField(max_length=120)
+    bt_code = models.CharField(max_length=64, blank=True, default='')
+    qb_account_name = models.CharField(max_length=128, blank=True, default='')
+    trade_bucket = models.CharField(max_length=40, blank=True, default='')
+    draw_number = models.IntegerField(default=0)
+    budgeted = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    actual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    qb_bill_refs = models.JSONField(default=list, blank=True)
+    last_paid_at = models.DateTimeField(null=True, blank=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'po_number']
+        unique_together = ['job', 'po_number']
+
+    def __str__(self):
+        return f"{self.job.customer_name} — PO {self.po_number} {self.title}"
+
+
 class JobChangeOrder(models.Model):
     """A signed contract change order for a job. Modeled after the paper
     "Change Order" form (Version 2.2 Feb 2025). Numbered per-job (CO #1,

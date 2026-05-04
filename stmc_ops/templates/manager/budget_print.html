@@ -4,14 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>PM Budget — {{ job.customer_name|default:"Job" }}</title>
+  <title>{{ pdf_label|default:"PM Budget" }} — {{ job.customer_name|default:"Job" }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'contracts/buildwizard.css' %}?v=11">
   <style>
-    /* Hide every wizard surface — only the print sheet that
-       printPMBudgetPDF() injects should be visible. */
+    /* Hide every wizard surface — only the print sheet that the
+       wizard's print*PDF() helper injects should be visible. */
     body { background: #fff; }
     .header, .progress-wrap, .container, .nav-wrap, .footer, .toast,
     .modal-overlay { display: none !important; }
@@ -49,7 +49,7 @@
 
 <!-- The wizard's printPMBudgetPDF() writes its multi-page HTML into this node. -->
 <div id="printSheet" style="display:none"></div>
-<div id="pm-print-status">Preparing PM Budget PDF&hellip;</div>
+<div id="pm-print-status">Preparing {{ pdf_label|default:"PM Budget" }} PDF&hellip;</div>
 
 {{ wizard_state|json_script:"stmc-wizard-edit-state" }}
 <script>
@@ -80,18 +80,37 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="{% static 'contracts/buildwizard.js' %}?v=11" defer></script>
 <script>
-  // After the wizard's deferred init runs (defer scripts execute before
-  // DOMContentLoaded), invoke the same PM Budget PDF flow Step 9 exposes.
+  function _setPmPrintStatus(msg, isError) {
+    var el = document.getElementById("pm-print-status");
+    if (!el) return;
+    el.textContent = msg;
+    if (isError) el.style.color = "#B91C1C";
+  }
+
+  // Which wizard helper to call is decided server-side via the URL kind.
+  var PM_PDF_FN_NAME = "{{ pdf_fn|default:'printPMBudgetPDF'|escapejs }}";
+  var PM_PDF_LABEL = "{{ pdf_label|default:'PM Budget'|escapejs }}";
+
+  // Use the wizard's native print path: printToSheet() fills #printSheet then
+  // calls window.print(). The browser's print engine respects buildwizard.css
+  // @media print rules and renders at letter-page-content width — the user
+  // picks "Save as PDF" in the dialog. This is intentionally the same code
+  // path that produces the wizard's PDF, so the two outputs match exactly.
+  // (Earlier attempt used html2pdf to skip the dialog, but html2canvas
+  // captured the live viewport width and clipped the right edge.)
   window.addEventListener("DOMContentLoaded", function () {
     setTimeout(function () {
-      try {
-        if (typeof printPMBudgetPDF === "function") {
-          printPMBudgetPDF();
-        } else {
-          console.error("[PM Budget print] printPMBudgetPDF not defined");
-        }
-      } catch (e) {
-        console.error("[PM Budget print] failed:", e);
+      var pdfFn = window[PM_PDF_FN_NAME];
+      if (typeof pdfFn !== "function") {
+        console.error("[" + PM_PDF_LABEL + " print] " + PM_PDF_FN_NAME + " not defined");
+        _setPmPrintStatus(PM_PDF_LABEL + " PDF helper failed to load.", true);
+        return;
+      }
+      _setPmPrintStatus("Opening print dialog — choose “Save as PDF”.");
+      try { pdfFn(); }
+      catch (e) {
+        console.error("[" + PM_PDF_LABEL + " print] failed:", e);
+        _setPmPrintStatus("Failed to build " + PM_PDF_LABEL + ". " + (e && e.message || ""), true);
       }
     }, 250);
   });

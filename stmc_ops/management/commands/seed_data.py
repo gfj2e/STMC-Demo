@@ -15,9 +15,33 @@ from django.core.management.base import BaseCommand
 from decimal import Decimal
 from stmc_ops.models import (
     AppUser, Branch, BudgetTrade, BudgetTradeRate, FloorPlanModel, InteriorRateCard, Job,
-    JobTradeBudget, JobDraw,
+    JobBudgetLineItem, JobTradeBudget, JobDraw,
     UpgradeCategory, UpgradeSection, UpgradeItem, ApplianceConfig, IslandAddon,
 )
+
+
+# Canonical line-item template per seeded trade bucket. Mirrors the BT cost code
+# / QB account / draw assignment from the wizard's buildPMBudgetRows() so the
+# manager dashboard drill-down has plausible cost-code data without needing the
+# wizard to run for every demo job.
+SEED_TRADE_LINE_TEMPLATES = {
+    "Cabinets":          ("Cabinets",                    "Cabinets and Ctops",         "Cabinets and Ctops",         5),
+    "Countertops":       ("Countertops",                 "Cabinets and Ctops",         "Cabinets and Ctops",         5),
+    "Flooring":          ("Flooring Materials",          "Flooring",                   "Flooring",                   5),
+    "Drywall":           ("Drywall Material",            "Drywall",                    "Drywall & Painting",         5),
+    "Paint":             ("Painting",                    "Painting",                   "Drywall & Painting",         5),
+    "Trim":              ("Trim and Door Materials",     "Interior Trim & Doors",      "Interior Trim & Doors",      5),
+    "Trim & Doors":      ("Trim and Door Materials",     "Interior Trim & Doors",      "Interior Trim & Doors",      5),
+    "Electrical":        ("Electrical",                  "Electrical Installation",    "Electrical Installation",    4),
+    "Plumbing":          ("Plumbing Installation",       "Plumbing Installation",      "Plumbing Installation",      4),
+    "Insulation":        ("Insulation",                  "Insulation - Spray Foam",    "Insulation - Spray Foam",    4),
+    "HVAC":              ("HVAC",                        "HVAC",                       "HVAC",                       4),
+    "Light Fixtures":    ("Plumbing & Light Fixtures",   "Plumbing & Lighting Fixtures","Plumbing & Lighting Fixtures",5),
+    "Fireplaces":        ("Fireplace",                   "Fireplace",                  "Fireplaces",                 5),
+    "Contractor Labor":  ("Framing",                     "Whole House Framing",        "Framing of Home",            3),
+    "General":           ("Permits",                     "Permits",                    "Permits",                    6),
+    "Permits & General": ("Permits",                     "Permits",                    "Permits",                    6),
+}
 
 
 class Command(BaseCommand):
@@ -544,6 +568,30 @@ class Command(BaseCommand):
                         "actual": Decimal(str(actual)),
                         "sort_order": sort_order,
                     },
+                )
+
+            # Seed line-item budgets — one per trade using the canonical
+            # title/BT-code/QB-account template above. Real wizard saves emit
+            # ~29 lines; the demo set is intentionally simpler so the seed
+            # stays readable.
+            job.demo_budget_lines.all().delete()
+            for idx, (trade_name, budgeted, actual, sort_order) in enumerate(row["trade_budgets"]):
+                tmpl = SEED_TRADE_LINE_TEMPLATES.get(trade_name)
+                if tmpl is None:
+                    title, bt_code, qb_account, draw_number = trade_name, trade_name, trade_name, 5
+                else:
+                    title, bt_code, qb_account, draw_number = tmpl
+                JobBudgetLineItem.objects.create(
+                    job=job,
+                    po_number=str(idx + 1).zfill(4),
+                    title=title,
+                    bt_code=bt_code,
+                    qb_account_name=qb_account,
+                    trade_bucket=trade_name,
+                    draw_number=draw_number,
+                    budgeted=Decimal(str(budgeted)),
+                    actual=Decimal(str(actual)),
+                    sort_order=sort_order,
                 )
 
             # Seed draw schedule

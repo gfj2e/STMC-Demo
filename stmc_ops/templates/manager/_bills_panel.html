@@ -1,0 +1,71 @@
+{% if project.bills %}
+	<div class="exec-bill-summary">
+		<div class="exec-bill-box">
+			<div class="exec-bill-val">{{ project.bills_count }}</div>
+			<div class="exec-bill-lbl">Total Invoices</div>
+		</div>
+		<div class="exec-bill-box">
+			<div class="exec-bill-val">{{ project.bills_total_display }}</div>
+			<div class="exec-bill-lbl">Total Billed</div>
+		</div>
+		<div class="exec-bill-box">
+			<div class="exec-bill-val is-green">{{ project.bills_paid_display }}</div>
+			<div class="exec-bill-lbl">Paid</div>
+		</div>
+		<div class="exec-bill-box">
+			<div class="exec-bill-val is-amber">{{ project.bills_pending_display }}</div>
+			<div class="exec-bill-lbl">Pending</div>
+		</div>
+	</div>
+
+	<table class="exec-table">
+		<thead>
+			<tr>
+				<th>Invoice #</th>
+				<th>Vendor</th>
+				<th>Description</th>
+				<th>Cost Code</th>
+				<th>QB Account</th>
+				<th class="is-right">Amount</th>
+				<th>Date</th>
+				<th>Branch Paid From</th>
+				<th>Status</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for bill in project.bills %}
+				<tr class="{% if bill.status == 'paid' %}is-paid{% endif %}">
+					<td>
+						{% if bill.invoice_id == "—" %}
+							<span class="exec-mute">—</span>
+						{% else %}
+							<span class="exec-invoice-id">{{ bill.invoice_id }}</span>
+						{% endif %}
+					</td>
+					<td class="is-medium">
+						{% if bill.vendor %}
+							{{ bill.vendor }}
+						{% else %}
+							<span class="exec-mute">—</span>
+						{% endif %}
+					</td>
+					<td class="is-small">{{ bill.description }}</td>
+					<td><span class="exec-cost-code">{{ bill.cost_code }}</span></td>
+					<td class="is-small">{{ bill.qb_account }}</td>
+					<td class="is-right is-mono">{{ bill.amount_display }}</td>
+					<td>
+						{% if bill.date %}
+							{{ bill.date }}
+						{% else %}
+							<span class="exec-mute">-</span>
+						{% endif %}
+					</td>
+					<td><span class="exec-branch-tag {{ bill.branch_class }}">{{ bill.branch }}</span></td>
+					<td><span class="exec-bill-status {{ bill.status }}">{{ bill.status_label }}</span></td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+{% else %}
+	<div class="exec-empty">No invoices recorded yet for this job.</div>
+{% endif %}

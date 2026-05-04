@@ -148,10 +148,57 @@ ACCOUNT_ALIASES = {
     "Framing of Home":            ["Contractor Labor"],
     "Roofing":                    ["Contractor Labor"],
     "Metal Walls":                ["Contractor Labor"],
+    "Concrete":                   ["Contractor Labor"],
     # Close-out accounts → Permits & General
     "Final Cleaning":             ["Permits & General"],
     "Contract Allowance Expense": ["Permits & General"],
     "Waste Removal":              ["Permits & General"],
+}
+
+
+# ─────────────────────────────────────────────────────────────
+# 4. LINE_TITLE_TO_TRADE — wizard PM-budget line title → trade bucket
+# ─────────────────────────────────────────────────────────────
+# Server mirror of buildwizard.js TITLE_TO_TRADE, extended to cover all
+# 29 line titles emitted by buildPMBudgetRows(). Used by save_contract_view
+# to roll JobBudgetLineItem rows up into JobTradeBudget. Wizard JS copy
+# must be kept in lockstep.
+LINE_TITLE_TO_TRADE = {
+    # Concrete + exterior labor → Contractor Labor
+    "Concrete":                                "Contractor Labor",
+    "Framing":                                 "Contractor Labor",
+    "Sheathing on Roof":                       "Contractor Labor",
+    "Roof":                                    "Contractor Labor",
+    "Metal Install":                           "Contractor Labor",
+    "Rock":                                    "Contractor Labor",
+    "Door and Window Install":                 "Contractor Labor",
+    "Cupola":                                  "Contractor Labor",
+    "Decks/Porch":                             "Contractor Labor",
+    "Shop/Detached Garage — Material":           "Contractor Labor",
+    "Shop/Detached Garage — Concrete & Labor":   "Contractor Labor",
+    # Mechanical
+    "Electrical":                              "Electrical",
+    "Plumbing Installation":                   "Plumbing",
+    "HVAC":                                    "HVAC",
+    "Insulation":                              "Insulation",
+    # Interior finish
+    "Drywall Material":                        "Drywall",
+    "Drywall Installation":                    "Drywall",
+    "Painting":                                "Paint",
+    "Cabinets":                                "Cabinets",
+    "Countertops":                             "Countertops",
+    "Flooring Materials":                      "Flooring",
+    "Flooring Installation":                   "Flooring",
+    "Tile":                                    "Flooring",
+    "Trim and Door Materials":                 "Trim & Doors",
+    "Trim and Door Installation":              "Trim & Doors",
+    "Plumbing & Light Fixtures":               "Light Fixtures",
+    "Fireplace":                               "Fireplaces",
+    # Close-out
+    "Permits":                                 "Permits & General",
+    "Final Clean":                             "Permits & General",
+    "Contract Allowance Expense":              "Permits & General",
+    "Dumpster Allowance":                      "Permits & General",
 }
 
 

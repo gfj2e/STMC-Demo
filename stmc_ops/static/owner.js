@@ -22,6 +22,7 @@ function switchTab(btn, tab, options) {
   if (target) target.style.display = '';
   if (btn) btn.classList.add('active');
   setOwnerSearchVisibility(tab);
+  placeOwnerSearchWrap(tab);
   placeOwnerViewToggle(tab);
 
   if (shouldRefresh) {
@@ -73,6 +74,35 @@ function placeOwnerViewToggle(tab) {
   // Keep a single toggle instance in the DOM and move it right under
   // the current panel's anchor (above the section header).
   anchor.insertAdjacentElement('afterend', toggle);
+}
+
+function parkOwnerSearchWrap() {
+  const wrap = document.getElementById('job-search-wrap');
+  const home = document.getElementById('owner-search-wrap-home');
+  if (!wrap || !home) return;
+  if (wrap.parentNode !== home) {
+    home.appendChild(wrap);
+  }
+}
+
+function placeOwnerSearchWrap(tab) {
+  const wrap = document.getElementById('job-search-wrap');
+  if (!wrap) return;
+
+  const activeTab = tab || _ownerActiveTab();
+  const anchorId = activeTab === 'projects-closed'
+    ? 'owner-closed-search-anchor'
+    : 'owner-dashboard-search-anchor';
+  const anchor = document.getElementById(anchorId);
+  if (!anchor || !anchor.parentNode) {
+    parkOwnerSearchWrap();
+    return;
+  }
+
+  // Single search/filter instance — reposition beneath the active tab's
+  // anchor so it sits under the QB status on Active Contracts and at
+  // the top of the Closed Contracts panel.
+  anchor.insertAdjacentElement('afterend', wrap);
 }
 
 function bindTabNavigation() {
@@ -669,14 +699,19 @@ function bindOwnerFilterRefreshOnSwap() {
       // a row then expands the wrong sibling.
       _bindOwnerRowDetailRefs();
       applyOwnerFilters();
-      placeOwnerViewToggle('projects-closed');
+      // Reposition relative to the user's *current* tab — both panels
+      // load on init, and the search/toggle should follow the active
+      // tab regardless of which swap finished last.
+      placeOwnerSearchWrap();
+      placeOwnerViewToggle();
     }
     if (target.id === 'tab-dashboard-panel') {
       rebuildOwnerFilterOptions();
       bindOwnerFilters();
       _bindOwnerRowDetailRefs();
       applyOwnerFilters();
-      placeOwnerViewToggle('dashboard');
+      placeOwnerSearchWrap();
+      placeOwnerViewToggle();
     }
   });
 }
@@ -706,6 +741,7 @@ function init() {
   initAuthHeader();
   initExecDashboard();
   setOwnerSearchVisibility('dashboard');
+  placeOwnerSearchWrap('dashboard');
   placeOwnerViewToggle('dashboard');
 }
 

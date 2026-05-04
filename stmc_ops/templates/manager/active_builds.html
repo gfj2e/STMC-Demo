@@ -19,6 +19,7 @@
 										<p class="proj-sub">{{ project.subtitle }}</p>
 									</div>
 									<div style="display:flex;align-items:center;gap:8px">
+										<span class="pill {{ project.budget_health_pill_class }}" title="Budget utilization: {{ project.budget_health_pct }}%">{{ project.budget_health_label }}</span>
 										{% if project.change_order_count %}
 											<span class="pill pill-warning" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO x{{ project.change_order_count }}</span>
 										{% endif %}
@@ -41,11 +42,11 @@
 
 							<div class="proj-body">
 								<div class="exec-tabs" data-exec-tabs="card-{{ project.id }}">
-									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="card-{{ project.id }}">Draws</button>
-									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="card-{{ project.id }}">Budget</button>
+									<button class="exec-tab is-active" type="button" data-job-tab="budget" data-job-id="card-{{ project.id }}">Budget vs Actual</button>
+									<button class="exec-tab" type="button" data-job-tab="draws" data-job-id="card-{{ project.id }}">Draws</button>
 								</div>
 
-								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="card-{{ project.id }}">
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="card-{{ project.id }}" hidden>
 									{% for draw in project.timeline_draws %}
 										<div class="ph">
 											<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
@@ -66,7 +67,11 @@
 										<div class="co-section-hdr">
 											<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
 											<div style="display:flex;gap:6px;align-items:center">
-												<a class="budget-print-btn" href="{% url 'manager_budget_print' project.id %}" target="_blank" rel="noopener" title="Open a printable PM budget for this job">Print PM Budget</a>
+												<button type="button" class="budget-print-btn"
+        hx-get="{% url 'manager_pdf_picker_modal' %}?job_id={{ project.id }}"
+        hx-target="#manager-modal-host"
+        hx-swap="innerHTML"
+        title="Download PM-side PDFs for this contract">Download PDFs</button>
 												{% if project.loan_closed %}
 													<button
 														type="button"
@@ -154,7 +159,7 @@
 									</div>
 								</div>
 
-								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="card-{{ project.id }}" hidden>
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="card-{{ project.id }}">
 									{% include "manager/_budget_panel.html" with project=project %}
 								</div>
 							</div>
@@ -178,6 +183,7 @@
 					<th>Order #</th>
 					<th>Branch</th>
 					<th>Phase / Draw</th>
+					<th>Budget Health</th>
 					<th class="num">Contract</th>
 					<th class="num">Collected</th>
 					<th class="num">Progress</th>
@@ -216,6 +222,7 @@
 								<span class="pill pill-warning" style="margin-left:4px;" title="{{ project.change_order_count }} change order{{ project.change_order_count|pluralize }}">CO x{{ project.change_order_count }}</span>
 							{% endif %}
 						</td>
+						<td><span class="pill {{ project.budget_health_pill_class }}" title="Budget utilization: {{ project.budget_health_pct }}%">{{ project.budget_health_label }}</span></td>
 						<td class="num">{{ project.total_display }}</td>
 						<td class="num" style="color:var(--green);">{{ project.paid_display }}</td>
 						<td class="num">{{ project.pct }}%</td>
@@ -224,7 +231,7 @@
 
 					{# Detail row — same content as the card view (draws + change orders). #}
 					<tr class="job-table-detail" hidden>
-						<td colspan="9">
+						<td colspan="10">
 							<div class="job-detail-card">
 								<div class="proj-hdr-top" style="margin-bottom:10px;">
 									<div>
@@ -249,11 +256,11 @@
 								<div style="height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;background:var(--green);border-radius:2px;width:{{ project.pct }}%"></div></div>
 
 								<div class="exec-tabs" data-exec-tabs="row-{{ project.id }}">
-									<button class="exec-tab is-active" type="button" data-job-tab="draws" data-job-id="row-{{ project.id }}">Draws</button>
-									<button class="exec-tab" type="button" data-job-tab="budget" data-job-id="row-{{ project.id }}">Budget</button>
+									<button class="exec-tab is-active" type="button" data-job-tab="budget" data-job-id="row-{{ project.id }}">Budget vs Actual</button>
+									<button class="exec-tab" type="button" data-job-tab="draws" data-job-id="row-{{ project.id }}">Draws</button>
 								</div>
 
-								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="row-{{ project.id }}">
+								<div class="exec-tab-panel" data-job-panel="draws" data-job-id="row-{{ project.id }}" hidden>
 									{% for draw in project.timeline_draws %}
 										<div class="ph">
 											<div class="pd {{ draw.dot_class }}">{{ draw.icon }}</div>
@@ -274,7 +281,11 @@
 										<div class="co-section-hdr">
 											<span class="co-section-title">Change Orders {% if project.change_order_count %}<span class="co-section-count">({{ project.change_order_count }})</span>{% endif %}</span>
 											<div style="display:flex;gap:6px;align-items:center">
-												<a class="budget-print-btn" href="{% url 'manager_budget_print' project.id %}" target="_blank" rel="noopener" title="Open a printable PM budget for this job">Print PM Budget</a>
+												<button type="button" class="budget-print-btn"
+        hx-get="{% url 'manager_pdf_picker_modal' %}?job_id={{ project.id }}"
+        hx-target="#manager-modal-host"
+        hx-swap="innerHTML"
+        title="Download PM-side PDFs for this contract">Download PDFs</button>
 												{% if project.loan_closed %}
 													<button
 														type="button"
@@ -362,7 +373,7 @@
 									</div>
 								</div>
 
-								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="row-{{ project.id }}" hidden>
+								<div class="exec-tab-panel" data-job-panel="budget" data-job-id="row-{{ project.id }}">
 									{% include "manager/_budget_panel.html" with project=project %}
 								</div>
 							</div>
