@@ -1557,3 +1557,9 @@ body.view-mode-table .table-view { display: block; }
     width: 90px;
   }
 }
+
+.motto-nav {
+    max-height: 45px;
+    width: 6%;
+    display: block;
+}

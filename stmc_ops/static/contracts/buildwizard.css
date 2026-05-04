@@ -467,3 +467,9 @@ body{min-height:100vh;padding-bottom:80px}
 @media (max-width: 640px){
   .hdr-status { top: 4px; right: 8px; font-size: 9px; padding: 3px 8px; }
 }
+
+.motto-nav {
+    max-height: 45px;
+    width: 6%;
+    display: block;
+}

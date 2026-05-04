@@ -1162,3 +1162,9 @@ body.view-mode-table .table-view { display: block; }
 .job-table .muted { color: var(--g500); }
 .job-table a { color: var(--red); text-decoration: none; font-weight: 600; }
 .job-table a:hover { text-decoration: underline; }
+
+.motto-nav {
+    max-height: 45px;
+    width: 6%;
+    display: block;
+}

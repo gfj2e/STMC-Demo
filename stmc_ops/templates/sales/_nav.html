@@ -1,5 +1,6 @@
 {% load static %}
 <nav class="app-nav" id="mv-tab-nav" aria-label="Sales Navigation">
+  <img class="motto-nav" src="{% static 'images/motto.png' %}" alt="Summertown Metals motto">
   <div class="nav-tabs" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_turnkey' or request.resolver_match.url_name == 'sales_turnkey_edit' %}active{% endif %}" data-mv-tab="new-contract" href="{% url 'sales_turnkey' %}">New Contract</a>
     <a class="app-nav-link {% if request.resolver_match.url_name == 'sales_new_lead' or request.resolver_match.url_name == 'sales_edit_lead' %}active{% endif %}" data-mv-tab="leads" href="{% url 'sales_overview' %}?tab=leads">Leads</a>

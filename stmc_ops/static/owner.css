@@ -2117,3 +2117,8 @@ body.view-mode-table .table-view { display: block; }
   transform: translateX(-50%) translateY(0);
 }
 
+.motto-nav {
+    max-height: 45px;
+    width: 6%;
+    display: block;
+}
