@@ -5,3 +5,4 @@ python-quickbooks>=0.9.12
 python-dotenv>=1.0.0
 gunicorn
 psycopg[binary]>=3.1
+whitenoise>=6.6
