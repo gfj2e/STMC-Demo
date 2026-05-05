@@ -1668,6 +1668,7 @@ def _mark_draw_complete(job_id, draw_number):
     return today, event
 
 
+@role_required(AppUser.ROLE_PM)
 @login_required
 @require_POST
 @csrf_protect

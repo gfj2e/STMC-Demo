@@ -3008,12 +3008,17 @@ function renderStep5(){
 
   // ── PDF VIEWER (top) ──────────────────────────────
   if(pdfFile){
+    // Resolve through the Django-served URL (sales_floor_plan_pdf) so the
+    // PDF streams from BASE_DIR/pdf-plans/, not a phantom relative `pdfs/`
+    // path next to the page (which 404s / refuses to connect).
+    var pdfUrl = (window.SALES_FLOOR_PLAN_PDF_URL_TMPL || 'pdfs/__FILENAME__')
+                   .replace('__FILENAME__', encodeURIComponent(pdfFile));
     h += '<div class="card">';
     h +=   '<div class="section-hdr"><span>Floor Plan — '+esc(m)+'</span>';
-    h +=     '<button class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff" onclick="window.open(\'pdfs/'+esc(pdfFile)+'\',\'_blank\')">Open in New Window ↗</button>';
+    h +=     '<button class="badge" style="cursor:pointer;border:none;background:rgba(255,255,255,.22);color:#fff" onclick="window.open(\''+pdfUrl+'\',\'_blank\')">Open in New Window ↗</button>';
     h +=   '</div>';
-    h +=   '<iframe src="pdfs/'+esc(pdfFile)+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
-    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, confirm a <code>pdfs/</code> folder sits alongside this HTML file containing <code>'+esc(pdfFile)+'</code>.</div>';
+    h +=   '<iframe src="'+pdfUrl+'" style="width:100%;height:75vh;border:none;display:block;background:var(--g100)"></iframe>';
+    h +=   '<div style="padding:8px 14px;font-size:11px;color:var(--g500);background:var(--g50);border-top:1px solid var(--g200)">If the PDF doesn\'t display, confirm <code>'+esc(pdfFile)+'</code> exists in the project\'s <code>pdf-plans/</code> folder.</div>';
     h += '</div>';
   }
 

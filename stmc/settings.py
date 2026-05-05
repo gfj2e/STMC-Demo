@@ -29,12 +29,12 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-%j9%q0bd!*_mjb4iv6t787mu%s9%(@te$%qt&$xshjey4s!@2&'
+SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(',')
 
 
 # Application definition
@@ -92,6 +92,19 @@ DATABASES = {
     }
 }
 
+_DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+if _DATABASE_URL:
+    from urllib.parse import urlparse, unquote
+    _u = urlparse(_DATABASE_URL)
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': (_u.path or '/').lstrip('/'),
+        'USER': unquote(_u.username or ''),
+        'PASSWORD': unquote(_u.password or ''),
+        'HOST': _u.hostname or '',
+        'PORT': str(_u.port or ''),
+        'CONN_MAX_AGE': 60,
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -129,14 +142,20 @@ SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours
 
 CSRF_COOKIE_HTTPONLY = False  # JS (HTMX) needs to read token for header fallback
 CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(',')
 
 # Only force HTTPS-only cookies in production (DEBUG=False). Dev runs over HTTP.
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_HSTS_SECONDS=True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+SECURE_SSL_REDIRECT=True
+SECURE_HSTS_PRELOAD=True
 
 # Login throttle (used by stmc_ops.views.login_submit_view)
 LOGIN_MAX_ATTEMPTS = 5
