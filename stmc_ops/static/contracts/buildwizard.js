@@ -537,6 +537,7 @@ var INT_RC = {
   paintExtDoor:   {rate:300,    unit:"flat",  driver:"flat",         label:"Exterior Door Paint"},
   trimMat:        {rate:3.96,   unit:"/LF",   driver:"trimLF",       label:"Trim Material"},
   doorMat:        {rate:150,    unit:"/door", driver:"doors",        label:"Interior Doors (prehung)"},
+  closetRod:      {rate:75,     unit:"/closet", driver:"closetQty",  label:"Closet Rod & Shelf (per closet)"},
   lightBase:      {rate:800,    unit:"flat",  driver:"flat",         label:"Light Fixtures — Base"},
   lightBath:      {rate:600,    unit:"/bath", driver:"bathCount",    label:"Light Fixtures — Per Bath"},
   plumbFixBase:   {rate:900,    unit:"flat",  driver:"flat",         label:"Plumb Fixtures — Base (WH + kitchen)"},
@@ -562,7 +563,7 @@ var INT_TRADE_GROUPS = [
   {key:"flooring",        name:"Flooring",             rates:["floorMat","floorLab"]},
   {key:"drywall",         name:"Drywall",              rates:["drywallMat","drywallLab"]},
   {key:"paint",           name:"Paint",                rates:["paint","paintExtDoor"]},
-  {key:"trim",            name:"Trim & Doors",         rates:["trimMat","doorMat","trimDoorLab"]},
+  {key:"trim",            name:"Trim & Doors",         rates:["trimMat","doorMat","trimDoorLab","closetRod"]},
   {key:"electrical",      name:"Electrical",           rates:["electrical"]},
   {key:"plumbing",        name:"Plumbing",             rates:["plumbFixBase","plumbFixBath","plumbingLab"]},
   {key:"insulation",      name:"Insulation",           rates:["insulation","insulGarage"]},
@@ -2864,6 +2865,29 @@ function computeCadCharges(S){
     charges.push({label:APPLIANCE_LABELS[S.int.applianceConfig] || "Appliance upgrade", cost: appCost, trade:"cabinets"});
   }
 
+  // Closet Rod & Shelf (per closet) — customer-facing $150/closet
+  // Standard closet count = auto-estimate from Living SF (matches initInteriorState's autoBeds)
+  var living = (S.int.livingSFOverride > 0) ? pn(S.int.livingSFOverride) : livSF(S.ext);
+  var stdClosets = isCustom ? 0 : (living >= 2400 ? 4 : (living >= 1600 ? 3 : 2));
+  var modClosets = pi(S.int.closetQty);
+  if(isCustom){
+    if(modClosets > 0){
+      charges.push({label:"Closet Rod & Shelf — "+modClosets+" × $150", cost: modClosets * 150, trade:"trim"});
+    }
+  } else {
+    var deltaClosets = modClosets - stdClosets;
+    if(deltaClosets > 0){
+      charges.push({label:"Added Closets — "+deltaClosets+" × $150", cost: deltaClosets * 150, trade:"trim"});
+    }
+  }
+
+  // Laundry Sink — flat $300 if present (customer-facing markup over plumbing fixture baseline)
+  // Treated as upgrade in both preset and custom modes since standard floor plans typically omit
+  var laundrySinkQty = pi(S.int.laundrySink);
+  if(laundrySinkQty > 0){
+    charges.push({label:"Laundry Sink", cost: 300, trade:"plumbing"});
+  }
+
   return charges;
 }
 
@@ -2881,6 +2905,7 @@ function calcIntTradeBase(tg, S){
     drywallSF: pn(I.drywallSF),
     trimLF: pn(I.trimLF),
     doors: pn(I.doors),
+    closetQty: pi(I.closetQty),
     bathCount: pi(I.fullBaths) + pi(I.halfBaths),
     fixtures: pn(I.fixtures) + getSelectionFixturePoints(S),
     hvacTons: pn(I.hvacTons),
@@ -3250,15 +3275,16 @@ function stepIntMetric(path, delta){
   // delta) before baths cascade so the intent survives. Without this, a sales
   // rep who sets fixtures to 11 and then later changes bath count loses their
   // custom value silently.
-  var priorAutoFp = pi(STATE.int.fullBaths)*2 + pi(STATE.int.halfBaths)*2 + 4;
-  var priorManualDelta = (key === "fullBaths" || key === "halfBaths") ? (pi(STATE.int.fixtures) - priorAutoFp) : 0;
+  // EXTENDED: laundrySink now also drives the auto fixture count.
+  var priorAutoFp = pi(STATE.int.fullBaths)*2 + pi(STATE.int.halfBaths)*2 + 4 + pi(STATE.int.laundrySink);
+  var priorManualDelta = (key === "fullBaths" || key === "halfBaths" || key === "laundrySink") ? (pi(STATE.int.fixtures) - priorAutoFp) : 0;
 
   STATE.int[key] = Math.max(0, cur + delta);
   // Cap laundry sink at 1 (it's either present or not)
   if(key === "laundrySink" && STATE.int[key] > 1) STATE.int[key] = 1;
-  // Cascade: full/half baths → fixture points (preserving manual delta if any)
-  if(key === "fullBaths" || key === "halfBaths"){
-    var newAutoFp = STATE.int.fullBaths * 2 + STATE.int.halfBaths * 2 + 4;
+  // Cascade: full/half baths or laundry sink → fixture points (preserving manual delta if any)
+  if(key === "fullBaths" || key === "halfBaths" || key === "laundrySink"){
+    var newAutoFp = STATE.int.fullBaths * 2 + STATE.int.halfBaths * 2 + 4 + pi(STATE.int.laundrySink);
     STATE.int.fixtures = Math.max(0, newAutoFp + priorManualDelta);
   }
   applyIntMetrics();
@@ -7583,8 +7609,40 @@ function buildQBLineItems(){
     });
   }
 
-  // 4. Exterior Labor
-  if(pn(S.laborBudget) > 0){
+  // 4. Exterior Labor — broken out by trade per EXT_LABOR_SECTIONS so backend
+  //    Budget vs Actual shows individual contractor labor budget lines instead
+  //    of one lumped "Contractor Labor" entry.
+  //    BT/QB mapping mirrors the contractor calculator (Step 9 PM Budget).
+  var EXT_LABOR_QB_MAP = {
+    framing:         { btCode: "Whole House Framing", qbAccount: "Framing of Home", label: "Framing Subtotal" },
+    sheathingOnRoof: { btCode: "Roofing",             qbAccount: "Roofing",         label: "Sheathing Subtotal" },
+    roof:            { btCode: "Roofing",             qbAccount: "Roofing",         label: "Roof Subtotal" },
+    walls:           { btCode: "Siding",              qbAccount: "Metal Walls",     label: "Walls Subtotal" },
+    stone:           { btCode: "Siding",              qbAccount: "Metal Walls",     label: "Stone Subtotal" },
+    doorsWindows:    { btCode: "Whole House Framing", qbAccount: "Framing of Home", label: "D&W Subtotal" },
+    cupola:          { btCode: "Whole House Framing", qbAccount: "Framing of Home", label: "Cupola Subtotal" },
+    decksPorch:      { btCode: "Whole House Framing", qbAccount: "Framing of Home", label: "Decks/Porch Subtotal" }
+  };
+  var extTotals = S.extLaborTotals || {};
+  var extBrokenOut = false;
+  Object.keys(EXT_LABOR_QB_MAP).forEach(function(key){
+    var amt = pn(extTotals[key]);
+    if(amt <= 0) return;
+    extBrokenOut = true;
+    var map = EXT_LABOR_QB_MAP[key];
+    lines.push({
+      description: "Contractor Labor — " + map.label,
+      amount: amt,
+      accountRef: map.qbAccount,
+      btCode: map.btCode,
+      category: "shell",
+      drawNumber: 3
+    });
+  });
+  // Legacy fallback: if no per-section totals exist but there's a lump-sum
+  // laborBudget (older saved contracts), still send a single line so existing
+  // contracts don't break.
+  if(!extBrokenOut && pn(S.laborBudget) > 0){
     var qbLabor = qbForOther("Customer Labor (preset)");
     lines.push({
       description: "Exterior Labor Budget",
@@ -7920,6 +7978,7 @@ function buildPMBudgetRows(){
     var drivers = {
       livingSF: livSF(), garSF: garSF(), cabLF: pn(I.cabLF), counterSF: pn(I.counterSF),
       drywallSF: pn(I.drywallSF), trimLF: pn(I.trimLF), doors: pn(I.doors),
+      closetQty: pi(I.closetQty),
       bathCount: pi(I.fullBaths)+pi(I.halfBaths), fixtures: pn(I.fixtures)+getSelectionFixturePoints(S),
       hvacTons: pn(I.hvacTons), flat: 1
     };
@@ -7965,7 +8024,7 @@ function buildPMBudgetRows(){
   add("Flooring Materials",    rateCost("floorMat"), "Flooring", "Flooring", 5);
   add("Flooring Installation", rateCost("floorLab") + (upgradesByTrade["flooring"]||0), "Flooring", "Flooring", 5);
   // Rows 17-18: Trim & Doors (Draw 5)
-  add("Trim and Door Materials",    rateCost("trimMat") + rateCost("doorMat"), "Interior Trim & Doors", "Interior Trim & Doors", 5);
+  add("Trim and Door Materials",    rateCost("trimMat") + rateCost("doorMat") + rateCost("closetRod"), "Interior Trim & Doors", "Interior Trim & Doors", 5);
   add("Trim and Door Installation", rateCost("trimDoorLab") + (upgradesByTrade["trim"]||0), "Interior Trim & Doors", "Interior Trim & Doors", 5);
   // Row 19: Fixtures (Draw 5)
   add("Plumbing & Light Fixtures", sumRates(["plumbFixBase","plumbFixBath","lightBase","lightBath"]), "Plumbing & Lighting Fixtures", "Plumbing & Lighting Fixtures", 5);

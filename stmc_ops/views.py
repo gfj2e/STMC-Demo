@@ -874,30 +874,6 @@ def _build_project_ui_rows(projects):
                         "status": "paid",
                         "status_label": _bill_status_label("paid"),
                     })
-                # Show a pending placeholder for lines with budget remaining
-                # and no bill yet.
-                ln_budget = int(ln.budgeted or 0)
-                ln_actual = int(ln.actual or 0)
-                remaining = max(0, ln_budget - ln_actual)
-                if remaining > 0 and not refs:
-                    pf = _resolve_bill_paid_from(
-                        "", "", branch_map, branch_label, status="pending",
-                    )
-                    bills.append({
-                        "invoice_id": "—",
-                        "vendor": "",
-                        "description": ln.title,
-                        "cost_code": ln.bt_code or ln.trade_bucket or "",
-                        "qb_account": ln.qb_account_name or ln.trade_bucket or "",
-                        "amount": remaining,
-                        "amount_display": _format_money(remaining),
-                        "date": "",
-                        "branch": pf["label"],
-                        "branch_class": pf["class"],
-                        "branch_tooltip": pf["tooltip"],
-                        "status": "pending",
-                        "status_label": _bill_status_label("pending"),
-                    })
         else:
             # Legacy fallback — JobTradeBudget-only bills (no line detail).
             for trade in trade_rows:
@@ -933,31 +909,9 @@ def _build_project_ui_rows(projects):
                             "status_label": _bill_status_label(actual_status),
                         }
                     )
-                elif remaining_budget > 0:
-                    pf = _resolve_bill_paid_from(
-                        "", "", branch_map, branch_label, status="pending",
-                    )
-                    bills.append(
-                        {
-                            "invoice_id": "—",
-                            "vendor": "",
-                            "description": f"{trade_name} budgeted remaining",
-                            "cost_code": trade["cost_code"],
-                            "qb_account": trade_name,
-                            "amount": remaining_budget,
-                            "amount_display": _format_money(remaining_budget),
-                            "date": "",
-                            "branch": pf["label"],
-                            "branch_class": pf["class"],
-                            "branch_tooltip": pf["tooltip"],
-                            "status": "pending",
-                            "status_label": _bill_status_label("pending"),
-                        }
-                    )
 
         bills_total = sum(row["amount"] for row in bills)
         bills_paid = sum(row["amount"] for row in bills if row["status"] == "paid")
-        bills_pending = sum(row["amount"] for row in bills if row["status"] != "paid")
 
         margin_pct = int(round(((total - total_bg) / total) * 100, 0)) if total > 0 and total_bg > 0 else 0
         margin_color = "var(--green)" if margin_pct >= 30 else ("var(--amber)" if margin_pct >= 15 else "#DC2626")
@@ -1052,7 +1006,6 @@ def _build_project_ui_rows(projects):
                 "bills_count": len(bills),
                 "bills_total_display": _format_money(bills_total),
                 "bills_paid_display": _format_money(bills_paid),
-                "bills_pending_display": _format_money(bills_pending),
                 "total_bg": total_bg,
                 "total_ac": total_ac,
                 "total_bg_display": _format_money(total_bg),
